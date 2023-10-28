@@ -1,0 +1,63 @@
+#*****************************************************
+# specify minimum version of CMake to use
+# (find_package requires 3.23)
+#*****************************************************
+cmake_minimum_required(VERSION 3.23)
+
+#*****************************************************
+project(SoftwareRenderer LANGUAGES CXX)
+#*****************************************************
+
+#*****************************************************
+# add source files
+#*****************************************************
+
+SET(APP_SRC_FILES_LIST
+    App/main.cpp
+    App/Common.h
+    App/Renderer.h
+    App/Renderer.cpp
+    App/Vector3f.h
+    App/Vector3f.cpp
+    App/Matrix4.h
+    App/Matrix4.cpp
+
+    imgui/imgui.h
+    imgui/imgui.cpp
+    imgui/imgui-SFML.h
+    imgui/imgui-SFML.cpp
+    imgui/imgui_draw.cpp
+    imgui/imgui_tables.cpp
+    imgui/imgui_widgets.cpp
+
+)
+
+#*****************************************************
+# Find SFML library (set proper path and run find_package)
+#*****************************************************
+
+SET(SFML_DIR "./Dependencies/SFML-2.6.0/lib/cmake/SFML" )
+set(SFML_STATIC_LIBRARIES TRUE)
+
+find_package(SFML 2.6.0 COMPONENTS graphics audio REQUIRED)
+
+
+include_directories(SoftwareRenderer "./imgui")
+
+#*****************************************************
+# generate app exe
+#*****************************************************
+
+ADD_EXECUTABLE(SoftwareRenderer ${APP_SRC_FILES_LIST} )
+
+#*****************************************************
+# Set language version to C++20
+#*****************************************************
+
+set_property(TARGET SoftwareRenderer PROPERTY CXX_STANDARD 20)
+
+#*****************************************************
+# Specify which SFML libraries to link with exe
+#*****************************************************
+
+target_link_libraries(SoftwareRenderer sfml-graphics sfml-audio)
