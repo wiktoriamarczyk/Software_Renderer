@@ -1,7 +1,7 @@
 #pragma once
 #include "Common.h"
 
-class Matrix4;
+class Matrix4f;
 
 class Vector3f
 {
@@ -15,9 +15,11 @@ public:
     Vector3f operator/(float value)const;
 
     float GetLength()const;
+    float Dot(const Vector3f& other)const;
     Vector3f& Normalize();
     Vector3f Normalized()const;
-    Vector3f Transformed(const Matrix4& m) const;
+    Vector3f Transformed(const Matrix4f& m) const;
+    Vector3f Cross(const Vector3f& other)const;
 
     float x = 0;
     float y = 0;

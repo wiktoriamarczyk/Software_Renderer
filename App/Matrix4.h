@@ -2,12 +2,12 @@
 #include "Common.h"
 #include "Vector3f.h"
 
-class Matrix4
+class Matrix4f
 {
 public:
-    constexpr Matrix4();
-    constexpr Matrix4(const Matrix4&)=default;
-    constexpr Matrix4(float m00, float m01, float m02, float m03,
+    constexpr Matrix4f();
+    constexpr Matrix4f(const Matrix4f&)=default;
+    constexpr Matrix4f(float m00, float m01, float m02, float m03,
                       float m10, float m11, float m12, float m13,
                       float m20, float m21, float m22, float m23,
                       float m30, float m31, float m32, float m33)
@@ -18,30 +18,33 @@ public:
     {
     }
 
-    static constexpr Matrix4 Identity();
+    static constexpr Matrix4f Identity();
 
-    Matrix4 operator*(const Matrix4& other) const;
-    Matrix4& operator*=(const Matrix4& other);
+    Matrix4f operator*(const Matrix4f& other) const;
+    Matrix4f& operator*=(const Matrix4f& other);
     float& operator[](int index);
     const float& operator[](int index)const;
 
+    static Matrix4f CreateProjectionMatrix(float fieldOfView, float aspectRatio, float near, float far);
+    static Matrix4f CreateLookAtMatrix(const Vector3f& eye, const Vector3f& target, const Vector3f& up);
+    static Matrix4f Translation(Vector3f other);
+    static Matrix4f Rotation(Vector3f other);
+    static Matrix4f Scale(Vector3f other);
 
-    static Matrix4 Translation(Vector3f other);
-    static Matrix4 Rotation(Vector3f other);
-    static Matrix4 Scale(Vector3f other);
+    Matrix4f Transposed()const;
 
     float m_Matrix[4][4] = {};   // matrix elements; first index is for rows, second for columns (row-major)
 
 };
 
-constexpr Matrix4::Matrix4()
-    : Matrix4(Identity())
+constexpr Matrix4f::Matrix4f()
+    : Matrix4f(Identity())
 {
 }
 
-constexpr Matrix4 Matrix4::Identity()
+constexpr Matrix4f Matrix4f::Identity()
 {
-    constexpr Matrix4 result(1, 0, 0, 0,
+    constexpr Matrix4f result(1, 0, 0, 0,
                    0, 1, 0, 0,
                    0, 0, 1, 0,
                    0, 0, 0, 1);

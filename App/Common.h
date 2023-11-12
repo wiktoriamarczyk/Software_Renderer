@@ -8,6 +8,6 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
-#include<numbers>
+#include <numbers>
 
 using namespace std;

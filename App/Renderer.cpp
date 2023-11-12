@@ -22,29 +22,41 @@ void SoftwareRenderer::UpdateUI()
     m_Color = COL;
 }
 
+Vector3f ProjToScreen(Vector3f v)
+{
+    Vector3f result = v;
+    result.x = (v.x + 1) * 400;
+    result.y = (v.y + 1) * 300;
+    return result;
+}
+
 void SoftwareRenderer::Render(const vector<Vector3f>& Vertices)
 {
-    auto mat = Matrix4::Identity();
+    auto mat = Matrix4f::Identity();
 
     // clear screen
     std::fill(m_ScreenBuffer.begin(), m_ScreenBuffer.end(), 0xFF000000);
 
-    for(int i=0; i<Vertices.size(); ++i)
-    {
-        int x = Vertices[i].x;
-        int y = Vertices[i].y;
-        m_ScreenBuffer[y*800+x] = m_Color;
-    }
+    //for(int i=0; i<Vertices.size(); ++i)
+    //{
+    //    int x = Vertices[i].x;
+    //    int y = Vertices[i].y;
+    //    m_ScreenBuffer[y*800+x] = m_Color;
+    //}
 
-    Matrix4 matTranslation = Matrix4::Translation(Vector3f(-400, -300, 0));
-    Matrix4 matScale = Matrix4::Scale(Vector3f(m_Scale, m_Scale, m_Scale));
-    Matrix4 matRotation = Matrix4::Rotation(Vector3f(0, 0, (m_Rotation / 180.f) * std::numbers::pi));
-    Matrix4 matTranslationReturn = Matrix4::Translation(Vector3f(400, 300, 0));
-    Matrix4 matWorld = matTranslation * matScale * matRotation * matTranslationReturn;
+    //Matrix4f matTranslation = Matrix4f::Translation(Vector3f(-400, -300, 0));
+    //Matrix4f matScale = Matrix4f::Scale(Vector3f(m_Scale, m_Scale, m_Scale));
+    //Matrix4f matRotation = Matrix4f::Rotation(Vector3f(0, 0, (m_Rotation / 180.f) * std::numbers::pi));
+    //Matrix4f matTranslationReturn = Matrix4f::Translation(Vector3f(400, 300, 0));
+    //Matrix4f matWorld = matTranslation * matScale * matRotation * matTranslationReturn;
 
-    for(int i=0; i<Vertices.size(); i += 3)
+    Matrix4f mvpMatrix = m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix;
+
+    //mvpMatrix = mvpMatrix.Transposed();
+
+    for(int i = 0; i < Vertices.size(); i += 3)
     {
-        DrawTriangle(Vertices[i].Transformed(matWorld), Vertices[i + 1].Transformed(matWorld), Vertices[i + 2].Transformed(matWorld));
+        DrawTriangle(ProjToScreen(Vertices[i].Transformed(mvpMatrix)), ProjToScreen(Vertices[i + 1].Transformed(mvpMatrix)), ProjToScreen(Vertices[i + 2].Transformed(mvpMatrix)));
     }
 }
 
@@ -116,4 +128,19 @@ void SoftwareRenderer::PutPixel(int x, int y)
         return;
     }
    m_ScreenBuffer[y*800+x] = m_Color;
+}
+
+void SoftwareRenderer::SetModelMatrixx(const Matrix4f& other)
+{
+    m_ModelMatrix = other;
+}
+
+void SoftwareRenderer::SetViewMatrix(const Matrix4f& other)
+{
+    m_ViewMatrix = other;
+}
+
+void SoftwareRenderer::SetProjectionMatrix(const Matrix4f& other)
+{
+    m_ProjectionMatrix = other;
 }

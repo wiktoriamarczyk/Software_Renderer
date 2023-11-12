@@ -1,9 +1,15 @@
 #include "Common.h"
 #include "Renderer.h"
 
+#include "teapot.h"
+
 
 int main()
 {
+    vector<Vector3f> TeapotData(teapot_count/3);
+
+    memcpy( TeapotData.data() , teapot , sizeof(teapot) );
+
     // create the window
     sf::RenderWindow window(sf::VideoMode(800, 600), "My window");
 
@@ -19,11 +25,24 @@ int main()
 
     sf::Clock deltaClock;
 
-    SoftwareRenderer Renderer(800, 600);
+    SoftwareRenderer renderer(800, 600);
 
-    vector<Vector3f> Data = { { 10  , 10  , 0  }
-                                , { 700 , 10  , 0 }
-                                , { 400 , 500 , 0 }};
+    vector<Vector3f> data = {{-1,  1, -1},
+                             { 1,  1, -1},
+                             { 1, -1, -1},
+
+                             { 1, -1, -1},
+                             {-1,  1, -1},
+                             {-1, -1, -1}};
+
+    Matrix4f cameraMatrix = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 1), Vector3f(0, 1, 0));
+    Matrix4f projectionMatrix = Matrix4f::CreateProjectionMatrix(90, 800.0f / 600.0f, 0.1f, 1000.0f);
+    Matrix4f modelMatrix = Matrix4f::Identity();
+    float rotation = 0;
+
+    //for (auto& p : data)
+    //    p.z += 5;
+
 
 
     // run the program as long as the window is open
@@ -40,18 +59,28 @@ int main()
                 window.close();
         }
 
+        ++rotation;
+        //modelMatrix = Matrix4f::Rotation(Vector3f(0, 0, (rotation / 180.f) * std::numbers::pi));
+
+        float angle = (rotation / 180.f) * std::numbers::pi;
+
+        modelMatrix = Matrix4f::Rotation(Vector3f(0, angle, angle));
+        renderer.SetModelMatrixx(modelMatrix);
+        renderer.SetViewMatrix(cameraMatrix);
+        renderer.SetProjectionMatrix(projectionMatrix);
+
         // update UI
         ImGui::SFML::Update(window, deltaClock.restart());
-        Renderer.UpdateUI();
+        renderer.UpdateUI();
 
         // render stuff to screen buffer
-        Renderer.Render( Data );
+        renderer.Render(TeapotData);
 
 
-        auto buf = Renderer.GetScreenBuffer();
+        auto buf = renderer.GetScreenBuffer();
 
               uint32_t* dst = (uint32_t*)buf.data();
-        const uint32_t* src = (uint32_t*)Renderer.GetScreenBuffer().data();
+        const uint32_t* src = (uint32_t*)renderer.GetScreenBuffer().data();
 
         for (int y = 0; y < 600; ++y)
         {
