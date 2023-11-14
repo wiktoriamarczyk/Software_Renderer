@@ -6,26 +6,26 @@
 
 int main()
 {
-    vector<Vector3f> TeapotData(teapot_count/3);
+    vector<Vector3f> teapotData(teapot_count / triangleVerticesCount);
 
-    memcpy( TeapotData.data() , teapot , sizeof(teapot) );
+    memcpy(teapotData.data(), teapot, sizeof(teapot));
 
     // create the window
-    sf::RenderWindow window(sf::VideoMode(800, 600), "My window");
+    sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer");
 
     window.setFramerateLimit(60);
 
     ImGui::SFML::Init(window);
 
     sf::Texture texture;
-    texture.create( 800, 600 );
+    texture.create(SCREEN_WIDTH, SCREEN_HEIGHT);
 
     sf::Sprite sprite;
     sprite.setTexture(texture);
 
     sf::Clock deltaClock;
 
-    SoftwareRenderer renderer(800, 600);
+    SoftwareRenderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT);
 
     vector<Vector3f> data = {{-1,  1, -1},
                              { 1,  1, -1},
@@ -36,14 +36,8 @@ int main()
                              {-1, -1, -1}};
 
     Matrix4f cameraMatrix = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 1), Vector3f(0, 1, 0));
-    Matrix4f projectionMatrix = Matrix4f::CreateProjectionMatrix(90, 800.0f / 600.0f, 0.1f, 1000.0f);
+    Matrix4f projectionMatrix = Matrix4f::CreateProjectionMatrix(90, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);
     Matrix4f modelMatrix = Matrix4f::Identity();
-    float rotation = 0;
-
-    //for (auto& p : data)
-    //    p.z += 5;
-
-
 
     // run the program as long as the window is open
     while (window.isOpen())
@@ -59,12 +53,13 @@ int main()
                 window.close();
         }
 
-        ++rotation;
-        //modelMatrix = Matrix4f::Rotation(Vector3f(0, 0, (rotation / 180.f) * std::numbers::pi));
+        float angleX = (renderer.GetRotation().x / 180.f * pi);
+        float angleY = (renderer.GetRotation().y / 180.f * pi);
+        float angleZ = (renderer.GetRotation().z / 180.f * pi);
+        float scale = renderer.GetScale();
 
-        float angle = (rotation / 180.f) * std::numbers::pi;
-
-        modelMatrix = Matrix4f::Rotation(Vector3f(0, angle, angle));
+        modelMatrix = Matrix4f::Rotation(Vector3f(angleX, angleY, angleZ)) * Matrix4f::Scale(Vector3f(scale, scale, scale));
+        
         renderer.SetModelMatrixx(modelMatrix);
         renderer.SetViewMatrix(cameraMatrix);
         renderer.SetProjectionMatrix(projectionMatrix);
@@ -74,7 +69,7 @@ int main()
         renderer.UpdateUI();
 
         // render stuff to screen buffer
-        renderer.Render(TeapotData);
+        renderer.Render(teapotData);
 
 
         auto buf = renderer.GetScreenBuffer();
@@ -82,9 +77,9 @@ int main()
               uint32_t* dst = (uint32_t*)buf.data();
         const uint32_t* src = (uint32_t*)renderer.GetScreenBuffer().data();
 
-        for (int y = 0; y < 600; ++y)
+        for (int y = 0; y < SCREEN_HEIGHT; ++y)
         {
-            memcpy(dst + y * 800, src + (599 - y) * 800, 800 * 4);
+            memcpy(dst + y * SCREEN_WIDTH, src + (SCREEN_HEIGHT - 1 - y) * SCREEN_WIDTH, SCREEN_WIDTH * 4);
         }
         // update texture
         texture.update((uint8_t*)dst);

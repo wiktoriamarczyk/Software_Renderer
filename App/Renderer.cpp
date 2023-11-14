@@ -1,19 +1,17 @@
 #include "Renderer.h"
 
-
 SoftwareRenderer::SoftwareRenderer(int ScreenWidth, int ScreenHeight)
 {
     m_ScreenBuffer.resize(ScreenWidth*ScreenHeight, 0);
 }
-
 
 void SoftwareRenderer::UpdateUI()
 {
     ImGui::Begin("Settings", &m_SettingsOpen);
     ImGui::ColorEdit4("Color", &m_ImColor.x);
 
-    ImGui::SliderFloat("Rotation", &m_Rotation, 0, 360);
-    ImGui::SliderFloat("Scale", &m_Scale, 0, 5);
+    ImGui::SliderFloat3("Rotation", &m_Rotation.x, 0, fullCircle);
+    ImGui::SliderFloat("Scale", &m_Scale, 0, maxScale);
 
     ImGui::End();
 
@@ -25,8 +23,8 @@ void SoftwareRenderer::UpdateUI()
 Vector3f ProjToScreen(Vector3f v)
 {
     Vector3f result = v;
-    result.x = (v.x + 1) * 400;
-    result.y = (v.y + 1) * 300;
+    result.x = (v.x + 1) * SCREEN_WIDTH / 2;
+    result.y = (v.y + 1) * SCREEN_HEIGHT / 2;
     return result;
 }
 
@@ -71,10 +69,6 @@ void SoftwareRenderer::DrawTriangle(const Vector3f& A, const Vector3f& B, const 
     DrawLine(A,B);
     DrawLine(C,B);
     DrawLine(C,A);
-
-    // Vector3f P1 = { 400, 300 ,0};
-    // Vector3f P2 = { mTestX ,mTestY ,0};
-    // DrawLine(P1, P2);
 }
 
 void SoftwareRenderer::DrawLine(const Vector3f& A, const Vector3f& B)
@@ -124,10 +118,10 @@ void SoftwareRenderer::DrawLine(const Vector3f& A, const Vector3f& B)
 
 void SoftwareRenderer::PutPixel(int x, int y)
 {
-    if (x >= 800 || x <= 0 || y >= 600 || y <= 0) {
+    if (x >= SCREEN_WIDTH || x <= 0 || y >= SCREEN_HEIGHT || y <= 0) {
         return;
     }
-   m_ScreenBuffer[y*800+x] = m_Color;
+   m_ScreenBuffer[y * SCREEN_WIDTH + x] = m_Color;
 }
 
 void SoftwareRenderer::SetModelMatrixx(const Matrix4f& other)
@@ -143,4 +137,14 @@ void SoftwareRenderer::SetViewMatrix(const Matrix4f& other)
 void SoftwareRenderer::SetProjectionMatrix(const Matrix4f& other)
 {
     m_ProjectionMatrix = other;
+}
+
+Vector3f SoftwareRenderer::GetRotation() const
+{
+    return m_Rotation;
+}
+
+float SoftwareRenderer::GetScale() const
+{
+    return m_Scale;
 }

@@ -10,4 +10,10 @@
 #include <cmath>
 #include <numbers>
 
+const int SCREEN_WIDTH = 800;
+const int SCREEN_HEIGHT = 600;
+const int fullCircle = 360;
+const float pi = std::numbers::pi;
+const int triangleVerticesCount = 3;
+
 using namespace std;
