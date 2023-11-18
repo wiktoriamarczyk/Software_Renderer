@@ -66,3 +66,13 @@ Vector3f Vector3f::Cross(const Vector3f& other)const
 {
     return Vector3f(y * other.z - z * other.y, z * other.x - x * other.z, x * other.y - y * other.x);
 }
+
+Vector3f Vector3f::CWiseMin(const Vector3f& other) const
+{
+    return Vector3f(std::min(x, other.x), std::min(y, other.y), std::min(z, other.z));
+}
+
+Vector3f Vector3f::CWiseMax(const Vector3f& other) const
+{
+    return Vector3f(std::max(x, other.x), std::max(y, other.y), std::max(z, other.z));
+}

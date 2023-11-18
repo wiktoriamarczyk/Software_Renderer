@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <chrono>
 
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;

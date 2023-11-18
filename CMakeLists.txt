@@ -21,6 +21,12 @@ SET(APP_SRC_FILES_LIST
     App/Vector3f.cpp
     App/Matrix4.h
     App/Matrix4.cpp
+	App/Vector2f.h
+	App/Vector2f.cpp
+	App/Vector4f.h
+	App/Vector4f.cpp
+	App/Line2D.h
+	App/Line2D.cpp
 
     imgui/imgui.h
     imgui/imgui.cpp

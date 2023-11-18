@@ -20,10 +20,11 @@ public:
     Vector3f Normalized()const;
     Vector3f Transformed(const Matrix4f& m) const;
     Vector3f Cross(const Vector3f& other)const;
+    Vector3f CWiseMin(const Vector3f& other)const;
+    Vector3f CWiseMax(const Vector3f& other)const;
 
     float x = 0;
     float y = 0;
     float z = 0;
-
 };
 

@@ -39,9 +39,16 @@ int main()
     Matrix4f projectionMatrix = Matrix4f::CreateProjectionMatrix(90, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);
     Matrix4f modelMatrix = Matrix4f::Identity();
 
+    auto lastFrameTime = std::chrono::high_resolution_clock::now();
+
     // run the program as long as the window is open
     while (window.isOpen())
     {
+        auto now = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastFrameTime).count();
+        int fps = duration ? 1000 / duration : 0;
+        lastFrameTime = now;
+
         // check all the window's events that were triggered since the last iteration of the loop
         sf::Event event;
         while (window.pollEvent(event))
@@ -59,7 +66,7 @@ int main()
         float scale = renderer.GetScale();
 
         modelMatrix = Matrix4f::Rotation(Vector3f(angleX, angleY, angleZ)) * Matrix4f::Scale(Vector3f(scale, scale, scale));
-        
+
         renderer.SetModelMatrixx(modelMatrix);
         renderer.SetViewMatrix(cameraMatrix);
         renderer.SetProjectionMatrix(projectionMatrix);
@@ -86,6 +93,12 @@ int main()
 
         // render texture to screen
         window.draw(sprite);
+
+        // display fps counter
+        ImGui::Begin("FPS", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs);
+        ImGui::SetWindowPos(ImVec2(0, 0));
+        ImGui::Text("FPS: %d", fps);
+        ImGui::End();
 
         // render UI on top
         ImGui::SFML::Render(window);
