@@ -3,12 +3,33 @@
 
 #include "teapot.h"
 
+vector<Vertex> GenerateTeapotVertices()
+{
+    int verticesCount = teapot_count / triangleVerticesCount;
+    vector<Vertex> teapotData(verticesCount);
+
+    // we should have normals in the teapot data, but they are missing, so we calculate them here in simplified way assuming that each vertex has the same normal
+    for (int i = 0; i < verticesCount; ++i)
+    {
+        teapotData[i].position = Vector3f(teapot[i * triangleVerticesCount + 0], teapot[i * triangleVerticesCount + 1], teapot[i * triangleVerticesCount + 2]);
+    }
+    for (int i = 0; i < verticesCount; i += 3)
+    {
+        Vector3f A = teapotData[i + 0].position;
+        Vector3f B = teapotData[i + 1].position;
+        Vector3f C = teapotData[i + 2].position;
+        Vector3f wholeTriangleNormal = (B - A).Cross(C - A).Normalized();
+        teapotData[i + 0].normal = wholeTriangleNormal;
+        teapotData[i + 1].normal = wholeTriangleNormal;
+        teapotData[i + 2].normal = wholeTriangleNormal;
+    }
+
+    return teapotData;
+}
 
 int main()
 {
-    vector<Vector3f> teapotData(teapot_count / triangleVerticesCount);
-
-    memcpy(teapotData.data(), teapot, sizeof(teapot));
+    vector<Vertex> teapotData = GenerateTeapotVertices();
 
     // create the window
     sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer");
@@ -26,14 +47,6 @@ int main()
     sf::Clock deltaClock;
 
     SoftwareRenderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT);
-
-    vector<Vector3f> data = {{-1,  1, -1},
-                             { 1,  1, -1},
-                             { 1, -1, -1},
-
-                             { 1, -1, -1},
-                             {-1,  1, -1},
-                             {-1, -1, -1}};
 
     Matrix4f cameraMatrix = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 1), Vector3f(0, 1, 0));
     Matrix4f projectionMatrix = Matrix4f::CreateProjectionMatrix(90, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);

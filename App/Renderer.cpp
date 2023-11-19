@@ -34,19 +34,27 @@ void SoftwareRenderer::UpdateUI()
 
     ImGui::SliderFloat3("Rotation", &m_Rotation.x, 0, fullCircle);
     ImGui::SliderFloat("Scale", &m_Scale, 0, maxScale);
+    ImGui::SliderFloat3("Light Position", &m_LightPosition.x, -20, 20);
 
     ImGui::End();
 }
 
-Vector3f ProjToScreen(Vector3f v)
+TransformedVertex ProjToScreen(Vertex v, Matrix4f worldMatrix, Matrix4f mvpMatrix)
 {
-    Vector3f result = v;
-    result.x = (v.x + 1) * SCREEN_WIDTH / 2;
-    result.y = (v.y + 1) * SCREEN_HEIGHT / 2;
+    TransformedVertex result;
+
+    result.worldPosition  = v.position.Transformed(worldMatrix);
+    result.normal         = v.normal.Transformed(worldMatrix).Normalized();
+
+
+    result.screenPosition = v.position.Transformed(mvpMatrix);
+    result.screenPosition.x = (result.screenPosition.x + 1) * SCREEN_WIDTH / 2;
+    result.screenPosition.y = (result.screenPosition.y + 1) * SCREEN_HEIGHT / 2;
+
     return result;
 }
 
-void SoftwareRenderer::Render(const vector<Vector3f>& Vertices)
+void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 {
     auto mat = Matrix4f::Identity();
 
@@ -55,9 +63,12 @@ void SoftwareRenderer::Render(const vector<Vector3f>& Vertices)
 
     Matrix4f mvpMatrix = m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix;
 
-    for(int i = 0; i < Vertices.size(); i += triangleVerticesCount)
+    for(int i = 0; i < vertices.size(); i += triangleVerticesCount)
     {
-        DrawFilledTriangle(ProjToScreen(Vertices[i].Transformed(mvpMatrix)), ProjToScreen(Vertices[i + 1].Transformed(mvpMatrix)), ProjToScreen(Vertices[i + 2].Transformed(mvpMatrix)), m_Color);
+        TransformedVertex transformedA = ProjToScreen(vertices[i+0], m_ModelMatrix, mvpMatrix);
+        TransformedVertex transformedB = ProjToScreen(vertices[i+1], m_ModelMatrix, mvpMatrix);
+        TransformedVertex transformedC = ProjToScreen(vertices[i+2], m_ModelMatrix, mvpMatrix);
+        DrawFilledTriangle(transformedA, transformedB, transformedC, m_Color);
     }
 }
 
@@ -66,10 +77,14 @@ const vector<uint32_t>& SoftwareRenderer::GetScreenBuffer()const
     return m_ScreenBuffer;
 }
 
-void SoftwareRenderer::DrawFilledTriangle(const Vector3f& A, const Vector3f& B, const Vector3f& C, const Vector4f& color)
+void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color)
 {
     // filling algorithm is working that way that we are going through all pixels in rectangle that is created by min and max points
     // and we are checking if pixel is inside triangle by using three lines and checking if pixel is on the same side of each line
+
+    Vector2f A = VA.screenPosition;
+    Vector2f B = VB.screenPosition;
+    Vector2f C = VC.screenPosition;
 
     //            max
     //    -------B
@@ -83,12 +98,12 @@ void SoftwareRenderer::DrawFilledTriangle(const Vector3f& A, const Vector3f& B, 
     // min
 
     // min and max points of rectangle
-    Vector3f min = A.CWiseMin(B).CWiseMin(C);
-    Vector3f max = A.CWiseMax(B).CWiseMax(C);
+    Vector2f min = A.CWiseMin(B).CWiseMin(C);
+    Vector2f max = A.CWiseMax(B).CWiseMax(C);
 
     // clamp min and max points to screen size so we don't calculate points that we don't see
-    min = min.CWiseMin(Vector3f(SCREEN_WIDTH, SCREEN_HEIGHT, 0)).CWiseMax(Vector3f(0, 0, 0));
-    max = max.CWiseMin(Vector3f(SCREEN_WIDTH, SCREEN_HEIGHT, 0)).CWiseMax(Vector3f(0, 0, 0));
+    min = min.CWiseMin(Vector2f(SCREEN_WIDTH, SCREEN_HEIGHT)).CWiseMax(Vector2f(0, 0));
+    max = max.CWiseMin(Vector2f(SCREEN_WIDTH, SCREEN_HEIGHT)).CWiseMax(Vector2f(0, 0));
 
     int maxX = max.x;
     int maxY = max.y;
@@ -98,28 +113,38 @@ void SoftwareRenderer::DrawFilledTriangle(const Vector3f& A, const Vector3f& B, 
     Line2D lineBC (B, C);
     Line2D lineCA (C, A);
 
+
+    Vector3f pointToLightDir = (VA.worldPosition - m_LightPosition).Normalized();
+    float diffuseFactor = std::max(pointToLightDir.Dot(VA.normal), 0.0f);
+    Vector4f diffuseLight = color * diffuseFactor;
+    diffuseLight.w = 1.0f;
+    uint32_t finalColor = Vector4f::ToARGB(diffuseLight);
+
     for (int x = min.x; x <= maxX; ++x)
     {
         for (int y = min.y; y <= maxY; ++y)
         {
             if (IsPixelInsideTriangle(lineAB, lineBC, lineCA, Vector2f(x, y)))
             {
-                PutPixel(x, y, Vector4f::ToARGB(color));
+                PutPixel(x, y, finalColor);
             }
         }
     }
 }
 
-void SoftwareRenderer::DrawTriangle(const Vector3f& A, const Vector3f& B, const Vector3f& C, const Vector4f& color)
+void SoftwareRenderer::DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color)
 {
     DrawLine(A, B, color);
     DrawLine(C, B, color);
     DrawLine(C, A, color);
 }
 
-void SoftwareRenderer::DrawLine(const Vector3f& A, const Vector3f& B, const Vector4f& color)
+void SoftwareRenderer::DrawLine(const TransformedVertex& VA, const TransformedVertex& VB, const Vector4f& color)
 {
-    Vector3f dir = B - A;
+    Vector2f A = VA.screenPosition;
+    Vector2f B = VB.screenPosition;
+
+    Vector2f dir = B - A;
 
     // y = ax + b
     float a = (B.y - A.y) / (B.x - A.x);
