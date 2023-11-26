@@ -13,8 +13,8 @@
 
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
-const int fullCircle = 360;
-const float pi = std::numbers::pi;
-const int triangleVerticesCount = 3;
+const int FULL_ANGLE = 360;
+const float PI = std::numbers::pi;
+const int TRIANGLE_VERT_COUNT = 3;
 
 using namespace std;

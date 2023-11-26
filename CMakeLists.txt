@@ -49,6 +49,7 @@ find_package(SFML 2.6.0 COMPONENTS graphics audio REQUIRED)
 
 
 include_directories(SoftwareRenderer "./imgui")
+include_directories(SoftwareRenderer "./Dependencies/assimp/include")
 
 #*****************************************************
 # generate app exe
@@ -67,3 +68,4 @@ set_property(TARGET SoftwareRenderer PROPERTY CXX_STANDARD 20)
 #*****************************************************
 
 target_link_libraries(SoftwareRenderer sfml-graphics sfml-audio)
+target_link_libraries(SoftwareRenderer F:/repos/Git-C++/SoftwareRenderer/Dependencies/assimp/lib/assimp-vc143-mt.lib )

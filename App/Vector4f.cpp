@@ -1,5 +1,15 @@
 #include "Vector4f.h"
 #include "Matrix4.h"
+#include "Vector2f.h"
+#include "Vector3f.h"
+
+Vector4f::Vector4f(const Vector3f& v, float w)
+{
+    this->x = v.x;
+    this->y = v.y;
+    this->z = v.z;
+    this->w = w;
+}
 
 Vector4f::Vector4f(float x, float y, float z, float w)
 {
@@ -51,6 +61,15 @@ Vector4f Vector4f::Normalized()const
 }
 
 
+Vector4f Vector4f::Transformed(const Matrix4f& m) const
+{
+    return Vector4f(m[0] * x + m[4] * y + m[8] * z + m[12] * w,
+                    m[1] * x + m[5] * y + m[9] * z + m[13] * w,
+                    m[2] * x + m[6] * y + m[10] * z + m[14] * w,
+                    m[3] * x + m[7] * y + m[11] * z + m[15] * w);
+}
+
+
 float Vector4f::Dot(const Vector4f& other)const
 {
     return x * other.x + y * other.y + z * other.z + w * other.w;
@@ -65,6 +84,16 @@ Vector4f Vector4f::CWiseMin(const Vector4f& other) const
 Vector4f Vector4f::CWiseMax(const Vector4f& other) const
 {
     return Vector4f(std::max(x, other.x), std::max(y, other.y), std::max(z, other.z), std::max(w, other.w));
+}
+
+Vector3f Vector4f::xyz() const
+{
+    return Vector3f(x, y, z);
+}
+
+Vector2f Vector4f::xy() const
+{
+    return Vector2f(x, y);
 }
 
 uint32_t Vector4f::ToARGB(const Vector4f& color)

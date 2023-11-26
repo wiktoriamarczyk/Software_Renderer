@@ -2,11 +2,14 @@
 #include "Common.h"
 
 class Matrix4f;
+class Vector2f;
+class Vector3f;
 
 class Vector4f
 {
 public:
     Vector4f() = default;
+    Vector4f(const Vector3f& v,float w);
     Vector4f(float x, float y, float z, float w);
 
     Vector4f operator+(Vector4f other)const;
@@ -18,8 +21,12 @@ public:
     float Dot(const Vector4f& other)const;
     Vector4f& Normalize();
     Vector4f Normalized()const;
+    Vector4f Transformed(const Matrix4f& m) const;
     Vector4f CWiseMin(const Vector4f& other)const;
     Vector4f CWiseMax(const Vector4f& other)const;
+
+    Vector2f xy()const;
+    Vector3f xyz()const;
 
     static uint32_t ToARGB(const Vector4f& color);
     static Vector4f FromARGB(uint32_t color);

@@ -24,7 +24,8 @@ static bool IsPointInsideTheWindow(const Vector2f& point)
 
 SoftwareRenderer::SoftwareRenderer(int ScreenWidth, int ScreenHeight)
 {
-    m_ScreenBuffer.resize(ScreenWidth*ScreenHeight, 0);
+    m_ScreenBuffer.resize(ScreenWidth * ScreenHeight, 0);
+    m_ZBuffer.resize(ScreenWidth * ScreenHeight, 0);
 }
 
 void SoftwareRenderer::UpdateUI()
@@ -32,26 +33,34 @@ void SoftwareRenderer::UpdateUI()
     ImGui::Begin("Settings", &m_SettingsOpen);
     ImGui::ColorEdit4("Color", &m_Color.x);
 
-    ImGui::SliderFloat3("Rotation", &m_Rotation.x, 0, fullCircle);
+    ImGui::SliderFloat3("Rotation", &m_Rotation.x, 0, FULL_ANGLE);
+    //ImGui::SliderFloat3("Translation", &m_Translation.x, -5, 5);
     ImGui::SliderFloat("Scale", &m_Scale, 0, maxScale);
     ImGui::SliderFloat3("Light Position", &m_LightPosition.x, -20, 20);
 
     ImGui::End();
 }
 
+void SoftwareRenderer::ClearZBuffer()
+{
+    std::fill(m_ZBuffer.begin(), m_ZBuffer.end(), std::numeric_limits<float>::lowest());
+}
+
 TransformedVertex ProjToScreen(Vertex v, Matrix4f worldMatrix, Matrix4f mvpMatrix)
 {
-    TransformedVertex result;
+    static TransformedVertex aResult;
 
-    result.worldPosition  = v.position.Transformed(worldMatrix);
-    result.normal         = v.normal.Transformed(worldMatrix).Normalized();
+    aResult.worldPosition  = v.position.Transformed(worldMatrix);
+    aResult.normal         = v.normal.Transformed(worldMatrix).Normalized();
+    aResult.color          = v.color;
 
+    auto screenXYZ = Vector4f(v.position,1.0f).Transformed(mvpMatrix);
+    aResult.zValue         = screenXYZ.z;
+    aResult.screenPosition = screenXYZ.xy();
+    aResult.screenPosition.x = (aResult.screenPosition.x + 1) * SCREEN_WIDTH / 2;
+    aResult.screenPosition.y = (aResult.screenPosition.y + 1) * SCREEN_HEIGHT / 2;
 
-    result.screenPosition = v.position.Transformed(mvpMatrix);
-    result.screenPosition.x = (result.screenPosition.x + 1) * SCREEN_WIDTH / 2;
-    result.screenPosition.y = (result.screenPosition.y + 1) * SCREEN_HEIGHT / 2;
-
-    return result;
+    return aResult;
 }
 
 void SoftwareRenderer::Render(const vector<Vertex>& vertices)
@@ -63,7 +72,7 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 
     Matrix4f mvpMatrix = m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix;
 
-    for(int i = 0; i < vertices.size(); i += triangleVerticesCount)
+    for(int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
     {
         TransformedVertex transformedA = ProjToScreen(vertices[i+0], m_ModelMatrix, mvpMatrix);
         TransformedVertex transformedB = ProjToScreen(vertices[i+1], m_ModelMatrix, mvpMatrix);
@@ -102,31 +111,53 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
     Vector2f max = A.CWiseMax(B).CWiseMax(C);
 
     // clamp min and max points to screen size so we don't calculate points that we don't see
-    min = min.CWiseMin(Vector2f(SCREEN_WIDTH, SCREEN_HEIGHT)).CWiseMax(Vector2f(0, 0));
-    max = max.CWiseMin(Vector2f(SCREEN_WIDTH, SCREEN_HEIGHT)).CWiseMax(Vector2f(0, 0));
+    min = min.CWiseMin(Vector2f(SCREEN_WIDTH-1, SCREEN_HEIGHT-1)).CWiseMax(Vector2f(0, 0));
+    max = max.CWiseMin(Vector2f(SCREEN_WIDTH-1, SCREEN_HEIGHT-1)).CWiseMax(Vector2f(0, 0));
 
     int maxX = max.x;
     int maxY = max.y;
 
     // clockwise order so we check if point is on the right side of line
-    Line2D lineAB (A, B);
-    Line2D lineBC (B, C);
-    Line2D lineCA (C, A);
+    const float ABC = EdgeFunction(A, B, C);
+    const float inverseABC = 1.0f / ABC;
+
+    // if our edge function (signed area x2) is negative, it's a back facing triangle and we can cull it
+    if (ABC <= 0) {
+        return;
+    }
+
+    float invABC = 1.0f / ABC;
 
 
-    Vector3f pointToLightDir = (VA.worldPosition - m_LightPosition).Normalized();
-    float diffuseFactor = std::max(pointToLightDir.Dot(VA.normal), 0.0f);
-    Vector4f diffuseLight = color * diffuseFactor;
-    diffuseLight.w = 1.0f;
-    uint32_t finalColor = Vector4f::ToARGB(diffuseLight);
-
+    // loop through all pixels in rectangle
     for (int x = min.x; x <= maxX; ++x)
     {
         for (int y = min.y; y <= maxY; ++y)
         {
-            if (IsPixelInsideTriangle(lineAB, lineBC, lineCA, Vector2f(x, y)))
+            const Vector2f P(x, y);
+            // calculate value of edge function for each line
+            const float ABP = EdgeFunction(A, B, P);
+            const float BCP = EdgeFunction(B, C, P);
+            const float CAP = EdgeFunction(C, A, P);
+            // if pixel is inside triangle, draw it
+            if (ABP >= 0 && BCP >= 0 && CAP >= 0)
             {
-                PutPixel(x, y, finalColor);
+                // dividing edge function values by ABC will give us baricentric coordinates - how much each vertex contributes to final color in point P
+                Vector3f baricentricCoordinates = Vector3f(ABP, BCP, CAP) * invABC;
+                //TransformedVertex interpolatedVertex = VA * baricentricCoordinates.x + VB * baricentricCoordinates.y + VC * baricentricCoordinates.z;
+                TransformedVertex interpolatedVertex = VA * baricentricCoordinates.y + VB * baricentricCoordinates.z + VC * baricentricCoordinates.x;
+                interpolatedVertex.normal.Normalize();
+
+                float& z = m_ZBuffer[y * SCREEN_WIDTH + x];
+                if (interpolatedVertex.zValue > z) {
+                    z = interpolatedVertex.zValue;
+                }
+                else {
+                    continue;
+                }
+
+                Vector4f finalColor = FragmentShader(interpolatedVertex);
+                PutPixel(x, y, Vector4f::ToARGB(finalColor));
             }
         }
     }
@@ -188,12 +219,31 @@ void SoftwareRenderer::DrawLine(const TransformedVertex& VA, const TransformedVe
     }
 }
 
+float SoftwareRenderer::EdgeFunction(const Vector2f& A, const Vector2f& B, const Vector2f& C)
+{
+    return (B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x);
+}
+
+Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
+{
+    //return Vector4f{ (vertex.normal.x+1)/2, (vertex.normal.y + 1) / 2, (vertex.normal.z + 1) / 2, 1.0f };
+    //return Vector4f{ vertex.color.x, vertex.color.y, vertex.color.z, 1.0f };
+
+    Vector3f pointToLightDir = (vertex.worldPosition - m_LightPosition).Normalized();
+    float diffuseFactor = std::max(pointToLightDir.Dot(vertex.normal), 0.0f);
+    Vector4f diffuseLight = vertex.color * diffuseFactor;
+    diffuseLight.w = 1.0f;
+
+    return diffuseLight;
+
+}
+
 void SoftwareRenderer::PutPixel(int x, int y, uint32_t color)
 {
     if (x >= SCREEN_WIDTH || x <= 0 || y >= SCREEN_HEIGHT || y <= 0) {
         return;
     }
-   m_ScreenBuffer[y * SCREEN_WIDTH + x] = color;
+    m_ScreenBuffer[y * SCREEN_WIDTH + x] = color;
 }
 
 void SoftwareRenderer::SetModelMatrixx(const Matrix4f& other)
@@ -214,6 +264,11 @@ void SoftwareRenderer::SetProjectionMatrix(const Matrix4f& other)
 Vector3f SoftwareRenderer::GetRotation() const
 {
     return m_Rotation;
+}
+
+Vector3f SoftwareRenderer::GetTranslation() const
+{
+    return m_Translation;
 }
 
 float SoftwareRenderer::GetScale() const

@@ -3,17 +3,78 @@
 
 #include "teapot.h"
 
+#include <assimp/cimport.h>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
+vector<Vertex> LoadFromScene(const aiScene* scene)
+{
+    if (!scene->HasMeshes())
+    {
+        printf("No meshes\n");
+        return vector<Vertex>();
+    }
+    auto mesh = scene->mMeshes[0];
+
+    vector<Vertex> vertices;
+    vertices.reserve(mesh->mNumFaces * 3);
+
+    for (int t = 0; t < mesh->mNumFaces; ++t)
+    {
+        const aiFace* face = &mesh->mFaces[t];
+        if(face->mNumIndices != 3)
+        {
+            continue;
+        }
+
+        for (int i = 0; i < face->mNumIndices; i++)
+        {
+            Vertex v;
+            v.color = Vector4f(1, 1, 1, 1);
+
+            int index = face->mIndices[i];
+            if (mesh->mColors[0] != NULL)
+                v.color = Vector4f(mesh->mColors[0][index].r, mesh->mColors[0][index].g, mesh->mColors[0][index].b, mesh->mColors[0][index].a);
+
+            //if (mesh->mTextureCoords[0] != NULL)
+            //    v.color = Vector4f(mesh->mTextureCoords[0][index].x, mesh->mTextureCoords[0][index].y,1,1);
+
+
+            if (mesh->mNormals != NULL)
+                v.normal = Vector3f(mesh->mNormals[index].x, mesh->mNormals[index].y, mesh->mNormals[index].z);
+
+            v.position = Vector3f(mesh->mVertices[index].x, mesh->mVertices[index].y, mesh->mVertices[index].z);
+            vertices.push_back(v);
+        }
+    }
+
+    return vertices;
+}
+
+
 vector<Vertex> GenerateTeapotVertices()
 {
-    int verticesCount = teapot_count / triangleVerticesCount;
+    auto scene = aiImportFile("C:/Users/wikto/source/repos/Git-C++/SoftwareRenderer/Data/scene.gltf", aiProcessPreset_TargetRealtime_MaxQuality);
+    if (scene)
+    {
+        auto vertices = LoadFromScene(scene);
+        aiReleaseImport(scene);
+        return vertices;
+    };
+
+    int verticesCount = teapot_count / TRIANGLE_VERT_COUNT;
     vector<Vertex> teapotData(verticesCount);
+
+    Vector4f colors[3] = { Vector4f(1, 0, 0,1), Vector4f(0, 1, 0,1), Vector4f(0, 0, 1,1) };
 
     // we should have normals in the teapot data, but they are missing, so we calculate them here in simplified way assuming that each vertex has the same normal
     for (int i = 0; i < verticesCount; ++i)
     {
-        teapotData[i].position = Vector3f(teapot[i * triangleVerticesCount + 0], teapot[i * triangleVerticesCount + 1], teapot[i * triangleVerticesCount + 2]);
+        teapotData[i].position = Vector3f(teapot[i * TRIANGLE_VERT_COUNT + 0], teapot[i * TRIANGLE_VERT_COUNT + 1], teapot[i * TRIANGLE_VERT_COUNT + 2]);
+
+        teapotData[i].color = colors[i % 3];
     }
-    for (int i = 0; i < verticesCount; i += 3)
+    for (int i = 0; i < verticesCount; i += TRIANGLE_VERT_COUNT)
     {
         Vector3f A = teapotData[i + 0].position;
         Vector3f B = teapotData[i + 1].position;
@@ -73,12 +134,13 @@ int main()
                 window.close();
         }
 
-        float angleX = (renderer.GetRotation().x / 180.f * pi);
-        float angleY = (renderer.GetRotation().y / 180.f * pi);
-        float angleZ = (renderer.GetRotation().z / 180.f * pi);
+        float angleX = (renderer.GetRotation().x / 180.f * PI);
+        float angleY = (renderer.GetRotation().y / 180.f * PI);
+        float angleZ = (renderer.GetRotation().z / 180.f * PI);
         float scale = renderer.GetScale();
+        Vector3f translation = renderer.GetTranslation();
 
-        modelMatrix = Matrix4f::Rotation(Vector3f(angleX, angleY, angleZ)) * Matrix4f::Scale(Vector3f(scale, scale, scale));
+        modelMatrix = Matrix4f::Rotation(Vector3f(angleX, angleY, angleZ)) * Matrix4f::Scale(Vector3f(scale, scale, scale)) * Matrix4f::Translation(translation);
 
         renderer.SetModelMatrixx(modelMatrix);
         renderer.SetViewMatrix(cameraMatrix);
@@ -89,6 +151,7 @@ int main()
         renderer.UpdateUI();
 
         // render stuff to screen buffer
+        renderer.ClearZBuffer();
         renderer.Render(teapotData);
 
 
