@@ -1,96 +1,158 @@
 #include "Common.h"
 #include "Renderer.h"
-
 #include "teapot.h"
-
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-vector<Vertex> LoadFromScene(const aiScene* scene)
+struct Model
 {
-    if (!scene->HasMeshes())
+    vector<Vertex> vertices;
+};
+
+vector<Model> LoadFromScene(const aiScene* pScene)
+{
+    if (!pScene->HasMeshes())
     {
         printf("No meshes\n");
-        return vector<Vertex>();
+        return vector<Model>();
     }
-    auto mesh = scene->mMeshes[0];
 
-    vector<Vertex> vertices;
-    vertices.reserve(mesh->mNumFaces * 3);
+    vector<Model> result;
 
-    for (int t = 0; t < mesh->mNumFaces; ++t)
+    for (int i = 0; i < pScene->mNumMeshes; ++i)
     {
-        const aiFace* face = &mesh->mFaces[t];
-        if(face->mNumIndices != 3)
+        result.push_back(Model());
+
+        Model& model = result.back();
+
+        auto mesh = pScene->mMeshes[i];
+
+        model.vertices.reserve(mesh->mNumFaces * 3);
+
+        for (int t = 0; t < mesh->mNumFaces; ++t)
         {
-            continue;
-        }
+            const aiFace* face = &mesh->mFaces[t];
+            if (face->mNumIndices != 3)
+            {
+                continue;
+            }
 
-        for (int i = 0; i < face->mNumIndices; i++)
-        {
-            Vertex v;
-            v.color = Vector4f(1, 1, 1, 1);
+            for (int i = 0; i < face->mNumIndices; i++)
+            {
+                Vertex v;
+                v.color = Vector4f(1, 1, 1, 1);
 
-            int index = face->mIndices[i];
-            if (mesh->mColors[0] != NULL)
-                v.color = Vector4f(mesh->mColors[0][index].r, mesh->mColors[0][index].g, mesh->mColors[0][index].b, mesh->mColors[0][index].a);
+                int index = face->mIndices[i];
+                if (mesh->mColors[0] != NULL)
+                    v.color = Vector4f(mesh->mColors[0][index].r, mesh->mColors[0][index].g, mesh->mColors[0][index].b, mesh->mColors[0][index].a);
 
-            //if (mesh->mTextureCoords[0] != NULL)
-            //    v.color = Vector4f(mesh->mTextureCoords[0][index].x, mesh->mTextureCoords[0][index].y,1,1);
+                if (mesh->mTextureCoords[0] != NULL)
+                    v.uv = Vector2f(mesh->mTextureCoords[0][index].x, mesh->mTextureCoords[0][index].y);
 
 
-            if (mesh->mNormals != NULL)
-                v.normal = Vector3f(mesh->mNormals[index].x, mesh->mNormals[index].y, mesh->mNormals[index].z);
+                if (mesh->mNormals != NULL)
+                    v.normal = Vector3f(mesh->mNormals[index].x, mesh->mNormals[index].y, mesh->mNormals[index].z);
 
-            v.position = Vector3f(mesh->mVertices[index].x, mesh->mVertices[index].y, mesh->mVertices[index].z);
-            vertices.push_back(v);
+                v.position = Vector3f(mesh->mVertices[index].x, mesh->mVertices[index].y, mesh->mVertices[index].z);
+                model.vertices.push_back(v);
+            }
         }
     }
 
-    return vertices;
+    return result;
 }
 
-
-vector<Vertex> GenerateTeapotVertices()
+void NormalizeModelPosition(vector<Model>& models)
 {
-    auto scene = aiImportFile("C:/Users/wikto/source/repos/Git-C++/SoftwareRenderer/Data/scene.gltf", aiProcessPreset_TargetRealtime_MaxQuality);
-    if (scene)
+    float maxValue = std::numeric_limits<float>::max();
+    float minValue = std::numeric_limits<float>::lowest();
+
+    Vector3f min = Vector3f(maxValue, maxValue, maxValue);
+    Vector3f max = Vector3f(minValue, minValue, minValue);
+
+    for (auto& model : models)
     {
-        auto vertices = LoadFromScene(scene);
-        aiReleaseImport(scene);
-        return vertices;
-    };
+        for (auto& v : model.vertices)
+        {
+            min = min.CWiseMin(v.position);
+            max = max.CWiseMax(v.position);
+        }
+    }
+
+    // center and scale model
+    Vector3f center = (min + max) * 0.5f;
+    const float expectedFinalDistance = 2.0f;
+    const float currentDistance = (max - min).MaxComponent();
+    const float currentToExpectedMultiplier = expectedFinalDistance / currentDistance;
+
+    for (auto& model : models)
+    {
+        for (auto& v : model.vertices)
+        {
+            v.position = (v.position - center) * currentToExpectedMultiplier;
+        }
+    }
+}
+
+vector<Model> LoadFallbackModel()
+{
+    vector<Model> result;
+    result.push_back(Model());
+
+    vector<Vertex>& vertices = result[0].vertices;
 
     int verticesCount = teapot_count / TRIANGLE_VERT_COUNT;
-    vector<Vertex> teapotData(verticesCount);
+    vertices.resize(verticesCount);
 
     Vector4f colors[3] = { Vector4f(1, 0, 0,1), Vector4f(0, 1, 0,1), Vector4f(0, 0, 1,1) };
 
     // we should have normals in the teapot data, but they are missing, so we calculate them here in simplified way assuming that each vertex has the same normal
     for (int i = 0; i < verticesCount; ++i)
     {
-        teapotData[i].position = Vector3f(teapot[i * TRIANGLE_VERT_COUNT + 0], teapot[i * TRIANGLE_VERT_COUNT + 1], teapot[i * TRIANGLE_VERT_COUNT + 2]);
-
-        teapotData[i].color = colors[i % 3];
+        vertices[i].position = Vector3f(teapot[i * TRIANGLE_VERT_COUNT + 0], teapot[i * TRIANGLE_VERT_COUNT + 1], teapot[i * TRIANGLE_VERT_COUNT + 2]);
+        vertices[i].color = colors[i % 3];
     }
+
     for (int i = 0; i < verticesCount; i += TRIANGLE_VERT_COUNT)
     {
-        Vector3f A = teapotData[i + 0].position;
-        Vector3f B = teapotData[i + 1].position;
-        Vector3f C = teapotData[i + 2].position;
+        Vector3f A = vertices[i + 0].position;
+        Vector3f B = vertices[i + 1].position;
+        Vector3f C = vertices[i + 2].position;
         Vector3f wholeTriangleNormal = (B - A).Cross(C - A).Normalized();
-        teapotData[i + 0].normal = wholeTriangleNormal;
-        teapotData[i + 1].normal = wholeTriangleNormal;
-        teapotData[i + 2].normal = wholeTriangleNormal;
+        vertices[i + 0].normal = wholeTriangleNormal;
+        vertices[i + 1].normal = wholeTriangleNormal;
+        vertices[i + 2].normal = wholeTriangleNormal;
     }
 
-    return teapotData;
+    return result;
+}
+
+vector<Model> LoadModelVertices()
+{
+    vector<Model> result;
+    auto scene = aiImportFile("C:/Users/wikto/source/repos/Git-C++/SoftwareRenderer/Data/doghouse0908.fbx", aiProcessPreset_TargetRealtime_MaxQuality);
+    if (scene)
+    {
+        result = LoadFromScene(scene);
+        aiReleaseImport(scene);
+    }
+    else
+    {
+        result = LoadFallbackModel();
+    }
+
+    NormalizeModelPosition(result);
+
+    return result;
 }
 
 int main()
 {
-    vector<Vertex> teapotData = GenerateTeapotVertices();
+    vector<Model> modelsData = LoadModelVertices();
+
+    shared_ptr<Texture> modelTexture = make_shared<Texture>();
+    modelTexture->Load("C:/Users/wikto/source/repos/Git-C++/SoftwareRenderer/Data/doghouse0908.png");
 
     // create the window
     sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer");
@@ -99,15 +161,17 @@ int main()
 
     ImGui::SFML::Init(window);
 
-    sf::Texture texture;
-    texture.create(SCREEN_WIDTH, SCREEN_HEIGHT);
+    sf::Texture screenTexture;
+    screenTexture.create(SCREEN_WIDTH, SCREEN_HEIGHT);
 
     sf::Sprite sprite;
-    sprite.setTexture(texture);
+    sprite.setTexture(screenTexture);
 
     sf::Clock deltaClock;
 
     SoftwareRenderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    renderer.SetTexture(modelTexture);
 
     Matrix4f cameraMatrix = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 1), Vector3f(0, 1, 0));
     Matrix4f projectionMatrix = Matrix4f::CreateProjectionMatrix(90, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);
@@ -152,8 +216,12 @@ int main()
 
         // render stuff to screen buffer
         renderer.ClearZBuffer();
-        renderer.Render(teapotData);
+        renderer.ClearScreen();
 
+        for (auto& model : modelsData) {
+            renderer.Render(model.vertices);
+           // renderer.RenderWireframe(model.vertices);
+        }
 
         auto buf = renderer.GetScreenBuffer();
 
@@ -165,7 +233,7 @@ int main()
             memcpy(dst + y * SCREEN_WIDTH, src + (SCREEN_HEIGHT - 1 - y) * SCREEN_WIDTH, SCREEN_WIDTH * 4);
         }
         // update texture
-        texture.update((uint8_t*)dst);
+        screenTexture.update((uint8_t*)dst);
 
         // render texture to screen
         window.draw(sprite);

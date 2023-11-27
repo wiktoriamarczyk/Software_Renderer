@@ -29,6 +29,11 @@ Vector4f Vector4f::operator-(Vector4f other)const
     return Vector4f(x - other.x, y - other.y, z - other.z, w - other.w);
 }
 
+Vector4f Vector4f::operator*(Vector4f other) const
+{
+    return Vector4f(x * other.x, y * other.y, z * other.z, w * other.w);
+}
+
 Vector4f Vector4f::operator*(float value)const
 {
     return Vector4f(x * value, y * value, z * value, w * value);

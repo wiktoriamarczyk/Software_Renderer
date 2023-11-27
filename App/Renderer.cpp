@@ -1,23 +1,50 @@
 #include "Renderer.h"
 #include "Line2D.h"
+#include "../stb/stb_image.h"
 
 
-static bool IsPixelInsideTriangle(const Line2D& AB, const Line2D& BC, const Line2D& CA, const Vector2f& pixel)
+void TransformedVertex::ProjToScreen(Vertex v, Matrix4f worldMatrix, Matrix4f mvpMatrix)
 {
-    if (AB.IsRightFromLine(pixel) && BC.IsRightFromLine(pixel) && CA.IsRightFromLine(pixel))
-    {
-        return true;
-    }
-    return false;
+    worldPosition = v.position.Transformed(worldMatrix);
+    normal = v.normal.Transformed(worldMatrix).Normalized();
+    color = v.color;
+
+    auto screenXYZ = Vector4f(v.position, 1.0f).Transformed(mvpMatrix);
+    zValue = screenXYZ.z;
+    screenPosition = screenXYZ.xy();
+    screenPosition.x = (screenPosition.x + 1) * SCREEN_WIDTH / 2;
+    screenPosition.y = (screenPosition.y + 1) * SCREEN_HEIGHT / 2;
+    uv = v.uv;
 }
 
-static bool IsPointInsideTheWindow(const Vector2f& point)
+
+bool Texture::Load(const char* fileName)
 {
-    if (point.x >= 0 && point.x <= SCREEN_WIDTH && point.y >= 0 && point.y <= SCREEN_HEIGHT)
-    {
-        return true;
+    int width, height, channels;
+
+    //STB::stbi_set_flip_vertically_on_load(true);
+
+    STB::stbi_uc* data = STB::stbi_load(fileName, &width, &height, &channels, 4);
+    if (!data) {
+        return false;
     }
-    return false;
+    m_Data.resize(width * height);
+    memcpy(m_Data.data(), data, width * height * 4);
+    m_Width = width;
+    m_Height = height;
+    STB::stbi_image_free(data);
+    return true;
+
+}
+
+Vector4f Texture::Sample(Vector2f uv) const
+{
+    int x = uv.x * m_Width;
+    int y = uv.y * m_Height;
+
+    int pixelIndex = y * m_Width + x;
+
+    return Vector4f::FromARGB(m_Data[pixelIndex]);
 }
 
 // ---------------------------- SoftwareRenderer ----------------------------
@@ -35,10 +62,16 @@ void SoftwareRenderer::UpdateUI()
 
     ImGui::SliderFloat3("Rotation", &m_Rotation.x, 0, FULL_ANGLE);
     //ImGui::SliderFloat3("Translation", &m_Translation.x, -5, 5);
-    ImGui::SliderFloat("Scale", &m_Scale, 0, maxScale);
+    ImGui::SliderFloat("Scale", &m_Scale, 0, m_MaxScale);
     ImGui::SliderFloat3("Light Position", &m_LightPosition.x, -20, 20);
 
     ImGui::End();
+}
+
+void SoftwareRenderer::ClearScreen()
+{
+    // clear screen
+    std::fill(m_ScreenBuffer.begin(), m_ScreenBuffer.end(), 0xFF000000);
 }
 
 void SoftwareRenderer::ClearZBuffer()
@@ -46,38 +79,41 @@ void SoftwareRenderer::ClearZBuffer()
     std::fill(m_ZBuffer.begin(), m_ZBuffer.end(), std::numeric_limits<float>::lowest());
 }
 
-TransformedVertex ProjToScreen(Vertex v, Matrix4f worldMatrix, Matrix4f mvpMatrix)
-{
-    static TransformedVertex aResult;
-
-    aResult.worldPosition  = v.position.Transformed(worldMatrix);
-    aResult.normal         = v.normal.Transformed(worldMatrix).Normalized();
-    aResult.color          = v.color;
-
-    auto screenXYZ = Vector4f(v.position,1.0f).Transformed(mvpMatrix);
-    aResult.zValue         = screenXYZ.z;
-    aResult.screenPosition = screenXYZ.xy();
-    aResult.screenPosition.x = (aResult.screenPosition.x + 1) * SCREEN_WIDTH / 2;
-    aResult.screenPosition.y = (aResult.screenPosition.y + 1) * SCREEN_HEIGHT / 2;
-
-    return aResult;
-}
-
 void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 {
     auto mat = Matrix4f::Identity();
-
-    // clear screen
-    std::fill(m_ScreenBuffer.begin(), m_ScreenBuffer.end(), 0xFF000000);
 
     Matrix4f mvpMatrix = m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix;
 
     for(int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
     {
-        TransformedVertex transformedA = ProjToScreen(vertices[i+0], m_ModelMatrix, mvpMatrix);
-        TransformedVertex transformedB = ProjToScreen(vertices[i+1], m_ModelMatrix, mvpMatrix);
-        TransformedVertex transformedC = ProjToScreen(vertices[i+2], m_ModelMatrix, mvpMatrix);
+        TransformedVertex transformedA;
+        transformedA.ProjToScreen(vertices[i + 0], m_ModelMatrix, mvpMatrix);
+        TransformedVertex transformedB;
+        transformedB.ProjToScreen(vertices[i + 1], m_ModelMatrix, mvpMatrix);
+        TransformedVertex transformedC;
+        transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, mvpMatrix);
+
         DrawFilledTriangle(transformedA, transformedB, transformedC, m_Color);
+    }
+}
+
+void SoftwareRenderer::RenderWireframe(const vector<Vertex>& vertices)
+{
+    auto mat = Matrix4f::Identity();
+
+    Matrix4f mvpMatrix = m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix;
+
+    for (int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
+    {
+        TransformedVertex transformedA;
+        transformedA.ProjToScreen(vertices[i + 0], m_ModelMatrix, mvpMatrix);
+        TransformedVertex transformedB;
+        transformedB.ProjToScreen(vertices[i + 1], m_ModelMatrix, mvpMatrix);
+        TransformedVertex transformedC;
+        transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, mvpMatrix);
+
+        DrawTriangle(transformedA, transformedB, transformedC, m_Color);
     }
 }
 
@@ -226,16 +262,19 @@ float SoftwareRenderer::EdgeFunction(const Vector2f& A, const Vector2f& B, const
 
 Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
 {
-    //return Vector4f{ (vertex.normal.x+1)/2, (vertex.normal.y + 1) / 2, (vertex.normal.z + 1) / 2, 1.0f };
-    //return Vector4f{ vertex.color.x, vertex.color.y, vertex.color.z, 1.0f };
-
+    Vector4f sampledPixel;
+    if (m_Texture) {
+        sampledPixel = m_Texture->Sample(vertex.uv);
+    }
+    else {
+        sampledPixel = Vector4f(1, 1, 1, 1);
+    }
     Vector3f pointToLightDir = (vertex.worldPosition - m_LightPosition).Normalized();
     float diffuseFactor = std::max(pointToLightDir.Dot(vertex.normal), 0.0f);
-    Vector4f diffuseLight = vertex.color * diffuseFactor;
+    Vector4f diffuseLight = vertex.color * diffuseFactor * sampledPixel;
     diffuseLight.w = 1.0f;
 
     return diffuseLight;
-
 }
 
 void SoftwareRenderer::PutPixel(int x, int y, uint32_t color)
@@ -259,6 +298,11 @@ void SoftwareRenderer::SetViewMatrix(const Matrix4f& other)
 void SoftwareRenderer::SetProjectionMatrix(const Matrix4f& other)
 {
     m_ProjectionMatrix = other;
+}
+
+void SoftwareRenderer::SetTexture(shared_ptr<Texture> texture)
+{
+    m_Texture = texture;
 }
 
 Vector3f SoftwareRenderer::GetRotation() const

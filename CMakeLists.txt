@@ -35,6 +35,9 @@ SET(APP_SRC_FILES_LIST
     imgui/imgui_draw.cpp
     imgui/imgui_tables.cpp
     imgui/imgui_widgets.cpp
+	
+	stb/stb_image.h
+	stb/stb_image.cpp
 
 )
 

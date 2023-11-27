@@ -14,6 +14,7 @@ public:
 
     Vector4f operator+(Vector4f other)const;
     Vector4f operator-(Vector4f other)const;
+    Vector4f operator*(Vector4f other)const;
     Vector4f operator*(float value)const;
     Vector4f operator/(float value)const;
 
