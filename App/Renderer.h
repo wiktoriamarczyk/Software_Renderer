@@ -5,15 +5,7 @@
 #include "Matrix4.h"
 #include "Vector4f.h"
 #include "Vector2f.h"
-
-
-struct Vertex
-{
-    Vector3f position;
-    Vector3f normal;
-    Vector4f color;
-    Vector2f uv;
-};
+#include "Math.h"
 
 struct TransformedVertex
 {
@@ -56,6 +48,7 @@ class Texture
 public:
     Texture() = default;
     bool Load(const char* fileName);
+    bool IsValid()const;
     Vector4f Sample(Vector2f uv)const;
 
 private:

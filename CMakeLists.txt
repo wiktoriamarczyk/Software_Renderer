@@ -27,6 +27,8 @@ SET(APP_SRC_FILES_LIST
 	App/Vector4f.cpp
 	App/Line2D.h
 	App/Line2D.cpp
+	App/Math.h
+	App/Math.cpp
 
     imgui/imgui.h
     imgui/imgui.cpp
@@ -38,6 +40,9 @@ SET(APP_SRC_FILES_LIST
 	
 	stb/stb_image.h
 	stb/stb_image.cpp
+	
+	ImGuiFileDialog/ImGuiFileDialog.h
+	ImGuiFileDialog/ImGuiFileDialog.cpp
 
 )
 

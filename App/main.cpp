@@ -1,9 +1,11 @@
 #include "Common.h"
 #include "Renderer.h"
-#include "teapot.h"
+#include "Fallback.h"
+#include "Math.h"
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include "../ImGuiFileDialog/ImGuiFileDialog.h"
 
 struct Model
 {
@@ -101,37 +103,18 @@ vector<Model> LoadFallbackModel()
     result.push_back(Model());
 
     vector<Vertex>& vertices = result[0].vertices;
-
-    int verticesCount = teapot_count / TRIANGLE_VERT_COUNT;
-    vertices.resize(verticesCount);
-
-    Vector4f colors[3] = { Vector4f(1, 0, 0,1), Vector4f(0, 1, 0,1), Vector4f(0, 0, 1,1) };
-
-    // we should have normals in the teapot data, but they are missing, so we calculate them here in simplified way assuming that each vertex has the same normal
-    for (int i = 0; i < verticesCount; ++i)
-    {
-        vertices[i].position = Vector3f(teapot[i * TRIANGLE_VERT_COUNT + 0], teapot[i * TRIANGLE_VERT_COUNT + 1], teapot[i * TRIANGLE_VERT_COUNT + 2]);
-        vertices[i].color = colors[i % 3];
-    }
-
-    for (int i = 0; i < verticesCount; i += TRIANGLE_VERT_COUNT)
-    {
-        Vector3f A = vertices[i + 0].position;
-        Vector3f B = vertices[i + 1].position;
-        Vector3f C = vertices[i + 2].position;
-        Vector3f wholeTriangleNormal = (B - A).Cross(C - A).Normalized();
-        vertices[i + 0].normal = wholeTriangleNormal;
-        vertices[i + 1].normal = wholeTriangleNormal;
-        vertices[i + 2].normal = wholeTriangleNormal;
-    }
+    vertices.resize(FALLBACK_MODEL_VERT_COUNT);
+    std::copy(fallbackVertices, fallbackVertices + FALLBACK_MODEL_VERT_COUNT, vertices.begin());
 
     return result;
 }
 
-vector<Model> LoadModelVertices()
+
+
+vector<Model> LoadModelVertices(const char* path)
 {
     vector<Model> result;
-    auto scene = aiImportFile("C:/Users/wikto/source/repos/Git-C++/SoftwareRenderer/Data/doghouse0908.fbx", aiProcessPreset_TargetRealtime_MaxQuality);
+    auto scene = aiImportFile(path, aiProcessPreset_TargetRealtime_MaxQuality);
     if (scene)
     {
         result = LoadFromScene(scene);
@@ -147,12 +130,50 @@ vector<Model> LoadModelVertices()
     return result;
 }
 
+void OpenDialog(const char* title, const char* filters, function<void()> callback)
+{
+    string filePathName;
+
+    if (ImGui::Button(title))
+        ImGuiFileDialog::Instance()->OpenDialog(title, title, filters, ".", 1, nullptr, ImGuiFileDialogFlags_Modal);
+
+    // display
+    if (ImGuiFileDialog::Instance()->Display(title))
+    {
+        // action if OK
+        if (ImGuiFileDialog::Instance()->IsOk())
+        {
+            if (callback)
+                callback();
+        }
+
+        // close
+        ImGuiFileDialog::Instance()->Close();
+    }
+}
+
+void OpenSceneDataDialog(MyModelPaths& selectedPaths)
+{
+    OpenDialog("Choose Model", ".fbx,.glb,.gltf", [&selectedPaths]
+    {
+        selectedPaths.modelPath = ImGuiFileDialog::Instance()->GetFilePathName();
+    });
+
+    OpenDialog("Choose Model Texture", ".png,.jpg,.jpeg,.bmp,.tga", [&selectedPaths]
+    {
+        selectedPaths.texturePath = ImGuiFileDialog::Instance()->GetFilePathName();
+    });
+}
+
 int main()
 {
-    vector<Model> modelsData = LoadModelVertices();
+    MyModelPaths lastModelPaths;
+    MyModelPaths modelPaths;
 
+    // load default model
+    vector<Model> modelsData = LoadFallbackModel();
     shared_ptr<Texture> modelTexture = make_shared<Texture>();
-    modelTexture->Load("C:/Users/wikto/source/repos/Git-C++/SoftwareRenderer/Data/doghouse0908.png");
+    modelTexture->Load(DEFAULT_TEXTURE_PATH.c_str());
 
     // create the window
     sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer");
@@ -196,6 +217,20 @@ int main()
             // "close requested" event: we close the window
             if (event.type == sf::Event::Closed)
                 window.close();
+        }
+
+        // load model and texture if user selected them
+        if (lastModelPaths.modelPath != modelPaths.modelPath)
+        {
+            modelsData = LoadModelVertices(modelPaths.modelPath.c_str());
+            lastModelPaths = modelPaths;
+        }
+
+        if (lastModelPaths.texturePath != modelPaths.texturePath)
+        {
+            modelTexture->Load(modelPaths.texturePath.c_str());
+            renderer.SetTexture(modelTexture);
+            lastModelPaths = modelPaths;
         }
 
         float angleX = (renderer.GetRotation().x / 180.f * PI);
@@ -243,6 +278,8 @@ int main()
         ImGui::SetWindowPos(ImVec2(0, 0));
         ImGui::Text("FPS: %d", fps);
         ImGui::End();
+
+        OpenSceneDataDialog(modelPaths);
 
         // render UI on top
         ImGui::SFML::Render(window);

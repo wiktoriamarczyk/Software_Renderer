@@ -10,11 +10,21 @@
 #include <cmath>
 #include <numbers>
 #include <chrono>
+#include <string>
+#include <filesystem>
+#include <functional>
+
+using namespace std;
 
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
 const int FULL_ANGLE = 360;
 const float PI = std::numbers::pi;
 const int TRIANGLE_VERT_COUNT = 3;
+const string DEFAULT_TEXTURE_PATH = filesystem::current_path().string() + "/../Data/Checkerboard.png";
 
-using namespace std;
+struct MyModelPaths
+{
+    string modelPath;
+    string texturePath;
+};

@@ -2,11 +2,10 @@
 #include "Line2D.h"
 #include "../stb/stb_image.h"
 
-
 void TransformedVertex::ProjToScreen(Vertex v, Matrix4f worldMatrix, Matrix4f mvpMatrix)
 {
     worldPosition = v.position.Transformed(worldMatrix);
-    normal = v.normal.Transformed(worldMatrix).Normalized();
+    normal = (v.normal.Transformed(worldMatrix) - Vector3f{0,0,0}.Transformed(worldMatrix)).Normalized();
     color = v.color;
 
     auto screenXYZ = Vector4f(v.position, 1.0f).Transformed(mvpMatrix);
@@ -16,7 +15,6 @@ void TransformedVertex::ProjToScreen(Vertex v, Matrix4f worldMatrix, Matrix4f mv
     screenPosition.y = (screenPosition.y + 1) * SCREEN_HEIGHT / 2;
     uv = v.uv;
 }
-
 
 bool Texture::Load(const char* fileName)
 {
@@ -37,10 +35,15 @@ bool Texture::Load(const char* fileName)
 
 }
 
+bool Texture::IsValid()const
+{
+    return m_Data.size() > 0;
+}
+
 Vector4f Texture::Sample(Vector2f uv) const
 {
-    int x = uv.x * m_Width;
-    int y = uv.y * m_Height;
+    int x = uv.x * (m_Width - 1);
+    int y = uv.y * (m_Height - 1);
 
     int pixelIndex = y * m_Width + x;
 
@@ -192,6 +195,7 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
                     continue;
                 }
 
+                interpolatedVertex.normal.Normalize();
                 Vector4f finalColor = FragmentShader(interpolatedVertex);
                 PutPixel(x, y, Vector4f::ToARGB(finalColor));
             }
