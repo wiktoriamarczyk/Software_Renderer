@@ -19,20 +19,20 @@ void TransformedVertex::ProjToScreen(Vertex v, Matrix4f worldMatrix, Matrix4f mv
 bool Texture::Load(const char* fileName)
 {
     int width, height, channels;
-
     //STB::stbi_set_flip_vertically_on_load(true);
-
     STB::stbi_uc* data = STB::stbi_load(fileName, &width, &height, &channels, 4);
+
     if (!data) {
         return false;
     }
+
     m_Data.resize(width * height);
     memcpy(m_Data.data(), data, width * height * 4);
     m_Width = width;
     m_Height = height;
     STB::stbi_image_free(data);
-    return true;
 
+    return true;
 }
 
 bool Texture::IsValid()const
@@ -61,19 +61,25 @@ SoftwareRenderer::SoftwareRenderer(int ScreenWidth, int ScreenHeight)
 void SoftwareRenderer::UpdateUI()
 {
     ImGui::Begin("Settings", &m_SettingsOpen);
-    ImGui::ColorEdit4("Color", &m_Color.x);
 
+    ImGui::ColorEdit4("WireFrame Color", &m_WireFrameColor.x);
+    ImGui::ColorEdit4("Ambient Color", &m_AmbientColor.x);
+    ImGui::ColorEdit4("Diffuse Color", &m_DiffuseColor.x);
+    ImGui::SliderFloat("Ambient Strength", &m_AmbientStrength, 0, 1);
+    ImGui::SliderFloat("Diffuse Strength", &m_DiffuseStrength, 0, 1);
+    ImGui::SliderFloat("Specular Strength", &m_SpecularStrength, 0, 1);
+    ImGui::InputFloat("Shininess", &m_Shininess, 2.f);
     ImGui::SliderFloat3("Rotation", &m_Rotation.x, 0, FULL_ANGLE);
     //ImGui::SliderFloat3("Translation", &m_Translation.x, -5, 5);
     ImGui::SliderFloat("Scale", &m_Scale, 0, m_MaxScale);
-    ImGui::SliderFloat3("Light Position", &m_LightPosition.x, -20, 20);
+    ImGui::SliderFloat3("Light Position", &m_LightPosition.x, 0, SCREEN_WIDTH);
+    ImGui::Checkbox("Wireframe", &m_Wireframe);
 
     ImGui::End();
 }
 
 void SoftwareRenderer::ClearScreen()
 {
-    // clear screen
     std::fill(m_ScreenBuffer.begin(), m_ScreenBuffer.end(), 0xFF000000);
 }
 
@@ -97,7 +103,31 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
         TransformedVertex transformedC;
         transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, mvpMatrix);
 
-        DrawFilledTriangle(transformedA, transformedB, transformedC, m_Color);
+        DrawFilledTriangle(transformedA, transformedB, transformedC);
+    }
+
+    RenderLightSource();
+}
+
+void SoftwareRenderer::RenderLightSource()
+{
+    // render light source as cube
+    Vector2f lightPos = Vector2f(m_LightPosition.x, m_LightPosition.y);
+    float lightSize = 10;
+    for (int x = lightPos.x - lightSize; x < lightPos.x + lightSize; ++x)
+    {
+        for (int y = lightPos.y - lightSize; y < lightPos.y + lightSize; ++y)
+        {
+            PutPixel(x, y, Vector4f::ToARGB(m_AmbientColor));
+        }
+    }
+    // render light direction
+    Vector2f lightDir = (Vector2f(0, 0) - lightPos).Normalized();
+    int lightRayLength = 100;
+    for (int i = 0; i < lightRayLength; ++i)
+    {
+        Vector2f point = lightPos + lightDir * i;
+        PutPixel(point.x, point.y, Vector4f::ToARGB(m_DiffuseColor));
     }
 }
 
@@ -116,7 +146,7 @@ void SoftwareRenderer::RenderWireframe(const vector<Vertex>& vertices)
         TransformedVertex transformedC;
         transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, mvpMatrix);
 
-        DrawTriangle(transformedA, transformedB, transformedC, m_Color);
+        DrawTriangle(transformedA, transformedB, transformedC, m_WireFrameColor);
     }
 }
 
@@ -125,7 +155,7 @@ const vector<uint32_t>& SoftwareRenderer::GetScreenBuffer()const
     return m_ScreenBuffer;
 }
 
-void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color)
+void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC)
 {
     // filling algorithm is working that way that we are going through all pixels in rectangle that is created by min and max points
     // and we are checking if pixel is inside triangle by using three lines and checking if pixel is on the same side of each line
@@ -166,7 +196,6 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
     }
 
     float invABC = 1.0f / ABC;
-
 
     // loop through all pixels in rectangle
     for (int x = min.x; x <= maxX; ++x)
@@ -273,12 +302,38 @@ Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
     else {
         sampledPixel = Vector4f(1, 1, 1, 1);
     }
-    Vector3f pointToLightDir = (vertex.worldPosition - m_LightPosition).Normalized();
-    float diffuseFactor = std::max(pointToLightDir.Dot(vertex.normal), 0.0f);
-    Vector4f diffuseLight = vertex.color * diffuseFactor * sampledPixel;
-    diffuseLight.w = 1.0f;
 
-    return diffuseLight;
+    Vector3f pointToLightDir = (vertex.worldPosition - m_LightPosition).Normalized();
+
+    // ambient - light that is reflected from other objects
+
+    Vector4f ambient = m_AmbientColor * m_AmbientStrength;
+    // ----------------------------------------------
+
+
+    // diffuse - light that is reflected from light source
+
+    float diffuseFactor = std::max(pointToLightDir.Dot(vertex.normal), 0.0f);
+    Vector4f diffuse = m_DiffuseColor * diffuseFactor * m_DiffuseStrength;
+    diffuse.w = 1.0f;
+    // ----------------------------------------------
+
+
+    // specular - light that is reflected from light source and is reflected in one direction
+    // specular = specularStrength * specularColor * pow(max(dot(viewDir, reflectDir), 0.0), shininess)
+
+    Vector3f viewDir = (Vector3f(0, 0, 0) - vertex.worldPosition).Normalized();
+    Vector3f reflectDir = (pointToLightDir * -1).Reflect(vertex.normal);
+    float shininess = 32;
+    float specularFactor = pow(max(viewDir.Dot(reflectDir), 0.0f), m_Shininess);
+    Vector4f specular = m_DiffuseColor * m_SpecularStrength * specularFactor;
+
+    // final light color = (ambient + diffuse + specular) * modelColor
+    Vector4f sumOfLight = ambient + diffuse + specular;
+    sumOfLight = sumOfLight.CWiseMin(Vector4f(1, 1, 1, 1));
+    Vector4f finalColor = sumOfLight * sampledPixel * vertex.color;
+
+    return finalColor;
 }
 
 void SoftwareRenderer::PutPixel(int x, int y, uint32_t color)
@@ -322,4 +377,9 @@ Vector3f SoftwareRenderer::GetTranslation() const
 float SoftwareRenderer::GetScale() const
 {
     return m_Scale;
+}
+
+bool SoftwareRenderer::IsWireframe() const
+{
+    return m_Wireframe;
 }

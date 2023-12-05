@@ -86,3 +86,8 @@ Vector3f Vector3f::CWiseAbs(const Vector3f& other) const
 {
     return Vector3f(std::abs(x), std::abs(y), std::abs(z));
 }
+
+Vector3f Vector3f::Reflect(const Vector3f& normal) const
+{
+    return *this - normal * 2.f * Dot(normal);
+}

@@ -24,6 +24,8 @@ public:
     Vector3f CWiseMin(const Vector3f& other)const;
     Vector3f CWiseMax(const Vector3f& other)const;
     Vector3f CWiseAbs(const Vector3f& other)const;
+    // TO CHECK!
+    Vector3f Reflect(const Vector3f& normal)const;
 
     float x = 0;
     float y = 0;

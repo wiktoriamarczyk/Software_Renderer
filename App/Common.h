@@ -16,8 +16,8 @@
 
 using namespace std;
 
-const int SCREEN_WIDTH = 800;
-const int SCREEN_HEIGHT = 600;
+const int SCREEN_WIDTH = 1000;
+const int SCREEN_HEIGHT = 800;
 const int FULL_ANGLE = 360;
 const float PI = std::numbers::pi;
 const int TRIANGLE_VERT_COUNT = 3;

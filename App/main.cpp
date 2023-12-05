@@ -255,7 +255,9 @@ int main()
 
         for (auto& model : modelsData) {
             renderer.Render(model.vertices);
-           // renderer.RenderWireframe(model.vertices);
+
+            if (renderer.IsWireframe())
+                renderer.RenderWireframe(model.vertices);
         }
 
         auto buf = renderer.GetScreenBuffer();
