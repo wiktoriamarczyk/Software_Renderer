@@ -1,20 +1,9 @@
 #include "Renderer.h"
 #include "Line2D.h"
 #include "../stb/stb_image.h"
+#include "TransformedVertex.h"
+#include "VertexInterpolator.h"
 
-void TransformedVertex::ProjToScreen(Vertex v, Matrix4f worldMatrix, Matrix4f mvpMatrix)
-{
-    worldPosition = v.position.Transformed(worldMatrix);
-    normal = (v.normal.Transformed(worldMatrix) - Vector3f{0,0,0}.Transformed(worldMatrix)).Normalized();
-    color = v.color;
-
-    auto screenXYZ = Vector4f(v.position, 1.0f).Transformed(mvpMatrix);
-    zValue = screenXYZ.z;
-    screenPosition = screenXYZ.xy();
-    screenPosition.x = (screenPosition.x + 1) * SCREEN_WIDTH / 2;
-    screenPosition.y = (screenPosition.y + 1) * SCREEN_HEIGHT / 2;
-    uv = v.uv;
-}
 
 bool Texture::Load(const char* fileName)
 {
@@ -197,6 +186,9 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
 
     float invABC = 1.0f / ABC;
 
+    VertexInterpolator interpolator(VA, VB, VC);
+    TransformedVertex interpolatedVertex;
+
     // loop through all pixels in rectangle
     for (int x = min.x; x <= maxX; ++x)
     {
@@ -211,9 +203,9 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
             if (ABP >= 0 && BCP >= 0 && CAP >= 0)
             {
                 // dividing edge function values by ABC will give us baricentric coordinates - how much each vertex contributes to final color in point P
-                Vector3f baricentricCoordinates = Vector3f(ABP, BCP, CAP) * invABC;
-                //TransformedVertex interpolatedVertex = VA * baricentricCoordinates.x + VB * baricentricCoordinates.y + VC * baricentricCoordinates.z;
-                TransformedVertex interpolatedVertex = VA * baricentricCoordinates.y + VB * baricentricCoordinates.z + VC * baricentricCoordinates.x;
+                Vector3f baricentricCoordinates = Vector3f( BCP, CAP , ABP) * invABC;
+                //TransformedVertex interpolatedVertex = VA * baricentricCoordinates.y + VB * baricentricCoordinates.z + VC * baricentricCoordinates.x;
+                interpolator.Interpolate(baricentricCoordinates, interpolatedVertex);
                 interpolatedVertex.normal.Normalize();
 
                 float& z = m_ZBuffer[y * SCREEN_WIDTH + x];

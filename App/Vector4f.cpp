@@ -44,6 +44,11 @@ Vector4f Vector4f::operator/(float value)const
     return Vector4f(x / value, y / value, z / value, w / value);
 }
 
+Vector4f operator*(float value, const Vector4f& v)
+{
+    return Vector4f(v.x * value, v.y * value, v.z * value, v.w * value);
+}
+
 float Vector4f::GetLength()const
 {
     return sqrt(x * x + y * y + z * z + w * w);
@@ -110,3 +115,5 @@ Vector4f Vector4f::FromARGB(uint32_t color)
 {
     return Vector4f((float)(color & 0xFF), (float)((color >> 8) & 0xFF), (float)((color >> 16) & 0xFF), (float)((color >> 24))) * 1.0f / 255.0f;
 }
+
+

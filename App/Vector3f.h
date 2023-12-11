@@ -14,6 +14,8 @@ public:
     Vector3f operator*(float value)const;
     Vector3f operator/(float value)const;
 
+    friend Vector3f operator*(float value, const Vector3f& v);
+
     float GetLength()const;
     float Dot(const Vector3f& other)const;
     float MaxComponent()const;

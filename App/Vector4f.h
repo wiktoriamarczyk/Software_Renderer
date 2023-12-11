@@ -18,6 +18,8 @@ public:
     Vector4f operator*(float value)const;
     Vector4f operator/(float value)const;
 
+    friend Vector4f operator*(float value, const Vector4f& v);
+
     float GetLength()const;
     float Dot(const Vector4f& other)const;
     Vector4f& Normalize();

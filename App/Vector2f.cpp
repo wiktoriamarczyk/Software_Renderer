@@ -34,6 +34,11 @@ Vector2f Vector2f::operator/(float value)const
     return Vector2f(x / value, y / value);
 }
 
+Vector2f operator*(float value, const Vector2f& v)
+{
+    return Vector2f(v.x * value, v.y * value);
+}
+
 float Vector2f::GetLength()const
 {
     return sqrt(x * x + y * y);

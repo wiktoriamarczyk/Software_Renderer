@@ -15,6 +15,8 @@ public:
     Vector2f operator*(float value)const;
     Vector2f operator/(float value)const;
 
+    friend Vector2f operator*(float value, const Vector2f& v);
+
     float GetLength()const;
     float Dot(const Vector2f& other)const;
     Vector2f& Normalize();

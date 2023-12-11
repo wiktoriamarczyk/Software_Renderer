@@ -29,6 +29,10 @@ SET(APP_SRC_FILES_LIST
 	App/Line2D.cpp
 	App/Math.h
 	App/Math.cpp
+	App/VertexInterpolator.h
+	App/VertexInterpolator.cpp
+	App/TransformedVertex.h
+	App/TransformedVertex.cpp
 
     imgui/imgui.h
     imgui/imgui.cpp
