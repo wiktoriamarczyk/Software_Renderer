@@ -52,6 +52,7 @@ private:
     void DrawLine(const TransformedVertex& A, const TransformedVertex& B, const Vector4f& color);
     void PutPixel(int x, int y, uint32_t color);
     void RenderLightSource();
+    void UpdateMVPMatrix();
 
     static float EdgeFunction(const Vector2f& A, const Vector2f& B, const Vector2f& C);
     Vector4f FragmentShader(const TransformedVertex& vertex);
@@ -63,13 +64,15 @@ private:
     Vector4f            m_WireFrameColor = Vector4f(1, 1, 1, 1);
     Vector4f            m_DiffuseColor = Vector4f(1, 1, 1, 1);
     Vector4f            m_AmbientColor = Vector4f(1, 1, 1, 1);
-    Vector3f            m_LightPosition = Vector3f(700, 550, 15);
+    Vector3f            m_LightPosition = Vector3f(0, 0, 15);
     Vector3f            m_Rotation;
     Vector3f            m_Translation;
+    Vector3f            m_CameraPosition = Vector3f(0, 0, 0);
 
     Matrix4f            m_ModelMatrix;
     Matrix4f            m_ViewMatrix;
     Matrix4f            m_ProjectionMatrix;
+    Matrix4f            m_MVPMatrix;
 
     bool                m_SettingsOpen = false;
     bool                m_Wireframe = false;

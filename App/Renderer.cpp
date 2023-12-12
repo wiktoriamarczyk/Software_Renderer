@@ -61,7 +61,7 @@ void SoftwareRenderer::UpdateUI()
     ImGui::SliderFloat3("Rotation", &m_Rotation.x, 0, FULL_ANGLE);
     //ImGui::SliderFloat3("Translation", &m_Translation.x, -5, 5);
     ImGui::SliderFloat("Scale", &m_Scale, 0, m_MaxScale);
-    ImGui::SliderFloat3("Light Position", &m_LightPosition.x, 0, SCREEN_WIDTH);
+    ImGui::SliderFloat3("Light Position", &m_LightPosition.x, -20, 20);
     ImGui::Checkbox("Wireframe", &m_Wireframe);
 
     ImGui::End();
@@ -79,18 +79,14 @@ void SoftwareRenderer::ClearZBuffer()
 
 void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 {
-    auto mat = Matrix4f::Identity();
-
-    Matrix4f mvpMatrix = m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix;
-
-    for(int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
+    for (int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
     {
         TransformedVertex transformedA;
-        transformedA.ProjToScreen(vertices[i + 0], m_ModelMatrix, mvpMatrix);
+        transformedA.ProjToScreen(vertices[i + 0], m_ModelMatrix, m_MVPMatrix);
         TransformedVertex transformedB;
-        transformedB.ProjToScreen(vertices[i + 1], m_ModelMatrix, mvpMatrix);
+        transformedB.ProjToScreen(vertices[i + 1], m_ModelMatrix, m_MVPMatrix);
         TransformedVertex transformedC;
-        transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, mvpMatrix);
+        transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, m_MVPMatrix);
 
         DrawFilledTriangle(transformedA, transformedB, transformedC);
     }
@@ -101,7 +97,13 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 void SoftwareRenderer::RenderLightSource()
 {
     // render light source as cube
-    Vector2f lightPos = Vector2f(m_LightPosition.x, m_LightPosition.y);
+
+    TransformedVertex transformed;
+    Vertex vertex(m_LightPosition);
+    transformed.ProjToScreen(vertex, m_ModelMatrix, m_ViewMatrix*m_ProjectionMatrix);
+
+    Vector2f lightPos = transformed.screenPosition;
+
     float lightSize = 10;
     for (int x = lightPos.x - lightSize; x < lightPos.x + lightSize; ++x)
     {
@@ -110,14 +112,11 @@ void SoftwareRenderer::RenderLightSource()
             PutPixel(x, y, Vector4f::ToARGB(m_AmbientColor));
         }
     }
-    // render light direction
-    Vector2f lightDir = (Vector2f(0, 0) - lightPos).Normalized();
-    int lightRayLength = 100;
-    for (int i = 0; i < lightRayLength; ++i)
-    {
-        Vector2f point = lightPos + lightDir * i;
-        PutPixel(point.x, point.y, Vector4f::ToARGB(m_DiffuseColor));
-    }
+}
+
+void SoftwareRenderer::UpdateMVPMatrix()
+{
+    m_MVPMatrix = m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix;
 }
 
 void SoftwareRenderer::RenderWireframe(const vector<Vertex>& vertices)
@@ -153,6 +152,16 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
     Vector2f B = VB.screenPosition;
     Vector2f C = VC.screenPosition;
 
+    // clockwise order so we check if point is on the right side of line
+    const float ABC = EdgeFunction(A, B, C);
+
+    // if our edge function (signed area x2) is negative, it's a back facing triangle and we can cull it
+    bool isBackFacing = ABC <= 0;
+    if (isBackFacing)
+    {
+        return;
+    }
+
     //            max
     //    -------B
     //   |      /|
@@ -175,16 +184,7 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
     int maxX = max.x;
     int maxY = max.y;
 
-    // clockwise order so we check if point is on the right side of line
-    const float ABC = EdgeFunction(A, B, C);
-    const float inverseABC = 1.0f / ABC;
-
-    // if our edge function (signed area x2) is negative, it's a back facing triangle and we can cull it
-    if (ABC <= 0) {
-        return;
-    }
-
-    float invABC = 1.0f / ABC;
+    const float invABC = 1.0f / ABC;
 
     VertexInterpolator interpolator(VA, VB, VC);
     TransformedVertex interpolatedVertex;
@@ -295,7 +295,7 @@ Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
         sampledPixel = Vector4f(1, 1, 1, 1);
     }
 
-    Vector3f pointToLightDir = (vertex.worldPosition - m_LightPosition).Normalized();
+    Vector3f pointToLightDir = (m_LightPosition- vertex.worldPosition).Normalized();
 
     // ambient - light that is reflected from other objects
 
@@ -314,9 +314,8 @@ Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
     // specular - light that is reflected from light source and is reflected in one direction
     // specular = specularStrength * specularColor * pow(max(dot(viewDir, reflectDir), 0.0), shininess)
 
-    Vector3f viewDir = (Vector3f(0, 0, 0) - vertex.worldPosition).Normalized();
+    Vector3f viewDir = (m_CameraPosition - vertex.worldPosition).Normalized();
     Vector3f reflectDir = (pointToLightDir * -1).Reflect(vertex.normal);
-    float shininess = 32;
     float specularFactor = pow(max(viewDir.Dot(reflectDir), 0.0f), m_Shininess);
     Vector4f specular = m_DiffuseColor * m_SpecularStrength * specularFactor;
 
@@ -339,16 +338,21 @@ void SoftwareRenderer::PutPixel(int x, int y, uint32_t color)
 void SoftwareRenderer::SetModelMatrixx(const Matrix4f& other)
 {
     m_ModelMatrix = other;
+    UpdateMVPMatrix();
 }
 
 void SoftwareRenderer::SetViewMatrix(const Matrix4f& other)
 {
     m_ViewMatrix = other;
+    Matrix4f inversedViewMatrix = m_ViewMatrix.Inversed();
+    m_CameraPosition = Vector3f(inversedViewMatrix[12], inversedViewMatrix[13], inversedViewMatrix[14]);
+    UpdateMVPMatrix();
 }
 
 void SoftwareRenderer::SetProjectionMatrix(const Matrix4f& other)
 {
     m_ProjectionMatrix = other;
+    UpdateMVPMatrix();
 }
 
 void SoftwareRenderer::SetTexture(shared_ptr<Texture> texture)

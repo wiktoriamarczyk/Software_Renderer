@@ -32,6 +32,7 @@ public:
     static Matrix4f Scale(Vector3f other);
 
     Matrix4f Transposed()const;
+    Matrix4f Inversed() const;
 
     float m_Matrix[4][4] = {};   // matrix elements; first index is for rows, second for columns (row-major)
 

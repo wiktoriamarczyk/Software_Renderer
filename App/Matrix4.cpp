@@ -133,3 +133,55 @@ Matrix4f Matrix4f::CreateLookAtMatrix(const Vector3f& eye, const Vector3f& targe
 
     return result;
 }
+
+Matrix4f Matrix4f::Inversed() const
+{
+    // wild magic 4 inverse - http://www.geometrictools.com/Documentation/LaplaceExpansionTheorem.pdf
+    // 84 multiplications
+    // 66 adds/subs
+    //  1 division
+
+    const float* data = (const float*)&m_Matrix[0][0];
+
+    // 24
+    const float fA0 = data[0] * data[5] - data[1] * data[4];
+    const float fA1 = data[0] * data[6] - data[2] * data[4];
+    const float fA2 = data[0] * data[7] - data[3] * data[4];
+    const float fA3 = data[1] * data[6] - data[2] * data[5];
+    const float fA4 = data[1] * data[7] - data[3] * data[5];
+    const float fA5 = data[2] * data[7] - data[3] * data[6];
+    const float fB0 = data[8] * data[13] - data[9] * data[12];
+    const float fB1 = data[8] * data[14] - data[10] * data[12];
+    const float fB2 = data[8] * data[15] - data[11] * data[12];
+    const float fB3 = data[9] * data[14] - data[10] * data[13];
+    const float fB4 = data[9] * data[15] - data[11] * data[13];
+    const float fB5 = data[10] * data[15] - data[11] * data[14];
+
+    // 6
+    const float det = fA0 * fB5 - fA1 * fB4 + fA2 * fB3 + fA3 * fB2 - fA4 * fB1 + fA5 * fB0;
+    if (det == 0.0f)
+        return {};
+
+    const float invDet = 1.0f / det;
+
+    // float* MyMatrixData = (float*)&m_Matrix[0][0];
+
+    // 36 + 16
+    return Matrix4f(
+        (data[5] * fB5 - data[6] * fB4 + data[7] * fB3) * invDet,
+        (-data[1] * fB5 + data[2] * fB4 - data[3] * fB3) * invDet,
+        (data[13] * fA5 - data[14] * fA4 + data[15] * fA3) * invDet,
+        (-data[9] * fA5 + data[10] * fA4 - data[11] * fA3) * invDet,
+        (-data[4] * fB5 + data[6] * fB2 - data[7] * fB1) * invDet,
+        (data[0] * fB5 - data[2] * fB2 + data[3] * fB1) * invDet,
+        (-data[12] * fA5 + data[14] * fA2 - data[15] * fA1) * invDet,
+        (data[8] * fA5 - data[10] * fA2 + data[11] * fA1) * invDet,
+        (data[4] * fB4 - data[5] * fB2 + data[7] * fB0) * invDet,
+        (-data[0] * fB4 + data[1] * fB2 - data[3] * fB0) * invDet,
+        (data[12] * fA4 - data[13] * fA2 + data[15] * fA0) * invDet,
+        (-data[8] * fA4 + data[9] * fA2 - data[11] * fA0) * invDet,
+        (-data[4] * fB3 + data[5] * fB1 - data[6] * fB0) * invDet,
+        (data[0] * fB3 - data[1] * fB1 + data[2] * fB0) * invDet,
+        (-data[12] * fA3 + data[13] * fA1 - data[14] * fA0) * invDet,
+        (data[8] * fA3 - data[9] * fA1 + data[10] * fA0) * invDet);
+}
