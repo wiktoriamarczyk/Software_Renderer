@@ -4,8 +4,7 @@
 
 struct TransformedVertex
 {
-    Vector2f screenPosition;
-    float    zValue = 0;
+    Vector4f screenPosition;
     Vector3f normal;
     Vector3f worldPosition;
     Vector4f color;
@@ -15,7 +14,7 @@ struct TransformedVertex
     {
         TransformedVertex result;
         result.screenPosition = screenPosition * value;
-        result.zValue = zValue * value;
+       // result.zValue = zValue * value;
         result.normal = normal * value;
         result.worldPosition = worldPosition * value;
         result.color = color * value;
@@ -27,7 +26,7 @@ struct TransformedVertex
     {
         TransformedVertex result;
         result.screenPosition = screenPosition + vertex.screenPosition;
-        result.zValue = zValue + vertex.zValue;
+        //result.zValue = zValue + vertex.zValue;
         result.normal = normal + vertex.normal;
         result.worldPosition = worldPosition + vertex.worldPosition;
         result.color = color + vertex.color;

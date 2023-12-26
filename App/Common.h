@@ -21,7 +21,8 @@ const int SCREEN_HEIGHT = 800;
 const int FULL_ANGLE = 360;
 const float PI = std::numbers::pi;
 const int TRIANGLE_VERT_COUNT = 3;
-const string DEFAULT_TEXTURE_PATH = filesystem::current_path().string() + "/../Data/Checkerboard.png";
+const string INIT_TEXTURE_PATH = filesystem::current_path().string() + "/../Data/Checkerboard.png";
+const string DEFAULT_TEXTURE_PATH = filesystem::current_path().string() + "/../Data/Default.png";
 
 struct MyModelPaths
 {

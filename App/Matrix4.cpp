@@ -1,7 +1,7 @@
 #pragma once
 #include "Common.h"
 #include "Matrix4.h"
-
+#include "Math.h"
 
 Matrix4f Matrix4f::Translation(Vector3f other)
 {
@@ -87,10 +87,10 @@ Matrix4f Matrix4f::CreateProjectionMatrix(float fieldOfView, float aspectRatio, 
 
     result.m_Matrix[0][0] = 1.f / (aspectRatio * tanHalfFovy);
     result.m_Matrix[1][1] = 1.f / (tanHalfFovy);
-    result.m_Matrix[3][2] = 1.f;
+    result.m_Matrix[2][3] = -1.f;
 
-    result.m_Matrix[2][2] = (far + near) / (far - near);
-    result.m_Matrix[2][3] = -(2.f * far * near) / (far - near);
+    result.m_Matrix[2][2] = -(far + near) / (far - near);
+    result.m_Matrix[3][2] = -(2.f * far * near) / (far - near);
     result.m_Matrix[3][3] = 0.f;
 
     return result;
@@ -184,4 +184,27 @@ Matrix4f Matrix4f::Inversed() const
         (data[0] * fB3 - data[1] * fB1 + data[2] * fB0) * invDet,
         (-data[12] * fA3 + data[13] * fA1 - data[14] * fA0) * invDet,
         (data[8] * fA3 - data[9] * fA1 + data[10] * fA0) * invDet);
+}
+
+
+bool Matrix4f::MakeFrustumPlane(float A, float B, float C, float D, Plane& OutPlane)
+{
+    const float	LengthSquared = A * A + B * B + C * C;
+    if (LengthSquared == 0)
+        return false;
+
+    const float	InvLength = 1 / sqrt(LengthSquared);
+    OutPlane = Plane(Vector3f{ -A * InvLength, -B * InvLength, -C * InvLength }, D * InvLength);
+    return true;
+}
+
+bool Matrix4f::GetFrustumNearPlane(Plane& OutPlane) const
+{
+    return MakeFrustumPlane(
+        m_Matrix[0][2],
+        m_Matrix[1][2],
+        m_Matrix[2][2],
+       -m_Matrix[3][2],
+        OutPlane
+    );
 }

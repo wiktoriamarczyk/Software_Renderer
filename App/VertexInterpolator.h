@@ -11,11 +11,12 @@ public:
 private:
     struct InterpolatedSource
     {
-        Vector3f    worldPositionOverZ;
-        Vector3f    normalOverZ;
-        Vector2f    uvOverZ;
-        Vector4f    colorOverZ;
-        float       oneOverZ;
+        Vector3f    worldPositionOverW;
+        Vector3f    normalOverW;
+        Vector2f    uvOverW;
+        Vector4f    colorOverW;
+        float       oneOverW;
+        float       screenPositionZ;
     };
 
     InterpolatedSource m_A;

@@ -173,7 +173,7 @@ int main()
     // load default model
     vector<Model> modelsData = LoadFallbackModel();
     shared_ptr<Texture> modelTexture = make_shared<Texture>();
-    modelTexture->Load(DEFAULT_TEXTURE_PATH.c_str());
+    modelTexture->Load(INIT_TEXTURE_PATH.c_str());
 
     // create the window
     sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer");
@@ -195,7 +195,7 @@ int main()
     renderer.SetTexture(modelTexture);
 
     Matrix4f cameraMatrix = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 0), Vector3f(0, 1, 0));
-    Matrix4f projectionMatrix = Matrix4f::CreateProjectionMatrix(90, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);
+    Matrix4f projectionMatrix = Matrix4f::CreateProjectionMatrix(60, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.8f, 1000.0f);
     Matrix4f modelMatrix = Matrix4f::Identity();
 
     auto lastFrameTime = std::chrono::high_resolution_clock::now();
@@ -223,6 +223,10 @@ int main()
         if (lastModelPaths.modelPath != modelPaths.modelPath)
         {
             modelsData = LoadModelVertices(modelPaths.modelPath.c_str());
+            lastModelPaths = modelPaths;
+            modelTexture->Load(DEFAULT_TEXTURE_PATH.c_str());
+            renderer.SetTexture(modelTexture);
+            modelPaths.texturePath = DEFAULT_TEXTURE_PATH;
             lastModelPaths = modelPaths;
         }
 

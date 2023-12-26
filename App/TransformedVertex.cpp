@@ -8,10 +8,14 @@ void TransformedVertex::ProjToScreen(Vertex v, Matrix4f worldMatrix, Matrix4f mv
     color = v.color;
     uv = v.uv;
 
-    Vector4f clip = Vector4f(v.position, 1.0f).Transformed(mvpMatrix);
+    screenPosition = Vector4f(v.position, 1.0f).Transformed(mvpMatrix);
 
-    zValue = clip.z;
+    float oneOverW = 1.0f / screenPosition.w;
 
-    screenPosition.x = (clip.x / clip.w + 1) * SCREEN_WIDTH / 2;
-    screenPosition.y = (clip.y / clip.w + 1) * SCREEN_HEIGHT / 2;
+    screenPosition.x *= oneOverW;
+    screenPosition.y *= oneOverW;
+    screenPosition.z *= oneOverW;
+
+    screenPosition.x = (screenPosition.x + 1) * SCREEN_WIDTH / 2;
+    screenPosition.y = (screenPosition.y + 1) * SCREEN_HEIGHT / 2;
 }
