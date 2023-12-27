@@ -15,7 +15,6 @@ public:
     void ClearScreen()override;
     void ClearZBuffer()override;
     void Render(const vector<Vertex>& vertices)override;
-    void RenderWireframe(const vector<Vertex>& vertices)override;
     const vector<uint32_t>& GetScreenBuffer() const override;
 
     void SetModelMatrixx(const Matrix4f& other)override;
@@ -32,15 +31,20 @@ public:
     void SetSpecularStrength(float specularStrength)override;
     void SetShininess(float shininess)override;
     void SetThreadsCount(uint8_t threadsCount)override;
+    void SetColorizeThreads(bool colorizeThreads)override;
+    void SetDrawWireframe(bool Wireframe)override;
+    void SetDrawBBoxes(bool drawBBoxes)override;
 private:
-    void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, int MinY, int MaxY);
-    void DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color);
-    void DrawLine(const TransformedVertex& A, const TransformedVertex& B, const Vector4f& color);
+    void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int MaxY);
+    void DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int MaxY);
+    void DrawTriangleBoundingBox(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int MaxY);
+    void DrawLine(const TransformedVertex& A, const TransformedVertex& B, const Vector4f& color, int MinY, int MaxY);
+    void DrawLine(Vector2f A, Vector2f B, const Vector4f& color, int MinY, int MaxY);
     void PutPixel(int x, int y, uint32_t color);
     void PutPixelUnsafe(int x, int y, uint32_t color);
     void RenderLightSource();
     void UpdateMVPMatrix();
-    void DoRender(const vector<Vertex>& vertices, int MinY, int MaxY);
+    void DoRender(const vector<Vertex>& vertices, int MinY, int MaxY, int threadID);
 
     static float EdgeFunction(const Vector2f& A, const Vector2f& B, const Vector2f& C);
     Vector4f FragmentShader(const TransformedVertex& vertex);
@@ -54,6 +58,7 @@ private:
     Vector4f            m_AmbientColor = Vector4f(1, 1, 1, 1);
     Vector3f            m_LightPosition = Vector3f(0, 0, -20);
     Vector3f            m_CameraPosition = Vector3f(0, 0, 0);
+    Vector4f            m_ThreadColors[12];
 
     Matrix4f            m_ModelMatrix;
     Matrix4f            m_ViewMatrix;
@@ -62,6 +67,8 @@ private:
 
     bool                m_SettingsOpen = false;
     bool                m_DrawWireframe = false;
+    bool                m_ColorizeThreads = false;
+    bool                m_DrawBBoxes = false;
     float               m_DiffuseStrength = 0.3f;
     float               m_AmbientStrength = 0.5f;
     float               m_SpecularStrength = 0.9f;

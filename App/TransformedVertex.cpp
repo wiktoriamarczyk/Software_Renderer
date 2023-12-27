@@ -1,7 +1,7 @@
 #include "TransformedVertex.h"
 #include "Matrix4.h"
 
-void TransformedVertex::ProjToScreen(Vertex v, Matrix4f worldMatrix, Matrix4f mvpMatrix)
+void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix)
 {
     worldPosition = v.position.Transformed(worldMatrix);
     normal = (v.normal.Transformed(worldMatrix) - Vector3f{ 0,0,0 }.Transformed(worldMatrix)).Normalized();

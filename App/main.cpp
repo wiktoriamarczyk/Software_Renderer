@@ -233,7 +233,7 @@ int main()
     Vector3f    modelRotation;
     Vector3f    modelTranslation;
     float       modelScale = 0.1;
-    Vector4f    wireFrameColor = Vector4f(1, 0, 1, 1);
+    Vector4f    wireFrameColor = Vector4f(1, 1, 1, 1);
     Vector4f    diffuseColor = Vector4f(1, 1, 1, 1);
     Vector4f    ambientColor = Vector4f(1, 1, 1, 1);
     Vector3f    lightPosition = Vector3f(0, 0, -20);
@@ -243,6 +243,8 @@ int main()
     float       shininess = 32.0f;
     int         threadsCount = 0;
     bool        drawWireframe = false;
+    bool        drawBBoxes = false;
+    bool        colorizeThreads = false;
 
     auto lastFrameTime = std::chrono::high_resolution_clock::now();
 
@@ -299,7 +301,6 @@ int main()
 
         ImGui::Begin("Settings");
 
-
         ImGui::ColorEdit4("WireFrame Color", &wireFrameColor.x);
         ImGui::ColorEdit4("Ambient Color", &ambientColor.x);
         ImGui::ColorEdit4("Diffuse Color", &diffuseColor.x);
@@ -312,7 +313,7 @@ int main()
         ImGui::SliderFloat("Scale", &modelScale, 0, 5);
         ImGui::SliderFloat3("Light Position", &lightPosition.x, -20, 20);
         ImGui::SliderInt("Thread Count", &threadsCount, 0, 12);
-        ImGui::Checkbox("Wireframe", &drawWireframe);
+        ImGui::Checkbox("Wireframe", &drawWireframe); ImGui::SameLine() ; ImGui::Checkbox("Colorize Threads", &colorizeThreads); ImGui::SameLine(); ImGui::Checkbox("BBoxes", &drawBBoxes);
 
         ImGui::End();
 
@@ -325,6 +326,9 @@ int main()
         renderer->SetSpecularStrength(specularStrength);
         renderer->SetShininess(shininess);
         renderer->SetThreadsCount(threadsCount);
+        renderer->SetDrawWireframe(drawWireframe);
+        renderer->SetColorizeThreads(colorizeThreads);
+        renderer->SetDrawBBoxes(drawBBoxes);
 
         // render stuff to screen buffer
         renderer->ClearZBuffer();
@@ -332,9 +336,6 @@ int main()
 
         for (auto& model : modelsData) {
             renderer->Render(model.vertices);
-
-            if (drawWireframe)
-                renderer->RenderWireframe(model.vertices);
         }
 
         auto buf = renderer->GetScreenBuffer();

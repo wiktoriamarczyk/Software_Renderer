@@ -34,5 +34,5 @@ struct TransformedVertex
         return result;
     }
 
-    void ProjToScreen(Vertex v, Matrix4f worldMatrix, Matrix4f mvpMatrix);
+    void ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix);
 };

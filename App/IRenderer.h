@@ -25,7 +25,6 @@ public:
     virtual void ClearScreen()=0;
     virtual void ClearZBuffer()=0;
     virtual void Render(const vector<Vertex>& vertices)=0;
-    virtual void RenderWireframe(const vector<Vertex>& vertices)=0;
     virtual const vector<uint32_t>& GetScreenBuffer() const=0;
 
     virtual void SetModelMatrixx(const Matrix4f& other)=0;
@@ -42,4 +41,7 @@ public:
     virtual void SetSpecularStrength(float specularStrength)=0;
     virtual void SetShininess(float shininess)=0;
     virtual void SetThreadsCount(uint8_t threadsCount)=0;
+    virtual void SetColorizeThreads(bool colorizeThreads)=0;
+    virtual void SetDrawWireframe(bool wireframe)=0;
+    virtual void SetDrawBBoxes(bool drawBBoxes)=0;
 };
