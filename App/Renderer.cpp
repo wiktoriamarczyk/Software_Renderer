@@ -12,29 +12,6 @@ SoftwareRenderer::SoftwareRenderer(int ScreenWidth, int ScreenHeight)
     m_ZBuffer.resize(ScreenWidth * ScreenHeight, 0);
 }
 
-void SoftwareRenderer::UpdateUI()
-{
-    ImGui::Begin("Settings", &m_SettingsOpen);
-
-    ImGui::ColorEdit4("WireFrame Color", &m_WireFrameColor.x);
-    ImGui::ColorEdit4("Ambient Color", &m_AmbientColor.x);
-    ImGui::ColorEdit4("Diffuse Color", &m_DiffuseColor.x);
-    ImGui::SliderFloat("Ambient Strength", &m_AmbientStrength, 0, 1);
-    ImGui::SliderFloat("Diffuse Strength", &m_DiffuseStrength, 0, 1);
-    ImGui::SliderFloat("Specular Strength", &m_SpecularStrength, 0, 1);
-    ImGui::InputFloat("Shininess", &m_Shininess, 2.f);
-    ImGui::SliderFloat3("Rotation", &m_Rotation.x, 0, FULL_ANGLE);
-    ImGui::SliderFloat3("Translation", &m_Translation.x, -15, 15);
-    ImGui::SliderFloat("Scale", &m_Scale, 0, m_MaxScale);
-    ImGui::SliderFloat3("Light Position", &m_LightPosition.x, -20, 20);
-    ImGui::SliderInt("Thread Count", &m_ThreadsCount, 0, 12);
-    ImGui::Checkbox("Wireframe", &m_Wireframe);
-
-    m_ThreadPool.SetThreadCount(m_ThreadsCount);
-
-    ImGui::End();
-}
-
 void SoftwareRenderer::ClearScreen()
 {
     std::fill(m_ScreenBuffer.begin(), m_ScreenBuffer.end(), 0xFF000000);
@@ -360,22 +337,60 @@ void SoftwareRenderer::SetTexture(shared_ptr<Texture> texture)
     m_Texture = texture;
 }
 
-Vector3f SoftwareRenderer::GetRotation() const
-{
-    return m_Rotation;
-}
-
-Vector3f SoftwareRenderer::GetTranslation() const
-{
-    return m_Translation;
-}
-
-float SoftwareRenderer::GetScale() const
-{
-    return m_Scale;
-}
-
 bool SoftwareRenderer::IsWireframe() const
 {
-    return m_Wireframe;
+    return m_DrawWireframe;
+}
+
+void SoftwareRenderer::SetWireFrameColor(const Vector4f& wireFrameColor)
+{
+    m_WireFrameColor = wireFrameColor;
+}
+
+void SoftwareRenderer::SetDiffuseColor(const Vector4f& diffuseColor)
+{
+    m_DiffuseColor = diffuseColor;
+}
+
+void SoftwareRenderer::SetAmbientColor(const Vector4f& ambientColor)
+{
+    m_AmbientColor = ambientColor;
+}
+
+void SoftwareRenderer::SetLightPosition(const Vector3f& lightPosition)
+{
+    m_LightPosition = lightPosition;
+}
+
+void SoftwareRenderer::SetDiffuseStrength(float diffuseStrength)
+{
+    m_DiffuseStrength = diffuseStrength;
+}
+
+void SoftwareRenderer::SetAmbientStrength(float ambientStrength)
+{
+    m_AmbientStrength = ambientStrength;
+}
+
+void SoftwareRenderer::SetSpecularStrength(float specularStrength)
+{
+    m_SpecularStrength = specularStrength;
+}
+void SoftwareRenderer::SetShininess(float shininess)
+{
+    m_Shininess = shininess;
+}
+
+void SoftwareRenderer::SetDrawWireframe(bool drawWireframe)
+{
+    m_DrawWireframe = drawWireframe;
+}
+
+void SoftwareRenderer::SetThreadsCount(uint8_t threadsCount)
+{
+    if (m_ThreadsCount==threadsCount)
+        return;
+
+    m_ThreadsCount = threadsCount;
+    m_ThreadPool.SetThreadCount(m_ThreadsCount);
 }

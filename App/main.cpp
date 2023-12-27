@@ -20,6 +20,24 @@ vector<Model> LoadFromScene(const aiScene* pScene)
         return vector<Model>();
     }
 
+    int totalVertices = 0;
+
+    for (int i = 0; i < pScene->mNumMeshes; ++i)
+    {
+        if( (pScene->mMeshes[i]->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)!=aiPrimitiveType_TRIANGLE )
+        {
+            // skip non-triangle meshes
+            continue;
+        }
+        totalVertices += pScene->mMeshes[i]->mNumFaces * 3;
+    }
+
+    if (totalVertices > MAX_MODEL_VERTICES)
+    {
+        printf("Total vertices count %d exceeds max allowed number of vertices %d\n" , totalVertices , MAX_MODEL_VERTICES );
+        return vector<Model>();
+    }
+
     vector<Model> result;
 
     for (int i = 0; i < pScene->mNumMeshes; ++i)
@@ -29,6 +47,11 @@ vector<Model> LoadFromScene(const aiScene* pScene)
         Model& model = result.back();
 
         auto mesh = pScene->mMeshes[i];
+        if( (mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)!=aiPrimitiveType_TRIANGLE )
+        {
+            // skip non-triangle meshes
+            continue;
+        }
 
         model.vertices.reserve(mesh->mNumFaces * 3);
 
@@ -171,7 +194,7 @@ void OpenSceneDataDialog(MyModelPaths& selectedPaths)
     });
 
 
-    ImGui::Begin("Settings");
+    ImGui::End();
 }
 
 int main()
@@ -203,9 +226,23 @@ int main()
 
     renderer.SetTexture(modelTexture);
 
-    Matrix4f cameraMatrix = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 0), Vector3f(0, 1, 0));
-    Matrix4f projectionMatrix = Matrix4f::CreateProjectionMatrix(60, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.8f, 1000.0f);
-    Matrix4f modelMatrix = Matrix4f::Identity();
+    Matrix4f    cameraMatrix = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 0), Vector3f(0, 1, 0));
+    Matrix4f    projectionMatrix = Matrix4f::CreateProjectionMatrix(60, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.8f, 1000.0f);
+    Matrix4f    modelMatrix = Matrix4f::Identity();
+
+    Vector3f    modelRotation;
+    Vector3f    modelTranslation;
+    float       modelScale = 0.1;
+    Vector4f    wireFrameColor = Vector4f(1, 0, 1, 1);
+    Vector4f    diffuseColor = Vector4f(1, 1, 1, 1);
+    Vector4f    ambientColor = Vector4f(1, 1, 1, 1);
+    Vector3f    lightPosition = Vector3f(0, 0, -20);
+    float       diffuseStrength = 0.7f;
+    float       ambientStrength = 0.3f;
+    float       specularStrength = 0.9f;
+    float       shininess = 32.0f;
+    int         threadsCount = 0;
+    bool        drawWireframe = false;
 
     auto lastFrameTime = std::chrono::high_resolution_clock::now();
 
@@ -246,13 +283,11 @@ int main()
             lastModelPaths = modelPaths;
         }
 
-        float angleX = (renderer.GetRotation().x / 180.f * PI);
-        float angleY = (renderer.GetRotation().y / 180.f * PI);
-        float angleZ = (renderer.GetRotation().z / 180.f * PI);
-        float scale = renderer.GetScale();
-        Vector3f translation = renderer.GetTranslation();
+        float angleX = (modelRotation.x / 180.f * PI);
+        float angleY = (modelRotation.y / 180.f * PI);
+        float angleZ = (modelRotation.z / 180.f * PI);
 
-        modelMatrix = Matrix4f::Rotation(Vector3f(angleX, angleY, angleZ)) * Matrix4f::Scale(Vector3f(scale, scale, scale)) * Matrix4f::Translation(translation);
+        modelMatrix = Matrix4f::Rotation(Vector3f(angleX, angleY, angleZ)) * Matrix4f::Scale(Vector3f(modelScale, modelScale, modelScale)) * Matrix4f::Translation(modelTranslation);
 
         renderer.SetModelMatrixx(modelMatrix);
         renderer.SetViewMatrix(cameraMatrix);
@@ -260,7 +295,37 @@ int main()
 
         // update UI
         ImGui::SFML::Update(window, deltaClock.restart());
-        renderer.UpdateUI();
+
+
+        ImGui::Begin("Settings");
+
+
+        ImGui::ColorEdit4("WireFrame Color", &wireFrameColor.x);
+        ImGui::ColorEdit4("Ambient Color", &ambientColor.x);
+        ImGui::ColorEdit4("Diffuse Color", &diffuseColor.x);
+        ImGui::SliderFloat("Ambient Strength", &ambientStrength, 0, 1);
+        ImGui::SliderFloat("Diffuse Strength", &diffuseStrength, 0, 1);
+        ImGui::SliderFloat("Specular Strength", &specularStrength, 0, 1);
+        ImGui::InputFloat("Shininess", &shininess, 2.f);
+        ImGui::SliderFloat3("Rotation", &modelRotation.x, 0, FULL_ANGLE);
+        ImGui::SliderFloat3("Translation", &modelTranslation.x, -15, 15);
+        ImGui::SliderFloat("Scale", &modelScale, 0, 5);
+        ImGui::SliderFloat3("Light Position", &lightPosition.x, -20, 20);
+        ImGui::SliderInt("Thread Count", &threadsCount, 0, 12);
+        ImGui::Checkbox("Wireframe", &drawWireframe);
+
+        ImGui::End();
+
+        renderer.SetWireFrameColor(wireFrameColor);
+        renderer.SetDiffuseColor(diffuseColor);
+        renderer.SetAmbientColor(ambientColor);
+        renderer.SetLightPosition(lightPosition);
+        renderer.SetDiffuseStrength(diffuseStrength);
+        renderer.SetAmbientStrength(ambientStrength);
+        renderer.SetSpecularStrength(specularStrength);
+        renderer.SetShininess(shininess);
+        renderer.SetDrawWireframe(drawWireframe);
+        renderer.SetThreadsCount(threadsCount);
 
         // render stuff to screen buffer
         renderer.ClearZBuffer();
