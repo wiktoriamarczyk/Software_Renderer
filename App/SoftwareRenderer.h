@@ -1,44 +1,37 @@
 #pragma once
 
-#include "Common.h"
-#include "Vector3f.h"
-#include "Matrix4.h"
-#include "Vector4f.h"
-#include "Vector2f.h"
-#include "Math.h"
+#include "IRenderer.h"
 #include "TransformedVertex.h"
 #include "Texture.h"
 #include "SimpleThreadPool.h"
 
-class SoftwareRenderer
+class SoftwareRenderer : public IRenderer
 {
 public:
     SoftwareRenderer(int screenWidth, int screenHeight);
 
-    void ClearScreen();
-    void ClearZBuffer();
-    void Render(const vector<Vertex>& vertices);
-    void RenderWireframe(const vector<Vertex>& vertices);
-    const vector<uint32_t>& GetScreenBuffer() const;
+    shared_ptr<ITexture> LoadTexture(const char* fileName)const override;
 
-    void SetModelMatrixx(const Matrix4f& other);
-    void SetViewMatrix(const Matrix4f& other);
-    void SetProjectionMatrix(const Matrix4f& other);
-    void SetTexture(shared_ptr<Texture> texture);
+    void ClearScreen()override;
+    void ClearZBuffer()override;
+    void Render(const vector<Vertex>& vertices)override;
+    void RenderWireframe(const vector<Vertex>& vertices)override;
+    const vector<uint32_t>& GetScreenBuffer() const override;
 
-    bool IsWireframe() const;
+    void SetModelMatrixx(const Matrix4f& other)override;
+    void SetViewMatrix(const Matrix4f& other)override;
+    void SetProjectionMatrix(const Matrix4f& other)override;
+    void SetTexture(shared_ptr<ITexture> texture)override;
 
-
-    void SetWireFrameColor(const Vector4f& wireFrameColor);
-    void SetDiffuseColor(const Vector4f& diffuseColor);
-    void SetAmbientColor(const Vector4f& ambientColor);
-    void SetLightPosition(const Vector3f& lightPosition);
-    void SetDiffuseStrength(float diffuseStrength);
-    void SetAmbientStrength(float ambientStrength);
-    void SetSpecularStrength(float specularStrength);
-    void SetShininess(float shininess);
-    void SetDrawWireframe(bool drawWireframe);
-    void SetThreadsCount(uint8_t threadsCount);
+    void SetWireFrameColor(const Vector4f& wireFrameColor)override;
+    void SetDiffuseColor(const Vector4f& diffuseColor)override;
+    void SetAmbientColor(const Vector4f& ambientColor)override;
+    void SetLightPosition(const Vector3f& lightPosition)override;
+    void SetDiffuseStrength(float diffuseStrength)override;
+    void SetAmbientStrength(float ambientStrength)override;
+    void SetSpecularStrength(float specularStrength)override;
+    void SetShininess(float shininess)override;
+    void SetThreadsCount(uint8_t threadsCount)override;
 private:
     void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, int MinY, int MaxY);
     void DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color);

@@ -31,3 +31,9 @@ struct MyModelPaths
     string modelPath;
     string texturePath;
 };
+
+enum class eRendererType : uint8_t
+{
+    SOFTWARE,
+    HARDWARE
+};

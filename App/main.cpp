@@ -1,5 +1,5 @@
 #include "Common.h"
-#include "SoftwareRenderer.h"
+#include "IRenderer.h"
 #include "Fallback.h"
 #include "Math.h"
 #include <assimp/cimport.h>
@@ -204,8 +204,6 @@ int main()
 
     // load default model
     vector<Model> modelsData = LoadFallbackModel();
-    shared_ptr<Texture> modelTexture = make_shared<Texture>();
-    modelTexture->Load(INIT_TEXTURE_PATH.c_str());
 
     // create the window
     sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer");
@@ -222,9 +220,11 @@ int main()
 
     sf::Clock deltaClock;
 
-    SoftwareRenderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT);
+    shared_ptr<IRenderer> renderer = IRenderer::CreateRenderer(eRendererType::SOFTWARE,SCREEN_WIDTH, SCREEN_HEIGHT);
 
-    renderer.SetTexture(modelTexture);
+    shared_ptr<ITexture> modelTexture = renderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
+
+    renderer->SetTexture(modelTexture);
 
     Matrix4f    cameraMatrix = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 0), Vector3f(0, 1, 0));
     Matrix4f    projectionMatrix = Matrix4f::CreateProjectionMatrix(60, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.8f, 1000.0f);
@@ -270,16 +270,16 @@ int main()
         {
             modelsData = LoadModelVertices(modelPaths.modelPath.c_str());
             lastModelPaths = modelPaths;
-            modelTexture->Load(DEFAULT_TEXTURE_PATH.c_str());
-            renderer.SetTexture(modelTexture);
+            modelTexture = renderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
+            renderer->SetTexture(modelTexture);
             modelPaths.texturePath = DEFAULT_TEXTURE_PATH;
             lastModelPaths = modelPaths;
         }
 
         if (lastModelPaths.texturePath != modelPaths.texturePath)
         {
-            modelTexture->Load(modelPaths.texturePath.c_str());
-            renderer.SetTexture(modelTexture);
+            modelTexture = renderer->LoadTexture(modelPaths.texturePath.c_str());
+            renderer->SetTexture(modelTexture);
             lastModelPaths = modelPaths;
         }
 
@@ -289,9 +289,9 @@ int main()
 
         modelMatrix = Matrix4f::Rotation(Vector3f(angleX, angleY, angleZ)) * Matrix4f::Scale(Vector3f(modelScale, modelScale, modelScale)) * Matrix4f::Translation(modelTranslation);
 
-        renderer.SetModelMatrixx(modelMatrix);
-        renderer.SetViewMatrix(cameraMatrix);
-        renderer.SetProjectionMatrix(projectionMatrix);
+        renderer->SetModelMatrixx(modelMatrix);
+        renderer->SetViewMatrix(cameraMatrix);
+        renderer->SetProjectionMatrix(projectionMatrix);
 
         // update UI
         ImGui::SFML::Update(window, deltaClock.restart());
@@ -316,32 +316,31 @@ int main()
 
         ImGui::End();
 
-        renderer.SetWireFrameColor(wireFrameColor);
-        renderer.SetDiffuseColor(diffuseColor);
-        renderer.SetAmbientColor(ambientColor);
-        renderer.SetLightPosition(lightPosition);
-        renderer.SetDiffuseStrength(diffuseStrength);
-        renderer.SetAmbientStrength(ambientStrength);
-        renderer.SetSpecularStrength(specularStrength);
-        renderer.SetShininess(shininess);
-        renderer.SetDrawWireframe(drawWireframe);
-        renderer.SetThreadsCount(threadsCount);
+        renderer->SetWireFrameColor(wireFrameColor);
+        renderer->SetDiffuseColor(diffuseColor);
+        renderer->SetAmbientColor(ambientColor);
+        renderer->SetLightPosition(lightPosition);
+        renderer->SetDiffuseStrength(diffuseStrength);
+        renderer->SetAmbientStrength(ambientStrength);
+        renderer->SetSpecularStrength(specularStrength);
+        renderer->SetShininess(shininess);
+        renderer->SetThreadsCount(threadsCount);
 
         // render stuff to screen buffer
-        renderer.ClearZBuffer();
-        renderer.ClearScreen();
+        renderer->ClearZBuffer();
+        renderer->ClearScreen();
 
         for (auto& model : modelsData) {
-            renderer.Render(model.vertices);
+            renderer->Render(model.vertices);
 
-            if (renderer.IsWireframe())
-                renderer.RenderWireframe(model.vertices);
+            if (drawWireframe)
+                renderer->RenderWireframe(model.vertices);
         }
 
-        auto buf = renderer.GetScreenBuffer();
+        auto buf = renderer->GetScreenBuffer();
 
               uint32_t* dst = (uint32_t*)buf.data();
-        const uint32_t* src = (uint32_t*)renderer.GetScreenBuffer().data();
+        const uint32_t* src = (uint32_t*)renderer->GetScreenBuffer().data();
 
         for (int y = 0; y < SCREEN_HEIGHT; ++y)
         {

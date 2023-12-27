@@ -12,6 +12,14 @@ SoftwareRenderer::SoftwareRenderer(int ScreenWidth, int ScreenHeight)
     m_ZBuffer.resize(ScreenWidth * ScreenHeight, 0);
 }
 
+shared_ptr<ITexture> SoftwareRenderer::LoadTexture(const char* fileName) const
+{
+    auto texture = std::make_shared<Texture>();
+    if (texture->Load(fileName))
+        return texture;
+    return nullptr;
+}
+
 void SoftwareRenderer::ClearScreen()
 {
     std::fill(m_ScreenBuffer.begin(), m_ScreenBuffer.end(), 0xFF000000);
@@ -332,14 +340,9 @@ void SoftwareRenderer::SetProjectionMatrix(const Matrix4f& other)
     UpdateMVPMatrix();
 }
 
-void SoftwareRenderer::SetTexture(shared_ptr<Texture> texture)
+void SoftwareRenderer::SetTexture(shared_ptr<ITexture> texture)
 {
-    m_Texture = texture;
-}
-
-bool SoftwareRenderer::IsWireframe() const
-{
-    return m_DrawWireframe;
+    m_Texture = dynamic_pointer_cast<Texture>(texture);
 }
 
 void SoftwareRenderer::SetWireFrameColor(const Vector4f& wireFrameColor)
@@ -376,14 +379,10 @@ void SoftwareRenderer::SetSpecularStrength(float specularStrength)
 {
     m_SpecularStrength = specularStrength;
 }
+
 void SoftwareRenderer::SetShininess(float shininess)
 {
     m_Shininess = shininess;
-}
-
-void SoftwareRenderer::SetDrawWireframe(bool drawWireframe)
-{
-    m_DrawWireframe = drawWireframe;
 }
 
 void SoftwareRenderer::SetThreadsCount(uint8_t threadsCount)
