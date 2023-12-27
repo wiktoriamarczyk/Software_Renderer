@@ -4,259 +4,6 @@
 #include "TransformedVertex.h"
 #include "VertexInterpolator.h"
 
-
-constexpr int INTSIGNBITNOTSET(int i) { return ((~((const unsigned long)(i))) >> 31); }
-
-template< typename T >
-static T LerpT(const T& a, const T& b, float alpha)
-{
-    float a1 = 1.0f - alpha;
-    return a * a1 + b * alpha;
-}
-
-const vector<Vertex>& ClipTraingles(const Plane& ClipPlane, const float Epsilon, const vector<Vertex>& Verts)
-{
-    static vector<Vertex> EMPTY;
-    vector<uint8_t> VertsRelation;
-    vector<Vertex> SplitedVertices;
-    vector<int> EdgeSplitVertex;
-    static thread_local vector<Vertex> ClippedVerts;
-
-    using eSide = Plane::eSide;
-
-    float            fDist = 0;
-    const int        OldVerticesCount = Verts.size();
-    const int        OldEdgesCount = OldVerticesCount;
-    const int        OldTrianglesCount = OldVerticesCount / 3;
-    int              FrontBack[3] = {};
-    VertsRelation.resize(OldVerticesCount);
-
-    for (int i = 0; i < OldVerticesCount; ++i)
-    {
-        VertsRelation[i] = (uint8_t)ClipPlane.GetSide(Verts[i].position, Epsilon);
-        FrontBack[VertsRelation[i]]++;
-    }
-
-    // all vertices behind clipping plane - clip all
-    if (!FrontBack[(int)eSide::Back])
-    {
-        return EMPTY;
-    }
-
-    // all vertices in front of clipping plane - no clipping
-    if (!FrontBack[(int)eSide::Front])
-    {
-        return Verts;
-    }
-
-    struct edge
-    {
-        uint8_t VertexIndex[2];
-    };
-
-    constexpr edge TriangleEdges[3] = {
-        { 0,1 },
-        { 1,2 },
-        { 2,0 }
-    };
-
-    SplitedVertices.clear();
-    EdgeSplitVertex.resize(OldEdgesCount);
-
-    for (int t = 0, e = 0; t < OldTrianglesCount; ++t)
-    {
-        int BaseVertex = t * 3;
-        for (auto& Edge : TriangleEdges)
-        {
-            int vi0 = BaseVertex + Edge.VertexIndex[0];
-            int vi1 = BaseVertex + Edge.VertexIndex[1];
-
-            if ((VertsRelation[vi0] ^ VertsRelation[vi1]) && !((VertsRelation[vi0] | VertsRelation[vi1]) & (uint8_t)eSide::On))
-            {
-                ClipPlane.LineIntersection(Verts[vi0].position, Verts[vi1].position, fDist);
-                Vertex NewVertex = LerpT(Verts[vi0], Verts[vi1], fDist);
-
-                EdgeSplitVertex[e] = (int)SplitedVertices.size();
-
-                SplitedVertices.push_back(NewVertex);
-            }
-            else
-            {
-                // no split
-                EdgeSplitVertex[e] = -1;
-            }
-            ++e;
-        }
-    }
-
-    ClippedVerts.reserve(OldVerticesCount + SplitedVertices.size() / 2);
-    ClippedVerts.clear();
-
-    for (int E = 0; E < OldEdgesCount; E += 3)
-    {
-        const int EdgeSplit0 = EdgeSplitVertex[E + 0];
-        const int EdgeSplit1 = EdgeSplitVertex[E + 1];
-        const int EdgeSplit2 = EdgeSplitVertex[E + 2];
-
-        const int vi0 = E + 0;
-        const int vi1 = E + 1;
-        const int vi2 = E + 2;
-
-        const uint8_t val = INTSIGNBITNOTSET(EdgeSplit0) | (INTSIGNBITNOTSET(EdgeSplit1) << 1) | (INTSIGNBITNOTSET(EdgeSplit2) << 2);
-        switch (val)
-        {
-        case 0:
-            // no split
-
-            // all vertices behind clipping plane - skip
-            if ((VertsRelation[vi0] | VertsRelation[vi1] | VertsRelation[vi2]) & uint8_t(eSide::Front))
-                break; // skip this triangle
-
-            // copy all
-            ClippedVerts.push_back(Verts[vi0]);
-            ClippedVerts.push_back(Verts[vi1]);
-            ClippedVerts.push_back(Verts[vi2]);
-            break;
-        case 1:
-            // edge 0 slitted
-            if (!(VertsRelation[vi0] & uint8_t(eSide::Front)))
-            {
-                ClippedVerts.push_back(Verts[vi0]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit0]);
-                ClippedVerts.push_back(Verts[vi2]);
-            }
-            else {
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit0]);
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(Verts[vi2]);
-            }
-            break;
-        case 2:
-            if (!(VertsRelation[vi1] & uint8_t(eSide::Front)))
-            {
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
-                ClippedVerts.push_back(Verts[vi0]);
-            }
-            else
-            {
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
-                ClippedVerts.push_back(Verts[vi2]);
-                ClippedVerts.push_back(Verts[vi0]);
-            }
-            break;
-        case 4:
-            if (!(VertsRelation[vi2] & uint8_t(eSide::Front)))
-            {
-                ClippedVerts.push_back(Verts[vi2]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
-                ClippedVerts.push_back(Verts[vi1]);
-            }
-            else {
-
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
-                ClippedVerts.push_back(Verts[vi0]);
-                ClippedVerts.push_back(Verts[vi1]);
-            }
-            break;
-        case 3:
-            // edge 0 and 1 slitted
-            if (!(VertsRelation[vi1] & uint8_t(eSide::Front)))
-            {
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit0]);
-            }
-            else {
-                ClippedVerts.push_back(Verts[vi0]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit0]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
-
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
-                ClippedVerts.push_back(Verts[vi2]);
-                ClippedVerts.push_back(Verts[vi0]);
-            }
-            break;
-
-        case 5:
-            // edge 0 and 2 slitted
-            if (!(VertsRelation[vi0] & uint8_t(eSide::Front)))
-            {
-                ClippedVerts.push_back(Verts[vi0]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit0]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
-            }
-            else {
-
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit0]);
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
-
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(Verts[vi2]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
-            }
-            break;
-        case 6:
-            // edge 1 and 2 slitted
-            if (!(VertsRelation[vi2] & uint8_t(eSide::Front)))
-            {
-                ClippedVerts.push_back(Verts[vi2]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
-            }
-            else {
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
-
-                ClippedVerts.push_back(Verts[vi0]);
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
-            }
-            break;
-        }
-    }
-    return ClippedVerts;
-}
-
-
-
-
-bool Texture::Load(const char* fileName)
-{
-    int width, height, channels;
-    //STB::stbi_set_flip_vertically_on_load(true);
-    STB::stbi_uc* data = STB::stbi_load(fileName, &width, &height, &channels, 4);
-
-    if (!data) {
-        return false;
-    }
-
-    m_Data.resize(width * height);
-    memcpy(m_Data.data(), data, width * height * 4);
-    m_Width = width;
-    m_Height = height;
-    STB::stbi_image_free(data);
-
-    return true;
-}
-
-bool Texture::IsValid()const
-{
-    return m_Data.size() > 0;
-}
-
-Vector4f Texture::Sample(Vector2f uv) const
-{
-    int x = std::clamp<int>( uv.x * (m_Width  - 1) , 0 , m_Width - 1);
-    int y = std::clamp<int>( uv.y * (m_Height - 1) , 0 , m_Height - 1);
-
-    int pixelIndex = y * m_Width + x;
-
-    return Vector4f::FromARGB(m_Data[pixelIndex]);
-}
-
 // ---------------------------- SoftwareRenderer ----------------------------
 
 SoftwareRenderer::SoftwareRenderer(int ScreenWidth, int ScreenHeight)
@@ -333,7 +80,7 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int MinY, int 
     Plane nearFrustumPlane;
     m_MVPMatrix.GetFrustumNearPlane(nearFrustumPlane);
 
-    const vector<Vertex>& vertices = ClipTraingles( nearFrustumPlane, 0.001f, inVertices);
+    const vector<Vertex>& vertices = ClipTraingles(nearFrustumPlane, 0.001f, inVertices);
 
     for (int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
     {
@@ -346,8 +93,6 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int MinY, int 
 
         DrawFilledTriangle(transformedA, transformedB, transformedC,MinY,MaxY);
     }
-
-   // RenderLightSource();
 }
 
 void SoftwareRenderer::RenderLightSource()
@@ -379,16 +124,14 @@ void SoftwareRenderer::RenderWireframe(const vector<Vertex>& vertices)
 {
     auto mat = Matrix4f::Identity();
 
-    Matrix4f mvpMatrix = m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix;
-
     for (int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
     {
         TransformedVertex transformedA;
-        transformedA.ProjToScreen(vertices[i + 0], m_ModelMatrix, mvpMatrix);
+        transformedA.ProjToScreen(vertices[i + 0], m_ModelMatrix, m_MVPMatrix);
         TransformedVertex transformedB;
-        transformedB.ProjToScreen(vertices[i + 1], m_ModelMatrix, mvpMatrix);
+        transformedB.ProjToScreen(vertices[i + 1], m_ModelMatrix, m_MVPMatrix);
         TransformedVertex transformedC;
-        transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, mvpMatrix);
+        transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, m_MVPMatrix);
 
         DrawTriangle(transformedA, transformedB, transformedC, m_WireFrameColor);
     }
@@ -397,6 +140,19 @@ void SoftwareRenderer::RenderWireframe(const vector<Vertex>& vertices)
 const vector<uint32_t>& SoftwareRenderer::GetScreenBuffer()const
 {
     return m_ScreenBuffer;
+}
+
+inline void SoftwareRenderer::PutPixelUnsafe(int x, int y, uint32_t color)
+{
+    m_ScreenBuffer[y * SCREEN_WIDTH + x] = color;
+}
+
+inline void SoftwareRenderer::PutPixel(int x, int y, uint32_t color)
+{
+    if (x >= SCREEN_WIDTH || x <= 0 || y >= SCREEN_HEIGHT || y <= 0) {
+        return;
+    }
+    m_ScreenBuffer[y * SCREEN_WIDTH + x] = color;
 }
 
 void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, int MinY, int MaxY)
@@ -443,9 +199,9 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
     TransformedVertex interpolatedVertex;
 
     // loop through all pixels in rectangle
-    for (int x = min.x; x <= max.x; ++x)
+    for (int y = min.y; y <= max.y; ++y)
     {
-        for (int y = min.y; y <= max.y; ++y)
+        for (int x = min.x; x <= max.x; ++x)
         {
             const Vector2f P(x, y);
             // calculate value of edge function for each line
@@ -455,11 +211,9 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
             // if pixel is inside triangle, draw it
             if (ABP >= 0 && BCP >= 0 && CAP >= 0)
             {
-                // dividing edge function values by ABC will give us baricentric coordinates - how much each vertex contributes to final color in point P
+                // dividing edge function values by ABC will give us barycentric coordinates - how much each vertex contributes to final color in point P
                 Vector3f baricentricCoordinates = Vector3f( BCP, CAP , ABP) * invABC;
-                //TransformedVertex interpolatedVertex = VA * baricentricCoordinates.y + VB * baricentricCoordinates.z + VC * baricentricCoordinates.x;
-                interpolator.Interpolate(baricentricCoordinates, interpolatedVertex);
-                interpolatedVertex.normal.Normalize();
+                interpolator.InterpolateZ(baricentricCoordinates, interpolatedVertex);
 
                 float& z = m_ZBuffer[y * SCREEN_WIDTH + x];
                 if (interpolatedVertex.screenPosition.z < z) {
@@ -469,9 +223,10 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
                     continue;
                 }
 
+                interpolator.InterpolateAllButZ(baricentricCoordinates, interpolatedVertex);
                 interpolatedVertex.normal.Normalize();
                 Vector4f finalColor = FragmentShader(interpolatedVertex);
-                PutPixel(x, y, Vector4f::ToARGB(finalColor));
+                PutPixelUnsafe(x, y, Vector4f::ToARGB(finalColor));
             }
         }
     }
@@ -580,14 +335,6 @@ Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
     return finalColor;
 }
 
-void SoftwareRenderer::PutPixel(int x, int y, uint32_t color)
-{
-    if (x >= SCREEN_WIDTH || x <= 0 || y >= SCREEN_HEIGHT || y <= 0) {
-        return;
-    }
-    m_ScreenBuffer[y * SCREEN_WIDTH + x] = color;
-}
-
 void SoftwareRenderer::SetModelMatrixx(const Matrix4f& other)
 {
     m_ModelMatrix = other;
@@ -631,121 +378,4 @@ float SoftwareRenderer::GetScale() const
 bool SoftwareRenderer::IsWireframe() const
 {
     return m_Wireframe;
-}
-
-
-
-
-
-
-
-SimlpeThreadPool::SimlpeThreadPool()
-    : m_NewTaskSemaphore(0)
-{
-    m_Finlizing = false;
-}
-
-SimlpeThreadPool::~SimlpeThreadPool()
-{
-    {
-        std::unique_lock lock(m_TasksCS);
-        if (m_ThreadCount <= 0)
-            return;
-
-        m_Finlizing = true;
-        m_NewTaskSemaphore.release(m_ThreadCount);
-    }
-
-    while (m_ThreadCount)
-    {
-    }
-}
-
-void SimlpeThreadPool::SetThreadCount(uint8_t Count)
-{
-    {
-        std::unique_lock lock(m_TasksCS);
-        int CurCount = m_ThreadCount;
-        if (Count == CurCount)
-            return;
-
-        if (Count < CurCount)
-        {
-            int TasksToKill = CurCount - Count;
-            for (int i = 0; i < TasksToKill; ++i)
-                m_Tasks.push_back({});
-
-            m_NewTaskSemaphore.release(TasksToKill);
-        }
-        else
-        {
-            int TasksToSpawn = Count - CurCount;
-            for (int i = 0; i < TasksToSpawn; ++i)
-                thread([this] { Worker(); }).detach();
-
-        }
-    }
-
-    while (m_ThreadCount != Count)
-    {
-    }
-}
-
-void SimlpeThreadPool::Worker()
-{
-    m_ThreadCount++;
-    while (true)
-    {
-        m_NewTaskSemaphore.acquire();
-        if (m_Finlizing)
-            break;
-
-        optional<Task> Task = AcquireTask();
-        if (!Task || !Task->m_Func)
-            break;
-
-        Task->m_Func();
-        Task->m_FinishPromise.set_value();
-    }
-    m_ThreadCount--;
-}
-
-void SimlpeThreadPool::LaunchTasks(vector<TaskFunc> TaskFuncs)
-{
-    vector<future<void>> TasksAwaiters;
-    {
-        std::unique_lock lock(m_TasksCS);
-        if (m_ThreadCount <= 0)
-            return;
-
-        for (auto& Func : TaskFuncs)
-        {
-            if (!Func)
-                continue;
-
-            m_Tasks.push_back(Task{ {}, std::move(Func) });
-            TasksAwaiters.push_back(m_Tasks.back().m_FinishPromise.get_future());
-        }
-
-        m_NewTaskSemaphore.release(TasksAwaiters.size());
-    }
-
-    for (auto& Awaiter : TasksAwaiters)
-    {
-        Awaiter.get();
-    }
-}
-
-
-optional<SimlpeThreadPool::Task> SimlpeThreadPool::AcquireTask()
-{
-    std::unique_lock lock(m_TasksCS);
-
-    optional<SimlpeThreadPool::Task> Result;
-    if (m_Tasks.empty())
-        return Result;
-
-    Result = std::move(m_Tasks.front());
-    m_Tasks.erase(m_Tasks.begin());
-    return Result;
 }

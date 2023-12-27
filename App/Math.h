@@ -31,7 +31,6 @@ struct Vertex
     }
 };
 
-
 class Plane
 {
 public:
@@ -55,3 +54,5 @@ private:
     Vector3f m_Normal;
     float    m_D = 0;
 };
+
+const vector<Vertex>& ClipTraingles(const Plane& ClipPlane, const float Epsilon, const vector<Vertex>& Verts);

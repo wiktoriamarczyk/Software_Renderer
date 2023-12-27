@@ -2,41 +2,10 @@
 #include "Matrix4.h"
 #include "Vector3f.h"
 
-Vector2f::Vector2f(float x, float y)
-{
-    this->x = x;
-    this->y = y;
-}
-
 Vector2f::Vector2f(Vector3f vector)
 {
     x = vector.x;
     y = vector.y;
-}
-
-Vector2f Vector2f::operator+(Vector2f other)const
-{
-    return Vector2f(x + other.x, y + other.y);
-}
-
-Vector2f Vector2f::operator-(Vector2f other)const
-{
-    return Vector2f(x - other.x, y - other.y);
-}
-
-Vector2f Vector2f::operator*(float value)const
-{
-    return Vector2f(x * value, y * value);
-}
-
-Vector2f Vector2f::operator/(float value)const
-{
-    return Vector2f(x / value, y / value);
-}
-
-Vector2f operator*(float value, const Vector2f& v)
-{
-    return Vector2f(v.x * value, v.y * value);
 }
 
 float Vector2f::GetLength()const

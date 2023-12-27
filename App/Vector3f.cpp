@@ -1,38 +1,6 @@
 #include "Vector3f.h"
 #include "Matrix4.h"
 
-Vector3f::Vector3f(float x, float y, float z)
-{
-    this->x = x;
-    this->y = y;
-    this->z = z;
-}
-
-Vector3f Vector3f::operator+(Vector3f other)const
-{
-    return Vector3f(x + other.x, y + other.y, z + other.z);
-}
-
-Vector3f Vector3f::operator-(Vector3f other)const
-{
-    return Vector3f(x - other.x, y - other.y, z - other.z);
-}
-
-Vector3f Vector3f::operator*(float value)const
-{
-    return Vector3f(x * value, y * value, z * value);
-}
-
-Vector3f Vector3f::operator/(float value)const
-{
-    return Vector3f(x / value, y / value, z / value);
-}
-
-Vector3f operator*(float value, const Vector3f& v)
-{
-    return Vector3f(v.x * value, v.y * value, v.z * value);
-}
-
 float Vector3f::GetLength()const
 {
     return sqrt(x * x + y * y + z * z);

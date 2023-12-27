@@ -114,7 +114,7 @@ vector<Model> LoadFallbackModel()
 vector<Model> LoadModelVertices(const char* path)
 {
     vector<Model> result;
-    auto scene = aiImportFile(path, aiProcessPreset_TargetRealtime_MaxQuality);
+    auto scene = aiImportFile(path, aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_Triangulate);
     if (scene)
     {
         result = LoadFromScene(scene);
@@ -122,6 +122,10 @@ vector<Model> LoadModelVertices(const char* path)
     }
     else
     {
+        auto Error = aiGetErrorString();
+        printf("Error loading model: %s\n", Error);
+        printf("Loading fallback model...\n");
+
         result = LoadFallbackModel();
     }
 
@@ -154,6 +158,8 @@ void OpenDialog(const char* title, const char* filters, function<void()> callbac
 
 void OpenSceneDataDialog(MyModelPaths& selectedPaths)
 {
+    ImGui::Begin("Settings");
+
     OpenDialog("Choose Model", ".fbx,.glb,.gltf", [&selectedPaths]
     {
         selectedPaths.modelPath = ImGuiFileDialog::Instance()->GetFilePathName();
@@ -163,6 +169,9 @@ void OpenSceneDataDialog(MyModelPaths& selectedPaths)
     {
         selectedPaths.texturePath = ImGuiFileDialog::Instance()->GetFilePathName();
     });
+
+
+    ImGui::Begin("Settings");
 }
 
 int main()

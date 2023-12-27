@@ -7,53 +7,8 @@
 #include "Vector2f.h"
 #include "Math.h"
 #include "TransformedVertex.h"
-
-#include <functional>
-#include <future>
-#include <semaphore>
-
-
-class Texture
-{
-public:
-    Texture() = default;
-    bool Load(const char* fileName);
-    bool IsValid()const;
-    Vector4f Sample(Vector2f uv)const;
-
-private:
-    vector<uint32_t> m_Data;
-    int              m_Width = 0;
-    int              m_Height = 0;
-
-};
-
-
-class SimlpeThreadPool
-{
-public:
-    using TaskFunc = function<void()>;
-
-    SimlpeThreadPool();
-    ~SimlpeThreadPool();
-    void                SetThreadCount(uint8_t Count);
-    uint8_t             GetThreadCount()const { return m_ThreadCount; }
-    void                LaunchTasks(vector<TaskFunc> tasks);
-public:
-    struct Task
-    {
-        promise<void>   m_FinishPromise;
-        TaskFunc        m_Func;
-    };
-    void                Worker();
-    optional<Task>      AcquireTask();
-
-    atomic_bool         m_Finlizing;
-    counting_semaphore<>m_NewTaskSemaphore;
-    vector<Task>        m_Tasks;
-    std::mutex          m_TasksCS;
-    atomic_int          m_ThreadCount = 0;
-};
+#include "Texture.h"
+#include "SimpleThreadPool.h"
 
 class SoftwareRenderer
 {
@@ -82,6 +37,7 @@ private:
     void DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color);
     void DrawLine(const TransformedVertex& A, const TransformedVertex& B, const Vector4f& color);
     void PutPixel(int x, int y, uint32_t color);
+    void PutPixelUnsafe(int x, int y, uint32_t color);
     void RenderLightSource();
     void UpdateMVPMatrix();
     void DoRender(const vector<Vertex>& vertices, int MinY, int MaxY);
@@ -116,7 +72,7 @@ private:
     int                 m_ThreadsCount = 0;
 
     shared_ptr<Texture> m_Texture;
-    SimlpeThreadPool    m_ThreadPool;
+    SimpleThreadPool    m_ThreadPool;
 
     const int           m_MaxScale = 5;
 };

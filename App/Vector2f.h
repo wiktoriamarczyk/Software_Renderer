@@ -27,3 +27,34 @@ public:
     float x = 0;
     float y = 0;
 };
+
+inline Vector2f::Vector2f(float x, float y)
+{
+    this->x = x;
+    this->y = y;
+}
+
+inline Vector2f Vector2f::operator+(Vector2f other)const
+{
+    return Vector2f(x + other.x, y + other.y);
+}
+
+inline Vector2f Vector2f::operator-(Vector2f other)const
+{
+    return Vector2f(x - other.x, y - other.y);
+}
+
+inline Vector2f Vector2f::operator*(float value)const
+{
+    return Vector2f(x * value, y * value);
+}
+
+inline Vector2f Vector2f::operator/(float value)const
+{
+    return Vector2f(x / value, y / value);
+}
+
+inline Vector2f operator*(float value, const Vector2f& v)
+{
+    return Vector2f(v.x * value, v.y * value);
+}

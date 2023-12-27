@@ -34,3 +34,36 @@ public:
     float z = 0;
 };
 
+
+inline Vector3f::Vector3f(float x, float y, float z)
+{
+    this->x = x;
+    this->y = y;
+    this->z = z;
+}
+
+inline Vector3f Vector3f::operator+(Vector3f other)const
+{
+    return Vector3f(x + other.x, y + other.y, z + other.z);
+}
+
+inline Vector3f Vector3f::operator-(Vector3f other)const
+{
+    return Vector3f(x - other.x, y - other.y, z - other.z);
+}
+
+inline Vector3f Vector3f::operator*(float value)const
+{
+    return Vector3f(x * value, y * value, z * value);
+}
+
+inline Vector3f Vector3f::operator/(float value)const
+{
+    return Vector3f(x / value, y / value, z / value);
+}
+
+inline Vector3f operator*(float value, const Vector3f& v)
+{
+    return Vector3f(v.x * value, v.y * value, v.z * value);
+}
+
