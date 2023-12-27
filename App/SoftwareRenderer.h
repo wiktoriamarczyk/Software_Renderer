@@ -34,6 +34,8 @@ public:
     void SetColorizeThreads(bool colorizeThreads)override;
     void SetDrawWireframe(bool Wireframe)override;
     void SetDrawBBoxes(bool drawBBoxes)override;
+    void SetZWrite(bool zwrite)override;
+    void SetZTest(bool ztest)override;
 private:
     void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int MaxY);
     void DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int MaxY);
@@ -65,10 +67,11 @@ private:
     Matrix4f            m_ProjectionMatrix;
     Matrix4f            m_MVPMatrix;
 
-    bool                m_SettingsOpen = false;
     bool                m_DrawWireframe = false;
     bool                m_ColorizeThreads = false;
     bool                m_DrawBBoxes = false;
+    bool                m_ZWrite = true;
+    bool                m_ZTest = true;
     float               m_DiffuseStrength = 0.3f;
     float               m_AmbientStrength = 0.5f;
     float               m_SpecularStrength = 0.9f;

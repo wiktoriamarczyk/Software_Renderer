@@ -197,6 +197,12 @@ void OpenSceneDataDialog(MyModelPaths& selectedPaths)
     ImGui::End();
 }
 
+struct RendererContext
+{
+    shared_ptr<IRenderer> pRenderer;
+    shared_ptr<ITexture>  pModelTexture;
+};
+
 int main()
 {
     MyModelPaths lastModelPaths;
@@ -205,8 +211,37 @@ int main()
     // load default model
     vector<Model> modelsData = LoadFallbackModel();
 
+
+    // specify the window context settings - requie OpenGL 4.0
+    sf::ContextSettings settings;
+    settings.depthBits = 24;
+    settings.stencilBits = 8;
+    settings.antialiasingLevel = 0;
+    settings.majorVersion = 4;
+    settings.minorVersion = 0;
+
     // create the window
-    sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer");
+    sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer", sf::Style::Default, settings);
+    {
+
+    settings = window.getSettings();
+
+    printf( "depth bits: %u\n" , settings.depthBits );
+    printf( "stencil bits: %u\n" , settings.stencilBits );
+    printf( "antialiasing level: %u\n" , settings.antialiasingLevel );
+    printf( "version: %u,%u\n" , settings.majorVersion , settings.minorVersion );
+
+    window.setActive(true); // ??
+
+    RendererContext Contexts[2];
+
+    Contexts[0].pRenderer = IRenderer::CreateRenderer(eRendererType::SOFTWARE,SCREEN_WIDTH, SCREEN_HEIGHT);
+    Contexts[1].pRenderer = IRenderer::CreateRenderer(eRendererType::HARDWARE,SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    Contexts[0].pModelTexture = Contexts[0].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
+    Contexts[1].pModelTexture = Contexts[1].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
+
+    RendererContext* pActiveContext = &Contexts[0];
 
     window.setFramerateLimit(60);
 
@@ -220,11 +255,6 @@ int main()
 
     sf::Clock deltaClock;
 
-    shared_ptr<IRenderer> renderer = IRenderer::CreateRenderer(eRendererType::SOFTWARE,SCREEN_WIDTH, SCREEN_HEIGHT);
-
-    shared_ptr<ITexture> modelTexture = renderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
-
-    renderer->SetTexture(modelTexture);
 
     Matrix4f    cameraMatrix = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 0), Vector3f(0, 1, 0));
     Matrix4f    projectionMatrix = Matrix4f::CreateProjectionMatrix(60, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.8f, 1000.0f);
@@ -232,7 +262,7 @@ int main()
 
     Vector3f    modelRotation;
     Vector3f    modelTranslation;
-    float       modelScale = 0.1;
+    float       modelScale = 1.0;
     Vector4f    wireFrameColor = Vector4f(1, 1, 1, 1);
     Vector4f    diffuseColor = Vector4f(1, 1, 1, 1);
     Vector4f    ambientColor = Vector4f(1, 1, 1, 1);
@@ -256,6 +286,9 @@ int main()
         int fps = duration ? 1000 / duration : 0;
         lastFrameTime = now;
 
+        auto renderer = pActiveContext->pRenderer;
+        auto modelTexture = pActiveContext->pModelTexture;
+
         // check all the window's events that were triggered since the last iteration of the loop
         sf::Event event;
         while (window.pollEvent(event))
@@ -265,23 +298,32 @@ int main()
             // "close requested" event: we close the window
             if (event.type == sf::Event::Closed)
                 window.close();
+
+            if (event.type == sf::Event::KeyPressed)
+            {
+                // space pressed
+                if (event.key.code == sf::Keyboard::Space)
+                {
+                    if (pActiveContext == &Contexts[0])
+                        pActiveContext = &Contexts[1];
+                    else
+                        pActiveContext = &Contexts[0];
+                }
+            }
         }
 
         // load model and texture if user selected them
         if (lastModelPaths.modelPath != modelPaths.modelPath)
         {
             modelsData = LoadModelVertices(modelPaths.modelPath.c_str());
-            lastModelPaths = modelPaths;
-            modelTexture = renderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
-            renderer->SetTexture(modelTexture);
             modelPaths.texturePath = DEFAULT_TEXTURE_PATH;
             lastModelPaths = modelPaths;
         }
 
         if (lastModelPaths.texturePath != modelPaths.texturePath)
         {
-            modelTexture = renderer->LoadTexture(modelPaths.texturePath.c_str());
-            renderer->SetTexture(modelTexture);
+            Contexts[0].pModelTexture = Contexts[0].pRenderer->LoadTexture(modelPaths.texturePath.c_str());
+            Contexts[1].pModelTexture = Contexts[1].pRenderer->LoadTexture(modelPaths.texturePath.c_str());
             lastModelPaths = modelPaths;
         }
 
@@ -291,6 +333,7 @@ int main()
 
         modelMatrix = Matrix4f::Rotation(Vector3f(angleX, angleY, angleZ)) * Matrix4f::Scale(Vector3f(modelScale, modelScale, modelScale)) * Matrix4f::Translation(modelTranslation);
 
+        renderer->SetTexture(modelTexture);
         renderer->SetModelMatrixx(modelMatrix);
         renderer->SetViewMatrix(cameraMatrix);
         renderer->SetProjectionMatrix(projectionMatrix);
@@ -338,23 +381,25 @@ int main()
             renderer->Render(model.vertices);
         }
 
-        auto buf = renderer->GetScreenBuffer();
-
-              uint32_t* dst = (uint32_t*)buf.data();
-        const uint32_t* src = (uint32_t*)renderer->GetScreenBuffer().data();
-
-        for (int y = 0; y < SCREEN_HEIGHT; ++y)
+        if( auto buf = renderer->GetScreenBuffer() ; buf.size() )
         {
-            memcpy(dst + y * SCREEN_WIDTH, src + (SCREEN_HEIGHT - 1 - y) * SCREEN_WIDTH, SCREEN_WIDTH * 4);
-        }
-        // update texture
-        screenTexture.update((uint8_t*)dst);
+                  uint32_t* dst = (uint32_t*)buf.data();
+            const uint32_t* src = (uint32_t*)renderer->GetScreenBuffer().data();
 
-        // render texture to screen
-        window.draw(sprite);
+            for (int y = 0; y < SCREEN_HEIGHT; ++y)
+            {
+                memcpy(dst + y * SCREEN_WIDTH, src + (SCREEN_HEIGHT - 1 - y) * SCREEN_WIDTH, SCREEN_WIDTH * 4);
+            }
+            // update texture
+            screenTexture.update((uint8_t*)dst);
+
+            // render texture to screen
+            window.draw(sprite);
+        }
 
         // display fps counter
-        ImGui::Begin("FPS", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs);
+        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+        ImGui::Begin("FPS", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::SetWindowPos(ImVec2(0, 0));
         ImGui::Text("FPS: %d", fps);
         ImGui::End();
@@ -367,7 +412,14 @@ int main()
         // end the current frame
         window.display();
     }
+
+    }
+
+    window.setActive(false);
+
     ImGui::SFML::Shutdown();
+
+    exit(0); // TODO: Creating OpenGl renderer causes application crash at exit
 
     return 0;
 }

@@ -29,7 +29,19 @@ struct Vertex
         result.uv = uv + vertex.uv;
         return result;
     }
+
+    static const uint32_t Stride;
+    static const uint32_t PositionOffset;
+    static const uint32_t NormalOffset;
+    static const uint32_t ColorOffset;
+    static const uint32_t UVOffset;
 };
+
+constexpr inline const uint32_t Vertex::Stride          = sizeof(Vertex);
+constexpr inline const uint32_t Vertex::PositionOffset  = offsetof(Vertex, position);
+constexpr inline const uint32_t Vertex::NormalOffset    = offsetof(Vertex, normal);
+constexpr inline const uint32_t Vertex::ColorOffset     = offsetof(Vertex, color);
+constexpr inline const uint32_t Vertex::UVOffset        = offsetof(Vertex, uv);
 
 class Plane
 {

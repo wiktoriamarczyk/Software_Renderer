@@ -223,9 +223,10 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
 
                 float& z = m_ZBuffer[y * SCREEN_WIDTH + x];
                 if (interpolatedVertex.screenPosition.z < z) {
-                    z = interpolatedVertex.screenPosition.z;
+                    if (m_ZWrite)
+                        z = interpolatedVertex.screenPosition.z;
                 }
-                else {
+                else if (m_ZTest){
                     continue;
                 }
 
@@ -493,4 +494,14 @@ void SoftwareRenderer::SetDrawWireframe(bool Wireframe)
 void SoftwareRenderer::SetDrawBBoxes(bool drawBBoxes)
 {
     m_DrawBBoxes = drawBBoxes;
+}
+
+void SoftwareRenderer::SetZWrite(bool zwrite)
+{
+    m_ZWrite = zwrite;
+}
+
+void SoftwareRenderer::SetZTest(bool ztest)
+{
+    m_ZTest = ztest;
 }

@@ -44,4 +44,6 @@ public:
     virtual void SetColorizeThreads(bool colorizeThreads)=0;
     virtual void SetDrawWireframe(bool wireframe)=0;
     virtual void SetDrawBBoxes(bool drawBBoxes)=0;
+    virtual void SetZWrite(bool zwrite)=0;
+    virtual void SetZTest(bool ztest)=0;
 };

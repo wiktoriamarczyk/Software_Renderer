@@ -39,6 +39,8 @@ SET(APP_SRC_FILES_LIST
     App/Texture.cpp
     App/SimpleThreadPool.h
     App/SimpleThreadPool.cpp
+    App/GlRenderer.h
+    App/GlRenderer.cpp
 
     imgui/imgui.h
     imgui/imgui.cpp
