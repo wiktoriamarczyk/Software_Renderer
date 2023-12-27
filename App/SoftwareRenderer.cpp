@@ -1,4 +1,4 @@
-#include "Renderer.h"
+#include "SoftwareRenderer.h"
 #include "Line2D.h"
 #include "../stb/stb_image.h"
 #include "TransformedVertex.h"

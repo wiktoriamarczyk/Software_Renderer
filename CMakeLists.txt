@@ -15,8 +15,8 @@ project(SoftwareRenderer LANGUAGES CXX)
 SET(APP_SRC_FILES_LIST
     App/main.cpp
     App/Common.h
-    App/Renderer.h
-    App/Renderer.cpp
+    App/SoftwareRenderer.h
+    App/SoftwareRenderer.cpp
     App/Vector3f.h
     App/Vector3f.cpp
     App/Matrix4.h
