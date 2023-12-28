@@ -183,12 +183,12 @@ void OpenSceneDataDialog(MyModelPaths& selectedPaths)
 {
     ImGui::Begin("Settings");
 
-    OpenDialog("Choose Model", ".fbx,.glb,.gltf", [&selectedPaths]
+    OpenDialog("Choose Model", ".fbx,.glb,.gltf,.3ds,.blend,.obj", [&selectedPaths]
     {
         selectedPaths.modelPath = ImGuiFileDialog::Instance()->GetFilePathName();
     });
 
-    ImGui::SameLine(); OpenDialog("Choose Model Texture", ".png,.jpg,.jpeg,.bmp,.tga", [&selectedPaths]
+    ImGui::SameLine(); OpenDialog("Choose Model Texture", ".png,.jpg,.jpeg,.bmp", [&selectedPaths]
     {
         selectedPaths.texturePath = ImGuiFileDialog::Instance()->GetFilePathName();
     });
