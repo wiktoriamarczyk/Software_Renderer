@@ -6,7 +6,7 @@
 // Shader Types
 enum class ShaderType { Vertex, Fragment, Geometry, Count };
 // Standard Uniforms in the shader.
-enum class UniformType { TransformPVM, World, LightPos, LightAmbientColor, LightDiffuseColor, AmbientStrength, DiffuseStrength, SpecularStrength, Shininess, CameraPos, Count };
+enum class UniformType { TransformPVM, World, LightPos, LightAmbientColor, LightDiffuseColor, AmbientStrength, DiffuseStrength, SpecularStrength, Shininess, CameraPos, WireframeColor, Count };
 // Vertex attributes for shaders and the input vertex array.
 enum class VertexAttribute { Position, Normal, Color, TexCoord, COUNT };
 
@@ -19,7 +19,7 @@ public:
     virtual bool IsValid()const;
     static void Unbind();
 private:
-	sf::Texture m_Texture;
+    sf::Texture m_Texture;
     bool m_Loaded = false;
 };
 
@@ -79,8 +79,8 @@ public:
     virtual void SetTexture(shared_ptr<ITexture> texture)override;
 
     virtual void SetWireFrameColor(const Vector4f& wireFrameColor)override;
-    virtual void SetDiffuseColor(const Vector4f& diffuseColor)override;
-    virtual void SetAmbientColor(const Vector4f& ambientColor)override;
+    virtual void SetDiffuseColor(const Vector3f& diffuseColor)override;
+    virtual void SetAmbientColor(const Vector3f& ambientColor)override;
     virtual void SetLightPosition(const Vector3f& lightPosition)override;
     virtual void SetDiffuseStrength(float diffuseStrength)override;
     virtual void SetAmbientStrength(float ambientStrength)override;
@@ -102,8 +102,8 @@ private:
     shared_ptr<GlVertexBuffer>  m_DefaultVertexBuffer;
 
     Vector4f                    m_WireFrameColor = Vector4f(1, 1, 1, 1);
-    Vector4f                    m_DiffuseColor = Vector4f(1, 1, 1, 1);
-    Vector4f                    m_AmbientColor = Vector4f(1, 1, 1, 1);
+    Vector3f                    m_DiffuseColor = Vector3f(1, 1, 1);
+    Vector3f                    m_AmbientColor = Vector3f(1, 1, 1);
     Vector3f                    m_LightPosition = Vector3f(0, 0, -20);
     Vector3f                    m_CameraPosition = Vector3f(0, 0, 0);
     Vector4f                    m_ThreadColors[12];

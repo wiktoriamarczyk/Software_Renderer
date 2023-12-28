@@ -10,12 +10,12 @@ SoftwareRenderer::SoftwareRenderer(int ScreenWidth, int ScreenHeight)
     m_ScreenBuffer.resize(ScreenWidth * ScreenHeight, 0);
     m_ZBuffer.resize(ScreenWidth * ScreenHeight, 0);
 
-    m_ThreadColors[0]  = Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+    m_ThreadColors[0]  = Vector4f(1.0f, 0.0f, 1.0f, 1.0f);
     m_ThreadColors[1]  = Vector4f(1.0f, 0.0f, 0.0f, 1.0f);
     m_ThreadColors[2]  = Vector4f(0.0f, 1.0f, 0.0f, 1.0f);
     m_ThreadColors[3]  = Vector4f(0.0f, 0.0f, 1.0f, 1.0f);
     m_ThreadColors[4]  = Vector4f(1.0f, 1.0f, 0.0f, 1.0f);
-    m_ThreadColors[5]  = Vector4f(1.0f, 0.0f, 1.0f, 1.0f);
+    m_ThreadColors[5]  = Vector4f(0.5f, 0.0f, 1.0f, 1.0f);
     m_ThreadColors[6]  = Vector4f(0.0f, 1.0f, 1.0f, 1.0f);
     m_ThreadColors[7]  = Vector4f(1.0f, 0.5f, 0.5f, 1.0f);
     m_ThreadColors[8]  = Vector4f(0.5f, 1.0f, 0.5f, 1.0f);
@@ -85,7 +85,7 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int MinY, int 
 
     if (m_DrawWireframe || m_DrawBBoxes)
     {
-        const Vector4f Color = m_ColorizeThreads ? m_WireFrameColor*m_ThreadColors[threadID] : m_WireFrameColor;
+        const Vector4f Color = m_ColorizeThreads ? m_ThreadColors[threadID] : m_WireFrameColor;
 
         for (int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
         {
@@ -93,14 +93,11 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int MinY, int 
             transformedB.ProjToScreen(vertices[i + 1], m_ModelMatrix, m_MVPMatrix);
             transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, m_MVPMatrix);
 
+            if(m_DrawWireframe)
+                DrawTriangle(transformedA, transformedB, transformedC,Color, MinY, MaxY);
+
             if( m_DrawBBoxes )
-            {
-                DrawTriangleBoundingBox(transformedA, transformedB, transformedC,Color, MinY,MaxY);
-            }
-            else
-            {
-                DrawTriangle(transformedA, transformedB, transformedC,Color, MinY,MaxY);
-            }
+                DrawTriangleBoundingBox(transformedA, transformedB, transformedC,Color, MinY, MaxY);
         }
     }
     else
@@ -133,7 +130,7 @@ void SoftwareRenderer::RenderLightSource()
     {
         for (int y = lightPos.y - lightSize; y < lightPos.y + lightSize; ++y)
         {
-            PutPixel(x, y, Vector4f::ToARGB(m_AmbientColor));
+            PutPixel(x, y, Vector4f::ToARGB(Vector4f(m_AmbientColor,1.0f)));
         }
     }
 }
@@ -379,15 +376,14 @@ Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
 
     // ambient - light that is reflected from other objects
 
-    Vector4f ambient = m_AmbientColor * m_AmbientStrength;
+    Vector3f ambient = m_AmbientColor * m_AmbientStrength;
     // ----------------------------------------------
 
 
     // diffuse - light that is reflected from light source
 
     float diffuseFactor = std::max(pointToLightDir.Dot(vertex.normal), 0.0f);
-    Vector4f diffuse = m_DiffuseColor * diffuseFactor * m_DiffuseStrength;
-    diffuse.w = 1.0f;
+    Vector3f diffuse = m_DiffuseColor * diffuseFactor * m_DiffuseStrength;
     // ----------------------------------------------
 
 
@@ -397,12 +393,12 @@ Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
     Vector3f viewDir = (m_CameraPosition - vertex.worldPosition).Normalized();
     Vector3f reflectDir = (pointToLightDir * -1).Reflect(vertex.normal);
     float specularFactor = pow(max(viewDir.Dot(reflectDir), 0.0f), m_Shininess);
-    Vector4f specular = m_DiffuseColor * m_SpecularStrength * specularFactor;
+    Vector3f specular = m_DiffuseColor * m_SpecularStrength * specularFactor;
 
     // final light color = (ambient + diffuse + specular) * modelColor
-    Vector4f sumOfLight = ambient + diffuse + specular;
-    sumOfLight = sumOfLight.CWiseMin(Vector4f(1, 1, 1, 1));
-    Vector4f finalColor = sumOfLight * sampledPixel * vertex.color;
+    Vector3f sumOfLight = ambient + diffuse + specular;
+    sumOfLight = sumOfLight.CWiseMin(Vector3f(1, 1, 1));
+    Vector4f finalColor = Vector4f(sumOfLight,1.0f) * sampledPixel * vertex.color;
 
     return finalColor;
 }
@@ -437,12 +433,12 @@ void SoftwareRenderer::SetWireFrameColor(const Vector4f& wireFrameColor)
     m_WireFrameColor = wireFrameColor;
 }
 
-void SoftwareRenderer::SetDiffuseColor(const Vector4f& diffuseColor)
+void SoftwareRenderer::SetDiffuseColor(const Vector3f& diffuseColor)
 {
     m_DiffuseColor = diffuseColor;
 }
 
-void SoftwareRenderer::SetAmbientColor(const Vector4f& ambientColor)
+void SoftwareRenderer::SetAmbientColor(const Vector3f& ambientColor)
 {
     m_AmbientColor = ambientColor;
 }
@@ -474,6 +470,10 @@ void SoftwareRenderer::SetShininess(float shininess)
 
 void SoftwareRenderer::SetThreadsCount(uint8_t threadsCount)
 {
+    if (threadsCount==1)
+        // no need to use thread pool for just 1 thread - execute work on main thread
+        threadsCount = 0;
+
     if (m_ThreadsCount==threadsCount)
         return;
 

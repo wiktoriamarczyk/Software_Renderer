@@ -37,8 +37,8 @@ bool Texture::IsValid()const
 
 Vector4f Texture::Sample(Vector2f uv) const
 {
-    int x = std::clamp<int>( uv.x * (m_Width  - 1) , 0 , m_Width - 1);
-    int y = std::clamp<int>( uv.y * (m_Height - 1) , 0 , m_Height - 1);
+    int x = std::trunc ( std::clamp<float>( uv.x * (m_Width  ) , 0 , m_Width - 1) );
+    int y = std::trunc ( std::clamp<float>( uv.y * (m_Height ) , 0 , m_Height - 1) );
 
     int pixelIndex = y * m_Width + x;
 

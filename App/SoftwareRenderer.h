@@ -23,8 +23,8 @@ public:
     void SetTexture(shared_ptr<ITexture> texture)override;
 
     void SetWireFrameColor(const Vector4f& wireFrameColor)override;
-    void SetDiffuseColor(const Vector4f& diffuseColor)override;
-    void SetAmbientColor(const Vector4f& ambientColor)override;
+    void SetDiffuseColor(const Vector3f& diffuseColor)override;
+    void SetAmbientColor(const Vector3f& ambientColor)override;
     void SetLightPosition(const Vector3f& lightPosition)override;
     void SetDiffuseStrength(float diffuseStrength)override;
     void SetAmbientStrength(float ambientStrength)override;
@@ -56,8 +56,8 @@ private:
     vector<float>       m_ZBuffer;
 
     Vector4f            m_WireFrameColor = Vector4f(1, 1, 1, 1);
-    Vector4f            m_DiffuseColor = Vector4f(1, 1, 1, 1);
-    Vector4f            m_AmbientColor = Vector4f(1, 1, 1, 1);
+    Vector3f            m_DiffuseColor = Vector3f(1, 1, 1);
+    Vector3f            m_AmbientColor = Vector3f(1, 1, 1);
     Vector3f            m_LightPosition = Vector3f(0, 0, -20);
     Vector3f            m_CameraPosition = Vector3f(0, 0, 0);
     Vector4f            m_ThreadColors[12];

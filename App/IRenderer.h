@@ -33,8 +33,8 @@ public:
     virtual void SetTexture(shared_ptr<ITexture> texture)=0;
 
     virtual void SetWireFrameColor(const Vector4f& wireFrameColor)=0;
-    virtual void SetDiffuseColor(const Vector4f& diffuseColor)=0;
-    virtual void SetAmbientColor(const Vector4f& ambientColor)=0;
+    virtual void SetDiffuseColor(const Vector3f& diffuseColor)=0;
+    virtual void SetAmbientColor(const Vector3f& ambientColor)=0;
     virtual void SetLightPosition(const Vector3f& lightPosition)=0;
     virtual void SetDiffuseStrength(float diffuseStrength)=0;
     virtual void SetAmbientStrength(float ambientStrength)=0;

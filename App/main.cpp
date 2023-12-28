@@ -188,7 +188,7 @@ void OpenSceneDataDialog(MyModelPaths& selectedPaths)
         selectedPaths.modelPath = ImGuiFileDialog::Instance()->GetFilePathName();
     });
 
-    OpenDialog("Choose Model Texture", ".png,.jpg,.jpeg,.bmp,.tga", [&selectedPaths]
+    ImGui::SameLine(); OpenDialog("Choose Model Texture", ".png,.jpg,.jpeg,.bmp,.tga", [&selectedPaths]
     {
         selectedPaths.texturePath = ImGuiFileDialog::Instance()->GetFilePathName();
     });
@@ -203,6 +203,27 @@ struct RendererContext
     shared_ptr<ITexture>  pModelTexture;
 };
 
+struct DrawSettings
+{
+    Vector3f    modelRotation;
+    Vector3f    modelTranslation;
+    float       modelScale = 1.0;
+    Vector4f    wireFrameColor = Vector4f(1, 0, 1, 1);
+    Vector3f    diffuseColor = Vector3f(1, 1, 1);
+    Vector3f    ambientColor = Vector3f(1, 1, 1);
+    Vector3f    lightPosition = Vector3f(0, 0, -20);
+    float       diffuseStrength = 0.7f;
+    float       ambientStrength = 0.1f;
+    float       specularStrength = 0.9f;
+    float       shininessPower = 5; // 2 4 8 16 32
+    int         threadsCount = 1;
+    bool        drawWireframe = false;
+    bool        drawBBoxes = false;
+    bool        colorizeThreads = false;
+    bool        useZBuffer = true;
+    int         rendererType = 0;
+};
+
 int main()
 {
     MyModelPaths lastModelPaths;
@@ -211,27 +232,18 @@ int main()
     // load default model
     vector<Model> modelsData = LoadFallbackModel();
 
-
-    // specify the window context settings - requie OpenGL 4.0
-    sf::ContextSettings settings;
-    settings.depthBits = 24;
-    settings.stencilBits = 8;
-    settings.antialiasingLevel = 0;
-    settings.majorVersion = 4;
-    settings.minorVersion = 0;
+    // specify the window context settings - require OpenGL 4.0
+    sf::ContextSettings windowSettings;
+    windowSettings.depthBits = 24;
+    windowSettings.stencilBits = 8;
+    windowSettings.antialiasingLevel = 0;
+    windowSettings.majorVersion = 4;
+    windowSettings.minorVersion = 0;
 
     // create the window
-    sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer", sf::Style::Default, settings);
+    sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer", sf::Style::Default, windowSettings);
     {
-
-    settings = window.getSettings();
-
-    printf( "depth bits: %u\n" , settings.depthBits );
-    printf( "stencil bits: %u\n" , settings.stencilBits );
-    printf( "antialiasing level: %u\n" , settings.antialiasingLevel );
-    printf( "version: %u,%u\n" , settings.majorVersion , settings.minorVersion );
-
-    window.setActive(true); // ??
+    window.setActive(true);
 
     RendererContext Contexts[2];
 
@@ -240,8 +252,6 @@ int main()
 
     Contexts[0].pModelTexture = Contexts[0].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
     Contexts[1].pModelTexture = Contexts[1].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
-
-    RendererContext* pActiveContext = &Contexts[0];
 
     window.setFramerateLimit(60);
 
@@ -252,29 +262,18 @@ int main()
 
     sf::Sprite sprite;
     sprite.setTexture(screenTexture);
+    // flip the sprite vertically
+    sprite.setTextureRect(sf::IntRect(0, SCREEN_HEIGHT, SCREEN_WIDTH, -SCREEN_HEIGHT));
 
     sf::Clock deltaClock;
 
+    const uint8_t MAX_THREADS_COUNT = uint8_t( std::min<int>( 12 , std::thread::hardware_concurrency() ) );
 
     Matrix4f    cameraMatrix = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 0), Vector3f(0, 1, 0));
     Matrix4f    projectionMatrix = Matrix4f::CreateProjectionMatrix(60, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.8f, 1000.0f);
     Matrix4f    modelMatrix = Matrix4f::Identity();
 
-    Vector3f    modelRotation;
-    Vector3f    modelTranslation;
-    float       modelScale = 1.0;
-    Vector4f    wireFrameColor = Vector4f(1, 1, 1, 1);
-    Vector4f    diffuseColor = Vector4f(1, 1, 1, 1);
-    Vector4f    ambientColor = Vector4f(1, 1, 1, 1);
-    Vector3f    lightPosition = Vector3f(0, 0, -20);
-    float       diffuseStrength = 0.7f;
-    float       ambientStrength = 0.3f;
-    float       specularStrength = 0.9f;
-    float       shininess = 32.0f;
-    int         threadsCount = 0;
-    bool        drawWireframe = false;
-    bool        drawBBoxes = false;
-    bool        colorizeThreads = false;
+    DrawSettings drawSettings;
 
     auto lastFrameTime = std::chrono::high_resolution_clock::now();
 
@@ -286,8 +285,8 @@ int main()
         int fps = duration ? 1000 / duration : 0;
         lastFrameTime = now;
 
-        auto renderer = pActiveContext->pRenderer;
-        auto modelTexture = pActiveContext->pModelTexture;
+        auto renderer     = Contexts[drawSettings.rendererType].pRenderer;
+        auto modelTexture = Contexts[drawSettings.rendererType].pModelTexture;
 
         // check all the window's events that were triggered since the last iteration of the loop
         sf::Event event;
@@ -303,12 +302,7 @@ int main()
             {
                 // space pressed
                 if (event.key.code == sf::Keyboard::Space)
-                {
-                    if (pActiveContext == &Contexts[0])
-                        pActiveContext = &Contexts[1];
-                    else
-                        pActiveContext = &Contexts[0];
-                }
+                    drawSettings.rendererType = (drawSettings.rendererType+1)%2;
             }
         }
 
@@ -327,11 +321,11 @@ int main()
             lastModelPaths = modelPaths;
         }
 
-        float angleX = (modelRotation.x / 180.f * PI);
-        float angleY = (modelRotation.y / 180.f * PI);
-        float angleZ = (modelRotation.z / 180.f * PI);
+        float angleX = (drawSettings.modelRotation.x / 180.f * PI);
+        float angleY = (drawSettings.modelRotation.y / 180.f * PI);
+        float angleZ = (drawSettings.modelRotation.z / 180.f * PI);
 
-        modelMatrix = Matrix4f::Rotation(Vector3f(angleX, angleY, angleZ)) * Matrix4f::Scale(Vector3f(modelScale, modelScale, modelScale)) * Matrix4f::Translation(modelTranslation);
+        modelMatrix = Matrix4f::Rotation(Vector3f(angleX, angleY, angleZ)) * Matrix4f::Scale(Vector3f(drawSettings.modelScale, drawSettings.modelScale, drawSettings.modelScale)) * Matrix4f::Translation(drawSettings.modelTranslation);
 
         renderer->SetTexture(modelTexture);
         renderer->SetModelMatrixx(modelMatrix);
@@ -341,57 +335,57 @@ int main()
         // update UI
         ImGui::SFML::Update(window, deltaClock.restart());
 
-
+        // render settings window
         ImGui::Begin("Settings");
 
-        ImGui::ColorEdit4("WireFrame Color", &wireFrameColor.x);
-        ImGui::ColorEdit4("Ambient Color", &ambientColor.x);
-        ImGui::ColorEdit4("Diffuse Color", &diffuseColor.x);
-        ImGui::SliderFloat("Ambient Strength", &ambientStrength, 0, 1);
-        ImGui::SliderFloat("Diffuse Strength", &diffuseStrength, 0, 1);
-        ImGui::SliderFloat("Specular Strength", &specularStrength, 0, 1);
-        ImGui::InputFloat("Shininess", &shininess, 2.f);
-        ImGui::SliderFloat3("Rotation", &modelRotation.x, 0, FULL_ANGLE);
-        ImGui::SliderFloat3("Translation", &modelTranslation.x, -15, 15);
-        ImGui::SliderFloat("Scale", &modelScale, 0, 5);
-        ImGui::SliderFloat3("Light Position", &lightPosition.x, -20, 20);
-        ImGui::SliderInt("Thread Count", &threadsCount, 0, 12);
-        ImGui::Checkbox("Wireframe", &drawWireframe); ImGui::SameLine() ; ImGui::Checkbox("Colorize Threads", &colorizeThreads); ImGui::SameLine(); ImGui::Checkbox("BBoxes", &drawBBoxes);
+        ImGui::SliderFloat("Ambient Strength", &drawSettings.ambientStrength, 0, 1);
+        ImGui::SliderFloat("Diffuse Strength", &drawSettings.diffuseStrength, 0, 1);
+        ImGui::SliderFloat("Specular Strength", &drawSettings.specularStrength, 0, 1);
+        ImGui::SliderFloat("Shininess Power", &drawSettings.shininessPower, 1.f , 10.0f );
+        ImGui::SliderFloat3("Rotation", &drawSettings.modelRotation.x, 0, FULL_ANGLE);
+        ImGui::SliderFloat3("Translation", &drawSettings.modelTranslation.x, -15, 15);
+        ImGui::SliderFloat("Scale", &drawSettings.modelScale, 0, 5);
+        ImGui::SliderFloat3("Light Position", &drawSettings.lightPosition.x, -20, 20);
+        ImGui::SliderInt("Thread Count", &drawSettings.threadsCount, 1, MAX_THREADS_COUNT);
+        ImGui::Combo("Renderer Type", &drawSettings.rendererType, "Software\0Hardware\0");
+        ImGui::Checkbox("Wireframe", &drawSettings.drawWireframe);
+        ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &drawSettings.colorizeThreads);
+        ImGui::SameLine(); ImGui::Checkbox("BBoxes", &drawSettings.drawBBoxes);
+        ImGui::SameLine(); ImGui::Checkbox("Use ZBuffer", &drawSettings.useZBuffer);
+      //ImGui::ColorEdit4("WireFrame Color", &drawSettings.wireFrameColor.x);
+        ImGui::ColorEdit3("Ambient Color", &drawSettings.ambientColor.x);
+        ImGui::ColorEdit3("Diffuse Color", &drawSettings.diffuseColor.x);
 
         ImGui::End();
 
-        renderer->SetWireFrameColor(wireFrameColor);
-        renderer->SetDiffuseColor(diffuseColor);
-        renderer->SetAmbientColor(ambientColor);
-        renderer->SetLightPosition(lightPosition);
-        renderer->SetDiffuseStrength(diffuseStrength);
-        renderer->SetAmbientStrength(ambientStrength);
-        renderer->SetSpecularStrength(specularStrength);
-        renderer->SetShininess(shininess);
-        renderer->SetThreadsCount(threadsCount);
-        renderer->SetDrawWireframe(drawWireframe);
-        renderer->SetColorizeThreads(colorizeThreads);
-        renderer->SetDrawBBoxes(drawBBoxes);
-
-        // render stuff to screen buffer
+        // set render params
+        renderer->SetWireFrameColor(drawSettings.wireFrameColor);
+        renderer->SetDiffuseColor(drawSettings.diffuseColor);
+        renderer->SetAmbientColor(drawSettings.ambientColor);
+        renderer->SetLightPosition(drawSettings.lightPosition);
+        renderer->SetDiffuseStrength(drawSettings.diffuseStrength);
+        renderer->SetAmbientStrength(drawSettings.ambientStrength);
+        renderer->SetSpecularStrength(drawSettings.specularStrength);
+        renderer->SetShininess( pow(2.0f,drawSettings.shininessPower) );
+        renderer->SetThreadsCount(drawSettings.threadsCount);
+        renderer->SetDrawWireframe(drawSettings.drawWireframe);
+        renderer->SetColorizeThreads(drawSettings.colorizeThreads);
+        renderer->SetDrawBBoxes(drawSettings.drawBBoxes);
+        renderer->SetZTest(drawSettings.useZBuffer);
+        renderer->SetZWrite(drawSettings.useZBuffer);
         renderer->ClearZBuffer();
         renderer->ClearScreen();
 
+        // render stuff to screen buffer
         for (auto& model : modelsData) {
             renderer->Render(model.vertices);
         }
 
-        if( auto buf = renderer->GetScreenBuffer() ; buf.size() )
+        // for software renderer render screen buffer to window (hardware renderer renders directly to window and calling GetScreenBuffer on it returns empty buffer)
+        if( auto& buf = renderer->GetScreenBuffer() ; buf.size() )
         {
-                  uint32_t* dst = (uint32_t*)buf.data();
-            const uint32_t* src = (uint32_t*)renderer->GetScreenBuffer().data();
-
-            for (int y = 0; y < SCREEN_HEIGHT; ++y)
-            {
-                memcpy(dst + y * SCREEN_WIDTH, src + (SCREEN_HEIGHT - 1 - y) * SCREEN_WIDTH, SCREEN_WIDTH * 4);
-            }
             // update texture
-            screenTexture.update((uint8_t*)dst);
+            screenTexture.update((uint8_t*)buf.data());
 
             // render texture to screen
             window.draw(sprite);

@@ -138,6 +138,7 @@ bool GlProgram::LoadShaderFromMemory(const std::string& shaderData, ShaderType t
     m_Uniform[uint32_t(UniformType::SpecularStrength    )] = glGetUniformLocation(m_Program, "g_SpecularStrength");
     m_Uniform[uint32_t(UniformType::CameraPos           )] = glGetUniformLocation(m_Program, "g_CameraPos");
     m_Uniform[uint32_t(UniformType::Shininess           )] = glGetUniformLocation(m_Program, "g_Shininess");
+    m_Uniform[uint32_t(UniformType::WireframeColor      )] = glGetUniformLocation(m_Program, "g_WireframeColor");
 
     return true;
 }
@@ -414,8 +415,10 @@ void main() {
 const std::string wireframeFragShader = R"(
 #version 330
 
+uniform vec3 g_WireframeColor;
+
 void main() {
-    gl_FragColor = vec4(1,0,1,1);
+    gl_FragColor = vec4(g_WireframeColor,1);
 }
 )";
 }
@@ -482,11 +485,11 @@ std::shared_ptr<ITexture> GlRenderer::LoadTexture(const char* fileName) const
 
 void GlRenderer::ClearScreen()
 {
-	// Configure the viewport (the same size as the window)
-	glViewport(0, 0, m_ScreenWidth, m_ScreenHeight);
+    // Configure the viewport (the same size as the window)
+    glViewport(0, 0, m_ScreenWidth, m_ScreenHeight);
 
-	// Clear the depth buffer
-	glClear(GL_COLOR_BUFFER_BIT );
+    // Clear the depth buffer
+    glClear(GL_COLOR_BUFFER_BIT );
 }
 
 void GlRenderer::ClearZBuffer()
@@ -496,42 +499,52 @@ void GlRenderer::ClearZBuffer()
 
 void GlRenderer::Render(const vector<Vertex>& vertices)
 {
-    m_DefaultProgram->Bind();
-    m_DefaultProgram->LoadMatrix( m_MVPMatrix       , UniformType::TransformPVM );
-    m_DefaultProgram->LoadMatrix( m_ModelMatrix     , UniformType::World );
-    m_DefaultProgram->LoadVector( m_LightPosition   , UniformType::LightPos );
-    m_DefaultProgram->LoadVector( m_AmbientColor.xyz()    , UniformType::LightAmbientColor );
-    m_DefaultProgram->LoadVector( m_DiffuseColor.xyz()    , UniformType::LightDiffuseColor );
-    m_DefaultProgram->LoadVector( m_CameraPosition  , UniformType::CameraPos );
-    m_DefaultProgram->LoadFloat ( m_AmbientStrength , UniformType::AmbientStrength );
-    m_DefaultProgram->LoadFloat ( m_DiffuseStrength , UniformType::DiffuseStrength );
-    m_DefaultProgram->LoadFloat ( m_SpecularStrength, UniformType::SpecularStrength );
-    m_DefaultProgram->LoadFloat ( m_Shininess       , UniformType::Shininess );
+    auto pCurProgram = m_DrawWireframe ? m_WireframeProgram : m_DefaultProgram;
+    pCurProgram->Bind();
+    pCurProgram->LoadMatrix( m_MVPMatrix            , UniformType::TransformPVM );
+    pCurProgram->LoadMatrix( m_ModelMatrix          , UniformType::World );
+    pCurProgram->LoadVector( m_LightPosition        , UniformType::LightPos );
+    pCurProgram->LoadVector( m_AmbientColor         , UniformType::LightAmbientColor );
+    pCurProgram->LoadVector( m_DiffuseColor         , UniformType::LightDiffuseColor );
+    pCurProgram->LoadVector( m_CameraPosition       , UniformType::CameraPos );
+    pCurProgram->LoadFloat ( m_AmbientStrength      , UniformType::AmbientStrength );
+    pCurProgram->LoadFloat ( m_DiffuseStrength      , UniformType::DiffuseStrength );
+    pCurProgram->LoadFloat ( m_SpecularStrength     , UniformType::SpecularStrength );
+    pCurProgram->LoadFloat ( m_Shininess            , UniformType::Shininess );
+    pCurProgram->LoadVector( m_WireFrameColor.xyz() , UniformType::WireframeColor );
 
 
     m_DefaultVertexBuffer->Bind();
     m_DefaultVertexBuffer->Load(vertices);
 
-    if( m_Texture )
+    if (m_Texture)
         m_Texture->Bind();
 
-    //if( m_ZTest )
+    if (m_ZTest && !m_DrawWireframe)
         glEnable(GL_DEPTH_TEST);
-    //else
-    //    glDisable(GL_DEPTH_TEST);
+    else
+        glDisable(GL_DEPTH_TEST);
 
-    //if( m_ZWrite )
+    if (m_ZWrite && !m_DrawWireframe)
         glDepthMask(GL_TRUE);
-    //else
-    //    glDepthMask(GL_FALSE);
+    else
+        glDepthMask(GL_FALSE);
 
-    glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
-    //glPolygonMode(GL_FRONT_AND_BACK,GL_LINE);
-    glDrawArrays( GL_TRIANGLES , 0 , vertices.size() );
-    //glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
-
+    if (m_DrawWireframe)
+    {
+        glDisable(GL_CULL_FACE);
+        glPolygonMode(GL_FRONT_AND_BACK,GL_LINE);
+        glDrawArrays( GL_TRIANGLES , 0 , vertices.size() );
+        glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
+        glEnable(GL_CULL_FACE);
+    }
+    else
+    {
+        glEnable(GL_CULL_FACE);
+        glDrawArrays( GL_TRIANGLES , 0 , vertices.size() );
+    }
 
     GlVertexBuffer::Unbind();
     GlProgram::Unbind();
@@ -575,12 +588,12 @@ void GlRenderer::SetWireFrameColor(const Vector4f& wireFrameColor)
     m_WireFrameColor = wireFrameColor;
 }
 
-void GlRenderer::SetDiffuseColor(const Vector4f& diffuseColor)
+void GlRenderer::SetDiffuseColor(const Vector3f& diffuseColor)
 {
     m_DiffuseColor = diffuseColor;
 }
 
-void GlRenderer::SetAmbientColor(const Vector4f& ambientColor)
+void GlRenderer::SetAmbientColor(const Vector3f& ambientColor)
 {
     m_AmbientColor = ambientColor;
 }
