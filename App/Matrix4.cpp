@@ -187,24 +187,24 @@ Matrix4f Matrix4f::Inversed() const
 }
 
 
-bool Matrix4f::MakeFrustumPlane(float A, float B, float C, float D, Plane& OutPlane)
+bool Matrix4f::MakeFrustumPlane(float a, float b, float c, float d, Plane& outPlane)
 {
-    const float	LengthSquared = A * A + B * B + C * C;
-    if (LengthSquared == 0)
+    const float	lengthSquared = a * a + b * b + c * c;
+    if (lengthSquared == 0)
         return false;
 
-    const float	InvLength = 1 / sqrt(LengthSquared);
-    OutPlane = Plane(Vector3f{ -A * InvLength, -B * InvLength, -C * InvLength }, D * InvLength);
+    const float	invLength = 1 / sqrt(lengthSquared);
+    outPlane = Plane(Vector3f{ -a * invLength, -b * invLength, -c * invLength }, -d * invLength);
     return true;
 }
 
-bool Matrix4f::GetFrustumNearPlane(Plane& OutPlane) const
+bool Matrix4f::GetFrustumNearPlane(Plane& outPlane) const
 {
     return MakeFrustumPlane(
         m_Matrix[0][2],
         m_Matrix[1][2],
         m_Matrix[2][2],
-       -m_Matrix[3][2],
-        OutPlane
+        m_Matrix[3][2],
+        outPlane
     );
 }

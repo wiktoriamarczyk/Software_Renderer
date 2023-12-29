@@ -20,21 +20,21 @@ vector<Model> LoadFromScene(const aiScene* pScene)
         return vector<Model>();
     }
 
-    int totalVertices = 0;
+    int totalTriangles = 0;
 
     for (int i = 0; i < pScene->mNumMeshes; ++i)
     {
-        if( (pScene->mMeshes[i]->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)!=aiPrimitiveType_TRIANGLE )
+        if ((pScene->mMeshes[i]->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)!=aiPrimitiveType_TRIANGLE)
         {
             // skip non-triangle meshes
             continue;
         }
-        totalVertices += pScene->mMeshes[i]->mNumFaces * 3;
+        totalTriangles += pScene->mMeshes[i]->mNumFaces;
     }
 
-    if (totalVertices > MAX_MODEL_VERTICES)
+    if (totalTriangles > MAX_MODEL_TRIANGLES)
     {
-        printf("Total vertices count %d exceeds max allowed number of vertices %d\n" , totalVertices , MAX_MODEL_VERTICES );
+        printf("Total triangles count %d exceeds max allowed number of triangles %d\n" , totalTriangles , MAX_MODEL_TRIANGLES );
         return vector<Model>();
     }
 
@@ -47,7 +47,7 @@ vector<Model> LoadFromScene(const aiScene* pScene)
         Model& model = result.back();
 
         auto mesh = pScene->mMeshes[i];
-        if( (mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)!=aiPrimitiveType_TRIANGLE )
+        if ((mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)!=aiPrimitiveType_TRIANGLE)
         {
             // skip non-triangle meshes
             continue;
@@ -145,8 +145,8 @@ vector<Model> LoadModelVertices(const char* path)
     }
     else
     {
-        auto Error = aiGetErrorString();
-        printf("Error loading model: %s\n", Error);
+        auto error = aiGetErrorString();
+        printf("Error loading model: %s\n", error);
         printf("Loading fallback model...\n");
 
         result = LoadFallbackModel();
@@ -244,16 +244,16 @@ int main()
     sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer", sf::Style::Default, windowSettings);
     {
     window.setActive(true);
-
-    RendererContext Contexts[2];
-
-    Contexts[0].pRenderer = IRenderer::CreateRenderer(eRendererType::SOFTWARE,SCREEN_WIDTH, SCREEN_HEIGHT);
-    Contexts[1].pRenderer = IRenderer::CreateRenderer(eRendererType::HARDWARE,SCREEN_WIDTH, SCREEN_HEIGHT);
-
-    Contexts[0].pModelTexture = Contexts[0].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
-    Contexts[1].pModelTexture = Contexts[1].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
-
     window.setFramerateLimit(60);
+
+    RendererContext contexts[2];
+
+    contexts[0].pRenderer = IRenderer::CreateRenderer(eRendererType::SOFTWARE,SCREEN_WIDTH, SCREEN_HEIGHT);
+    contexts[1].pRenderer = IRenderer::CreateRenderer(eRendererType::HARDWARE,SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    contexts[0].pModelTexture = contexts[0].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
+    contexts[1].pModelTexture = contexts[1].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
+
 
     ImGui::SFML::Init(window);
 
@@ -285,8 +285,8 @@ int main()
         int fps = duration ? 1000 / duration : 0;
         lastFrameTime = now;
 
-        auto renderer     = Contexts[drawSettings.rendererType].pRenderer;
-        auto modelTexture = Contexts[drawSettings.rendererType].pModelTexture;
+        auto renderer     = contexts[drawSettings.rendererType].pRenderer;
+        auto modelTexture = contexts[drawSettings.rendererType].pModelTexture;
 
         // check all the window's events that were triggered since the last iteration of the loop
         sf::Event event;
@@ -316,16 +316,12 @@ int main()
 
         if (lastModelPaths.texturePath != modelPaths.texturePath)
         {
-            Contexts[0].pModelTexture = Contexts[0].pRenderer->LoadTexture(modelPaths.texturePath.c_str());
-            Contexts[1].pModelTexture = Contexts[1].pRenderer->LoadTexture(modelPaths.texturePath.c_str());
+            contexts[0].pModelTexture = contexts[0].pRenderer->LoadTexture(modelPaths.texturePath.c_str());
+            contexts[1].pModelTexture = contexts[1].pRenderer->LoadTexture(modelPaths.texturePath.c_str());
             lastModelPaths = modelPaths;
         }
 
-        float angleX = (drawSettings.modelRotation.x / 180.f * PI);
-        float angleY = (drawSettings.modelRotation.y / 180.f * PI);
-        float angleZ = (drawSettings.modelRotation.z / 180.f * PI);
-
-        modelMatrix = Matrix4f::Rotation(Vector3f(angleX, angleY, angleZ)) * Matrix4f::Scale(Vector3f(drawSettings.modelScale, drawSettings.modelScale, drawSettings.modelScale)) * Matrix4f::Translation(drawSettings.modelTranslation);
+        modelMatrix = Matrix4f::Rotation(drawSettings.modelRotation / 180.f * PI ) * Matrix4f::Scale(Vector3f(drawSettings.modelScale, drawSettings.modelScale, drawSettings.modelScale)) * Matrix4f::Translation(drawSettings.modelTranslation);
 
         renderer->SetTexture(modelTexture);
         renderer->SetModelMatrixx(modelMatrix);
@@ -377,12 +373,13 @@ int main()
         renderer->ClearScreen();
 
         // render stuff to screen buffer
-        for (auto& model : modelsData) {
+        for (auto& model : modelsData)
+        {
             renderer->Render(model.vertices);
         }
 
         // for software renderer render screen buffer to window (hardware renderer renders directly to window and calling GetScreenBuffer on it returns empty buffer)
-        if( auto& buf = renderer->GetScreenBuffer() ; buf.size() )
+        if (auto& buf = renderer->GetScreenBuffer() ; buf.size())
         {
             // update texture
             screenTexture.update((uint8_t*)buf.data());

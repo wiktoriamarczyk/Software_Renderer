@@ -32,21 +32,21 @@ public:
     void SetShininess(float shininess)override;
     void SetThreadsCount(uint8_t threadsCount)override;
     void SetColorizeThreads(bool colorizeThreads)override;
-    void SetDrawWireframe(bool Wireframe)override;
+    void SetDrawWireframe(bool wireframe)override;
     void SetDrawBBoxes(bool drawBBoxes)override;
-    void SetZWrite(bool zwrite)override;
-    void SetZTest(bool ztest)override;
+    void SetZWrite(bool zWrite)override;
+    void SetZTest(bool zTest)override;
 private:
-    void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int MaxY);
-    void DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int MaxY);
-    void DrawTriangleBoundingBox(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int MaxY);
-    void DrawLine(const TransformedVertex& A, const TransformedVertex& B, const Vector4f& color, int MinY, int MaxY);
-    void DrawLine(Vector2f A, Vector2f B, const Vector4f& color, int MinY, int MaxY);
+    void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY);
+    void DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int maxY);
+    void DrawTriangleBoundingBox(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int maxY);
+    void DrawLine(const TransformedVertex& A, const TransformedVertex& B, const Vector4f& color, int MinY, int maxY);
+    void DrawLine(Vector2f A, Vector2f B, const Vector4f& color, int MinY, int maxY);
     void PutPixel(int x, int y, uint32_t color);
     void PutPixelUnsafe(int x, int y, uint32_t color);
     void RenderLightSource();
     void UpdateMVPMatrix();
-    void DoRender(const vector<Vertex>& vertices, int MinY, int MaxY, int threadID);
+    void DoRender(const vector<Vertex>& vertices, int MinY, int maxY, int threadID);
 
     static float EdgeFunction(const Vector2f& A, const Vector2f& B, const Vector2f& C);
     Vector4f FragmentShader(const TransformedVertex& vertex);

@@ -13,7 +13,7 @@ public:
 
     SimpleThreadPool();
     ~SimpleThreadPool();
-    void SetThreadCount(uint8_t Count);
+    void SetThreadCount(uint8_t count);
     uint8_t GetThreadCount()const;
     void LaunchTasks(vector<TaskFunc> tasks);
 public:

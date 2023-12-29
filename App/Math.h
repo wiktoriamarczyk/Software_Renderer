@@ -61,10 +61,10 @@ public:
     bool  LineIntersection(const Vector3f& start, const Vector3f& end, float& scale) const;
     const Vector3f& GetNormal()const { return m_Normal; }
     float GetD()const { return m_D; }
-    eSide GetSide(const Vector3f& point, float Epsilon = 0.0f)const;
+    eSide GetSide(const Vector3f& point, float epsilon = 0.0f)const;
 private:
     Vector3f m_Normal;
     float    m_D = 0;
 };
 
-const vector<Vertex>& ClipTraingles(const Plane& ClipPlane, const float Epsilon, const vector<Vertex>& Verts);
+const vector<Vertex>& ClipTraingles(const Plane& clipPlane, const float epsilon, const vector<Vertex>& verts);

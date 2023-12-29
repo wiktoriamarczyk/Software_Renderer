@@ -54,39 +54,39 @@ static T LerpT(const T& a, const T& b, float alpha)
     return a * a1 + b * alpha;
 }
 
-const vector<Vertex>& ClipTraingles(const Plane& ClipPlane, const float Epsilon, const vector<Vertex>& Verts)
+const vector<Vertex>& ClipTraingles(const Plane& clipPlane, const float epsilon, const vector<Vertex>& verts)
 {
     static vector<Vertex> EMPTY;
-    vector<uint8_t> VertsRelation;
-    vector<Vertex> SplitedVertices;
-    vector<int> EdgeSplitVertex;
-    static thread_local vector<Vertex> ClippedVerts;
+    vector<uint8_t> vertsRelation;
+    vector<Vertex> splitedVertices;
+    vector<int> edgeSplitVertex;
+    static thread_local vector<Vertex> clippedVerts;
 
     using eSide = Plane::eSide;
 
-    float            fDist = 0;
-    const int        OldVerticesCount = Verts.size();
-    const int        OldEdgesCount = OldVerticesCount;
-    const int        OldTrianglesCount = OldVerticesCount / 3;
-    int              FrontBack[3] = {};
-    VertsRelation.resize(OldVerticesCount);
+    float       distance = 0;
+    const int   oldVerticesCount = verts.size();
+    const int   oldEdgesCount = oldVerticesCount;
+    const int   oldTrianglesCount = oldVerticesCount / 3;
+    int         frontOnBackCount[3] = {};
+    vertsRelation.resize(oldVerticesCount);
 
-    for (int i = 0; i < OldVerticesCount; ++i)
+    for (int i = 0; i < oldVerticesCount; ++i)
     {
-        VertsRelation[i] = (uint8_t)ClipPlane.GetSide(Verts[i].position, Epsilon);
-        FrontBack[VertsRelation[i]]++;
+        vertsRelation[i] = (uint8_t)clipPlane.GetSide(verts[i].position, epsilon);
+        frontOnBackCount[vertsRelation[i]]++;
     }
 
     // all vertices behind clipping plane - clip all
-    if (!FrontBack[(int)eSide::Back])
+    if (!frontOnBackCount[(int)eSide::Back])
     {
         return EMPTY;
     }
 
     // all vertices in front of clipping plane - no clipping
-    if (!FrontBack[(int)eSide::Front])
+    if (!frontOnBackCount[(int)eSide::Front])
     {
-        return Verts;
+        return verts;
     }
 
     struct edge
@@ -94,168 +94,168 @@ const vector<Vertex>& ClipTraingles(const Plane& ClipPlane, const float Epsilon,
         uint8_t VertexIndex[2];
     };
 
-    constexpr edge TriangleEdges[3] = {
+    constexpr edge triangleEdges[3] = {
         { 0,1 },
         { 1,2 },
         { 2,0 }
     };
 
-    SplitedVertices.clear();
-    EdgeSplitVertex.resize(OldEdgesCount);
+    splitedVertices.clear();
+    edgeSplitVertex.resize(oldEdgesCount);
 
-    for (int t = 0, e = 0; t < OldTrianglesCount; ++t)
+    for (int t = 0, e = 0; t < oldTrianglesCount; ++t)
     {
-        int BaseVertex = t * 3;
-        for (auto& Edge : TriangleEdges)
+        int baseVertex = t * 3;
+        for (auto& edge : triangleEdges)
         {
-            int vi0 = BaseVertex + Edge.VertexIndex[0];
-            int vi1 = BaseVertex + Edge.VertexIndex[1];
+            int vi0 = baseVertex + edge.VertexIndex[0];
+            int vi1 = baseVertex + edge.VertexIndex[1];
 
-            if ((VertsRelation[vi0] ^ VertsRelation[vi1]) && !((VertsRelation[vi0] | VertsRelation[vi1]) & (uint8_t)eSide::On))
+            if ((vertsRelation[vi0] ^ vertsRelation[vi1]) && !((vertsRelation[vi0] | vertsRelation[vi1]) & (uint8_t)eSide::On))
             {
-                ClipPlane.LineIntersection(Verts[vi0].position, Verts[vi1].position, fDist);
-                Vertex NewVertex = LerpT(Verts[vi0], Verts[vi1], fDist);
+                clipPlane.LineIntersection(verts[vi0].position, verts[vi1].position, distance);
+                Vertex newVertex = LerpT(verts[vi0], verts[vi1], distance);
 
-                EdgeSplitVertex[e] = (int)SplitedVertices.size();
+                edgeSplitVertex[e] = (int)splitedVertices.size();
 
-                SplitedVertices.push_back(NewVertex);
+                splitedVertices.push_back(newVertex);
             }
             else
             {
                 // no split
-                EdgeSplitVertex[e] = -1;
+                edgeSplitVertex[e] = -1;
             }
             ++e;
         }
     }
 
-    ClippedVerts.reserve(OldVerticesCount + SplitedVertices.size() / 2);
-    ClippedVerts.clear();
+    clippedVerts.reserve(oldVerticesCount + splitedVertices.size() / 2);
+    clippedVerts.clear();
 
-    for (int E = 0; E < OldEdgesCount; E += 3)
+    for (int e = 0; e < oldEdgesCount; e += 3)
     {
-        const int EdgeSplit0 = EdgeSplitVertex[E + 0];
-        const int EdgeSplit1 = EdgeSplitVertex[E + 1];
-        const int EdgeSplit2 = EdgeSplitVertex[E + 2];
+        const int edgeSplit0 = edgeSplitVertex[e + 0];
+        const int edgeSplit1 = edgeSplitVertex[e + 1];
+        const int edgeSplit2 = edgeSplitVertex[e + 2];
 
-        const int vi0 = E + 0;
-        const int vi1 = E + 1;
-        const int vi2 = E + 2;
+        const int vi0 = e + 0;
+        const int vi1 = e + 1;
+        const int vi2 = e + 2;
 
-        const uint8_t val = IsIntSignBitNotSet(EdgeSplit0) | (IsIntSignBitNotSet(EdgeSplit1) << 1) | (IsIntSignBitNotSet(EdgeSplit2) << 2);
+        const uint8_t val = IsIntSignBitNotSet(edgeSplit0) | (IsIntSignBitNotSet(edgeSplit1) << 1) | (IsIntSignBitNotSet(edgeSplit2) << 2);
         switch (val)
         {
         case 0:
             // no split
 
             // all vertices behind clipping plane - skip
-            if ((VertsRelation[vi0] | VertsRelation[vi1] | VertsRelation[vi2]) & uint8_t(eSide::Front))
+            if ((vertsRelation[vi0] | vertsRelation[vi1] | vertsRelation[vi2]) & uint8_t(eSide::Front))
                 break; // skip this triangle
 
             // copy all
-            ClippedVerts.push_back(Verts[vi0]);
-            ClippedVerts.push_back(Verts[vi1]);
-            ClippedVerts.push_back(Verts[vi2]);
+            clippedVerts.push_back(verts[vi0]);
+            clippedVerts.push_back(verts[vi1]);
+            clippedVerts.push_back(verts[vi2]);
             break;
         case 1:
             // edge 0 slitted
-            if (!(VertsRelation[vi0] & uint8_t(eSide::Front)))
+            if (!(vertsRelation[vi0] & uint8_t(eSide::Front)))
             {
-                ClippedVerts.push_back(Verts[vi0]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit0]);
-                ClippedVerts.push_back(Verts[vi2]);
+                clippedVerts.push_back(verts[vi0]);
+                clippedVerts.push_back(splitedVertices[edgeSplit0]);
+                clippedVerts.push_back(verts[vi2]);
             }
             else {
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit0]);
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(Verts[vi2]);
+                clippedVerts.push_back(splitedVertices[edgeSplit0]);
+                clippedVerts.push_back(verts[vi1]);
+                clippedVerts.push_back(verts[vi2]);
             }
             break;
         case 2:
-            if (!(VertsRelation[vi1] & uint8_t(eSide::Front)))
+            if (!(vertsRelation[vi1] & uint8_t(eSide::Front)))
             {
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
-                ClippedVerts.push_back(Verts[vi0]);
+                clippedVerts.push_back(verts[vi1]);
+                clippedVerts.push_back(splitedVertices[edgeSplit1]);
+                clippedVerts.push_back(verts[vi0]);
             }
             else
             {
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
-                ClippedVerts.push_back(Verts[vi2]);
-                ClippedVerts.push_back(Verts[vi0]);
+                clippedVerts.push_back(splitedVertices[edgeSplit1]);
+                clippedVerts.push_back(verts[vi2]);
+                clippedVerts.push_back(verts[vi0]);
             }
             break;
         case 4:
-            if (!(VertsRelation[vi2] & uint8_t(eSide::Front)))
+            if (!(vertsRelation[vi2] & uint8_t(eSide::Front)))
             {
-                ClippedVerts.push_back(Verts[vi2]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
-                ClippedVerts.push_back(Verts[vi1]);
+                clippedVerts.push_back(verts[vi2]);
+                clippedVerts.push_back(splitedVertices[edgeSplit2]);
+                clippedVerts.push_back(verts[vi1]);
             }
             else {
 
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
-                ClippedVerts.push_back(Verts[vi0]);
-                ClippedVerts.push_back(Verts[vi1]);
+                clippedVerts.push_back(splitedVertices[edgeSplit2]);
+                clippedVerts.push_back(verts[vi0]);
+                clippedVerts.push_back(verts[vi1]);
             }
             break;
         case 3:
             // edge 0 and 1 slitted
-            if (!(VertsRelation[vi1] & uint8_t(eSide::Front)))
+            if (!(vertsRelation[vi1] & uint8_t(eSide::Front)))
             {
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit0]);
+                clippedVerts.push_back(verts[vi1]);
+                clippedVerts.push_back(splitedVertices[edgeSplit1]);
+                clippedVerts.push_back(splitedVertices[edgeSplit0]);
             }
             else {
-                ClippedVerts.push_back(Verts[vi0]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit0]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
+                clippedVerts.push_back(verts[vi0]);
+                clippedVerts.push_back(splitedVertices[edgeSplit0]);
+                clippedVerts.push_back(splitedVertices[edgeSplit1]);
 
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
-                ClippedVerts.push_back(Verts[vi2]);
-                ClippedVerts.push_back(Verts[vi0]);
+                clippedVerts.push_back(splitedVertices[edgeSplit1]);
+                clippedVerts.push_back(verts[vi2]);
+                clippedVerts.push_back(verts[vi0]);
             }
             break;
 
         case 5:
             // edge 0 and 2 slitted
-            if (!(VertsRelation[vi0] & uint8_t(eSide::Front)))
+            if (!(vertsRelation[vi0] & uint8_t(eSide::Front)))
             {
-                ClippedVerts.push_back(Verts[vi0]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit0]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
+                clippedVerts.push_back(verts[vi0]);
+                clippedVerts.push_back(splitedVertices[edgeSplit0]);
+                clippedVerts.push_back(splitedVertices[edgeSplit2]);
             }
             else {
 
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit0]);
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
+                clippedVerts.push_back(splitedVertices[edgeSplit0]);
+                clippedVerts.push_back(verts[vi1]);
+                clippedVerts.push_back(splitedVertices[edgeSplit2]);
 
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(Verts[vi2]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
+                clippedVerts.push_back(verts[vi1]);
+                clippedVerts.push_back(verts[vi2]);
+                clippedVerts.push_back(splitedVertices[edgeSplit2]);
             }
             break;
         case 6:
             // edge 1 and 2 slitted
-            if (!(VertsRelation[vi2] & uint8_t(eSide::Front)))
+            if (!(vertsRelation[vi2] & uint8_t(eSide::Front)))
             {
-                ClippedVerts.push_back(Verts[vi2]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
+                clippedVerts.push_back(verts[vi2]);
+                clippedVerts.push_back(splitedVertices[edgeSplit2]);
+                clippedVerts.push_back(splitedVertices[edgeSplit1]);
             }
             else {
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit1]);
+                clippedVerts.push_back(splitedVertices[edgeSplit2]);
+                clippedVerts.push_back(verts[vi1]);
+                clippedVerts.push_back(splitedVertices[edgeSplit1]);
 
-                ClippedVerts.push_back(Verts[vi0]);
-                ClippedVerts.push_back(Verts[vi1]);
-                ClippedVerts.push_back(SplitedVertices[EdgeSplit2]);
+                clippedVerts.push_back(verts[vi0]);
+                clippedVerts.push_back(verts[vi1]);
+                clippedVerts.push_back(splitedVertices[edgeSplit2]);
             }
             break;
         }
     }
-    return ClippedVerts;
+    return clippedVerts;
 }

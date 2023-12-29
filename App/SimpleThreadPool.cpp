@@ -22,32 +22,32 @@ SimpleThreadPool::~SimpleThreadPool()
     }
 }
 
-void SimpleThreadPool::SetThreadCount(uint8_t Count)
+void SimpleThreadPool::SetThreadCount(uint8_t count)
 {
     {
         std::unique_lock lock(m_TasksCS);
-        int CurCount = m_ThreadCount;
-        if (Count == CurCount)
+        int curCount = m_ThreadCount;
+        if (count == curCount)
             return;
 
-        if (Count < CurCount)
+        if (count < curCount)
         {
-            int TasksToKill = CurCount - Count;
-            for (int i = 0; i < TasksToKill; ++i)
+            int tasksToKill = curCount - count;
+            for (int i = 0; i < tasksToKill; ++i)
                 m_Tasks.push_back({});
 
-            m_NewTaskSemaphore.release(TasksToKill);
+            m_NewTaskSemaphore.release(tasksToKill);
         }
         else
         {
-            int TasksToSpawn = Count - CurCount;
-            for (int i = 0; i < TasksToSpawn; ++i)
+            int tasksToSpawn = count - curCount;
+            for (int i = 0; i < tasksToSpawn; ++i)
                 thread([this] { Worker(); }).detach();
 
         }
     }
 
-    while (m_ThreadCount != Count)
+    while (m_ThreadCount != count)
     {
     }
 }
@@ -73,7 +73,7 @@ void SimpleThreadPool::Worker()
 
 void SimpleThreadPool::LaunchTasks(vector<TaskFunc> TaskFuncs)
 {
-    vector<future<void>> TasksAwaiters;
+    vector<future<void>> tasksAwaiters;
     {
         std::unique_lock lock(m_TasksCS);
         if (m_ThreadCount <= 0)
@@ -85,13 +85,13 @@ void SimpleThreadPool::LaunchTasks(vector<TaskFunc> TaskFuncs)
                 continue;
 
             m_Tasks.push_back(Task{ {}, std::move(Func) });
-            TasksAwaiters.push_back(m_Tasks.back().m_FinishPromise.get_future());
+            tasksAwaiters.push_back(m_Tasks.back().m_FinishPromise.get_future());
         }
 
-        m_NewTaskSemaphore.release(TasksAwaiters.size());
+        m_NewTaskSemaphore.release(tasksAwaiters.size());
     }
 
-    for (auto& Awaiter : TasksAwaiters)
+    for (auto& Awaiter : tasksAwaiters)
     {
         Awaiter.get();
     }

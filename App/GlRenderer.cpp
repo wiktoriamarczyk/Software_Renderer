@@ -74,7 +74,7 @@ GlProgram::~GlProgram()
             glDeleteShader(m_Shader[i]);
         }
     }
-    if(m_Program)
+    if (m_Program)
         glDeleteProgram(m_Program);
 }
 
@@ -84,32 +84,32 @@ bool GlProgram::LoadShaderFromMemory(const std::string& shaderData, ShaderType t
     if (shaderData.empty())
         return false;
 
-    uint32_t& ShaderID = m_Shader[ static_cast<uint32_t>(type) ];
+    uint32_t& shaderID = m_Shader[ static_cast<uint32_t>(type) ];
 
-    if (m_Program && ShaderID)
+    if (m_Program && shaderID)
     {
-        glDetachShader(m_Program, ShaderID);
-        glDeleteShader(ShaderID);
-        ShaderID = 0;
+        glDetachShader(m_Program, shaderID);
+        glDeleteShader(shaderID);
+        shaderID = 0;
     }
 
 
     switch (type)
     {
     case ShaderType::Vertex:
-        ShaderID = buildShader(shaderData, GL_VERTEX_SHADER);
+        shaderID = buildShader(shaderData, GL_VERTEX_SHADER);
         break;
     case ShaderType::Geometry:
-        ShaderID = buildShader(shaderData, GL_GEOMETRY_SHADER);
+        shaderID = buildShader(shaderData, GL_GEOMETRY_SHADER);
         break;
     case ShaderType::Fragment:
-        ShaderID = buildShader(shaderData, GL_FRAGMENT_SHADER);
+        shaderID = buildShader(shaderData, GL_FRAGMENT_SHADER);
         break;
     default:
         break;
     }
 
-    if (!ShaderID)
+    if (!shaderID)
         return false;
 
     if (m_Program == 0)
@@ -117,7 +117,7 @@ bool GlProgram::LoadShaderFromMemory(const std::string& shaderData, ShaderType t
         m_Program = glCreateProgram();
     }
 
-    glAttachShader(m_Program, ShaderID);
+    glAttachShader(m_Program, shaderID);
     glBindAttribLocation(m_Program, static_cast<GLuint>(VertexAttribute::Position), "vs_position");
     glBindAttribLocation(m_Program, static_cast<GLuint>(VertexAttribute::Normal  ), "vs_normal");
     glBindAttribLocation(m_Program, static_cast<GLuint>(VertexAttribute::Color   ), "vs_color");
@@ -149,7 +149,7 @@ bool GlProgram::LoadMatrix(const Matrix4f& mat, UniformType uniformType)
         return false;
 
     auto uniform = (int)(m_Uniform[uint32_t(uniformType)]);
-    if(uniform == -1)
+    if (uniform == -1)
         return false;
 
     glUniformMatrix4fv( uniform , 1, GL_FALSE, mat.m_Matrix[0] );
@@ -162,7 +162,7 @@ bool GlProgram::LoadVector(const Vector4f& vec , UniformType uniform)
         return false;
 
     auto uniformID = (int)(m_Uniform[uint32_t(uniform)]);
-    if(uniformID == -1)
+    if (uniformID == -1)
         return false;
 
     glUniform4fv( uniformID , 1, &vec.x );
@@ -175,7 +175,7 @@ bool GlProgram::LoadVector(const Vector3f& vec , UniformType uniform)
         return false;
 
     auto uniformID = (int)(m_Uniform[uint32_t(uniform)]);
-    if(uniformID == -1)
+    if (uniformID == -1)
         return false;
 
     glUniform3fv( uniformID , 1, &vec.x );
@@ -188,7 +188,7 @@ bool GlProgram::LoadFloat(float val, UniformType uniform)
         return false;
 
     auto uniformID = (int)(m_Uniform[uint32_t(uniform)]);
-    if(uniformID == -1)
+    if (uniformID == -1)
         return false;
 
     glUniform1f( uniformID , val );

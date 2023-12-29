@@ -5,10 +5,10 @@
 
 // ---------------------------- SoftwareRenderer ----------------------------
 
-SoftwareRenderer::SoftwareRenderer(int ScreenWidth, int ScreenHeight)
+SoftwareRenderer::SoftwareRenderer(int screenWidth, int screenHeight)
 {
-    m_ScreenBuffer.resize(ScreenWidth * ScreenHeight, 0);
-    m_ZBuffer.resize(ScreenWidth * ScreenHeight, 0);
+    m_ScreenBuffer.resize(screenWidth * screenHeight, 0);
+    m_ZBuffer.resize(screenWidth * screenHeight, 0);
 
     m_ThreadColors[0]  = Vector4f(1.0f, 0.0f, 1.0f, 1.0f);
     m_ThreadColors[1]  = Vector4f(1.0f, 0.0f, 0.0f, 1.0f);
@@ -54,7 +54,7 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
         vector<function<void()>> tasks(threadsCount);
         for (int i = 0; i < threadsCount; ++i)
         {
-            if(i+1==threadsCount)
+            if (i+1==threadsCount)
                 lineEndY = SCREEN_HEIGHT - 1;
             tasks[i] = [this,&vertices, lineStyartY, lineEndY,i]
             {
@@ -72,7 +72,7 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
     }
 }
 
-void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int MinY, int MaxY, int threadID)
+void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int minY, int maxY, int threadID)
 {
     Plane nearFrustumPlane;
     m_MVPMatrix.GetFrustumNearPlane(nearFrustumPlane);
@@ -85,7 +85,7 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int MinY, int 
 
     if (m_DrawWireframe || m_DrawBBoxes)
     {
-        const Vector4f Color = m_ColorizeThreads ? m_ThreadColors[threadID] : m_WireFrameColor;
+        const Vector4f color = m_ColorizeThreads ? m_ThreadColors[threadID] : m_WireFrameColor;
 
         for (int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
         {
@@ -93,16 +93,16 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int MinY, int 
             transformedB.ProjToScreen(vertices[i + 1], m_ModelMatrix, m_MVPMatrix);
             transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, m_MVPMatrix);
 
-            if(m_DrawWireframe)
-                DrawTriangle(transformedA, transformedB, transformedC,Color, MinY, MaxY);
+            if (m_DrawWireframe)
+                DrawTriangle(transformedA, transformedB, transformedC, color, minY, maxY);
 
-            if( m_DrawBBoxes )
-                DrawTriangleBoundingBox(transformedA, transformedB, transformedC,Color, MinY, MaxY);
+            if (m_DrawBBoxes)
+                DrawTriangleBoundingBox(transformedA, transformedB, transformedC, color, minY, maxY);
         }
     }
     else
     {
-        const Vector4f Color = m_ColorizeThreads ? m_ThreadColors[threadID] : Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+        const Vector4f color = m_ColorizeThreads ? m_ThreadColors[threadID] : Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
 
         for (int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
         {
@@ -110,7 +110,7 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int MinY, int 
             transformedB.ProjToScreen(vertices[i + 1], m_ModelMatrix, m_MVPMatrix);
             transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, m_MVPMatrix);
 
-            DrawFilledTriangle(transformedA, transformedB, transformedC,Color, MinY,MaxY);
+            DrawFilledTriangle(transformedA, transformedB, transformedC, color, minY, maxY);
         }
     }
 }
@@ -158,7 +158,7 @@ inline void SoftwareRenderer::PutPixel(int x, int y, uint32_t color)
     m_ScreenBuffer[y * SCREEN_WIDTH + x] = color;
 }
 
-void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color, int MinY, int MaxY)
+void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color, int minY, int maxY)
 {
     // filling algorithm is working that way that we are going through all pixels in rectangle that is created by min and max points
     // and we are checking if pixel is inside triangle by using three lines and checking if pixel is on the same side of each line
@@ -193,8 +193,8 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
     Vector2f max = A.CWiseMax(B).CWiseMax(C);
 
     // clamp min and max points to screen size so we don't calculate points that we don't see
-    min = min.CWiseMin(Vector2f(SCREEN_WIDTH-1, MaxY)).CWiseMax(Vector2f(0, MinY));
-    max = max.CWiseMin(Vector2f(SCREEN_WIDTH-1, MaxY)).CWiseMax(Vector2f(0, MinY));
+    min = min.CWiseMin(Vector2f(SCREEN_WIDTH-1, maxY)).CWiseMax(Vector2f(0, minY));
+    max = max.CWiseMin(Vector2f(SCREEN_WIDTH-1, maxY)).CWiseMax(Vector2f(0, minY));
 
     const float invABC = 1.0f / ABC;
 
@@ -237,51 +237,51 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
     }
 }
 
-void SoftwareRenderer::DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int MaxY)
+void SoftwareRenderer::DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY)
 {
-    DrawLine(A, B, color, MinY, MaxY);
-    DrawLine(C, B, color, MinY, MaxY);
-    DrawLine(C, A, color, MinY, MaxY);
+    DrawLine(A, B, color, minY, maxY);
+    DrawLine(C, B, color, minY, maxY);
+    DrawLine(C, A, color, minY, maxY);
 }
 
-void SoftwareRenderer::DrawTriangleBoundingBox(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int MaxY)
+void SoftwareRenderer::DrawTriangleBoundingBox(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY)
 {
     Vector2f min = A.screenPosition.CWiseMin( B.screenPosition ).CWiseMin( C.screenPosition ).xy();
     Vector2f max = A.screenPosition.CWiseMax( B.screenPosition ).CWiseMax( C.screenPosition ).xy();
 
-    if( max.y < MinY ||
-        min.y > MaxY )
+    if( max.y < minY ||
+        min.y > maxY )
         return;
 
     // clamp min and max points to screen size so we don't calculate points that we don't see
-    min = min.CWiseMin(Vector2f(SCREEN_WIDTH-1, MaxY)).CWiseMax(Vector2f(0, MinY));
-    max = max.CWiseMin(Vector2f(SCREEN_WIDTH-1, MaxY)).CWiseMax(Vector2f(0, MinY));
+    min = min.CWiseMin(Vector2f(SCREEN_WIDTH-1, maxY)).CWiseMax(Vector2f(0, minY));
+    max = max.CWiseMin(Vector2f(SCREEN_WIDTH-1, maxY)).CWiseMax(Vector2f(0, minY));
 
-    DrawLine(min , Vector2f{max.x,min.y}, color, MinY, MaxY);
-    DrawLine(Vector2f{max.x,min.y} , max, color, MinY, MaxY);
-    DrawLine(max , Vector2f{min.x,max.y}, color, MinY, MaxY);
-    DrawLine(Vector2f{min.x,max.y} , min, color, MinY, MaxY);
+    DrawLine(min , Vector2f{max.x,min.y}, color, minY, maxY);
+    DrawLine(Vector2f{max.x,min.y} , max, color, minY, maxY);
+    DrawLine(max , Vector2f{min.x,max.y}, color, minY, maxY);
+    DrawLine(Vector2f{min.x,max.y} , min, color, minY, maxY);
 }
 
-void SoftwareRenderer::DrawLine(const TransformedVertex& VA, const TransformedVertex& VB, const Vector4f& color, int MinY, int MaxY)
+void SoftwareRenderer::DrawLine(const TransformedVertex& VA, const TransformedVertex& VB, const Vector4f& color, int minY, int maxY)
 {
     Vector2f A = VA.screenPosition.xy();
     Vector2f B = VB.screenPosition.xy();
 
-    return DrawLine(A, B, color, MinY,  MaxY);
+    return DrawLine(A, B, color, minY,  maxY);
 }
 
-void SoftwareRenderer::DrawLine(Vector2f A, Vector2f B, const Vector4f& color, int MinY, int MaxY)
+void SoftwareRenderer::DrawLine(Vector2f A, Vector2f B, const Vector4f& color, int minY, int maxY)
 {
     // Clip whole line against screen bounds
-    if( (A.x < 0 && B.x < 0) ||
-        (A.y < MinY && B.y < MinY) ||
+    if ((A.x < 0 && B.x < 0) ||
+        (A.y < minY && B.y < minY) ||
         (A.x >= SCREEN_WIDTH  && B.x >= SCREEN_WIDTH) ||
-        (A.y >= MaxY && B.y > MaxY) )
+        (A.y >= maxY && B.y > maxY) )
         return;
 
     // Handle case when start end end point are on the same pixel
-    if ( int(A.x) == int(B.x) && int(A.y) == int(B.y) )
+    if (int(A.x) == int(B.x) && int(A.y) == int(B.y))
     {
         PutPixel( int(A.x) , int(A.y) , Vector4f::ToARGB(color) );
         return;
@@ -290,28 +290,28 @@ void SoftwareRenderer::DrawLine(Vector2f A, Vector2f B, const Vector4f& color, i
     Vector2f dir = B - A;
 
     // Clip point A to minimum Y
-    if( A.y < MinY )
+    if (A.y < minY)
     {
-        float t = ( MinY - A.y ) / dir.y;
+        float t = ( minY - A.y ) / dir.y;
         A = A + dir * t;
     }
     // Clip point A to maximum Y
-    else if( A.y > MaxY )
+    else if (A.y > maxY)
     {
-        float t = ( MaxY - A.y ) / dir.y;
+        float t = ( maxY - A.y ) / dir.y;
         A = A + dir * t;
     }
 
     // Clip point B to minimum Y
-    if( B.y > MaxY )
+    if (B.y > maxY)
     {
-        float t = ( MaxY - A.y ) / dir.y;
+        float t = ( maxY - A.y ) / dir.y;
         B = A + dir * t;
     }
     // Clip point B to maximum Y
-    else if( B.y < MinY )
+    else if (B.y < minY)
     {
-        float t = ( MinY - A.y ) / dir.y;
+        float t = ( minY - A.y ) / dir.y;
         B = A + dir * t;
     }
 
@@ -320,8 +320,8 @@ void SoftwareRenderer::DrawLine(Vector2f A, Vector2f B, const Vector4f& color, i
     float b = B.y - a * B.x;
     uint32_t intColor = Vector4f::ToARGB(color);
 
-    if (abs(dir.x) >= abs(dir.y)) {
-
+    if (abs(dir.x) >= abs(dir.y))
+    {
         int startX = A.x;
         int endX = B.x;
 
@@ -336,8 +336,8 @@ void SoftwareRenderer::DrawLine(Vector2f A, Vector2f B, const Vector4f& color, i
             PutPixel(x, y, intColor);
         }
     }
-    else {
-
+    else
+    {
         float a = (B.x - A.x) / (B.y - A.y);
         float b = B.x - a * B.y;
 
@@ -357,7 +357,7 @@ void SoftwareRenderer::DrawLine(Vector2f A, Vector2f B, const Vector4f& color, i
     }
 }
 
-float SoftwareRenderer::EdgeFunction(const Vector2f& A, const Vector2f& B, const Vector2f& C)
+inline float SoftwareRenderer::EdgeFunction(const Vector2f& A, const Vector2f& B, const Vector2f& C)
 {
     return (B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x);
 }
@@ -486,9 +486,9 @@ void SoftwareRenderer::SetColorizeThreads(bool colorizeThreads)
     m_ColorizeThreads = colorizeThreads;
 }
 
-void SoftwareRenderer::SetDrawWireframe(bool Wireframe)
+void SoftwareRenderer::SetDrawWireframe(bool wireframe)
 {
-    m_DrawWireframe = Wireframe;
+    m_DrawWireframe = wireframe;
 }
 
 void SoftwareRenderer::SetDrawBBoxes(bool drawBBoxes)

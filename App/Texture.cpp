@@ -12,7 +12,7 @@ bool Texture::Load(const char* fileName)
 
     if (width>MAX_TEXTURE_SIZE || height>MAX_TEXTURE_SIZE)
     {
-        printf("Texture size is too big: %d x %d, max is (%d x %d)\n", width, height, MAX_TEXTURE_SIZE , MAX_TEXTURE_SIZE);
+        printf("Texture size is too big: %d x %d, max is %d x %d\n", width, height, MAX_TEXTURE_SIZE , MAX_TEXTURE_SIZE);
         return false;
     }
 
@@ -37,8 +37,8 @@ bool Texture::IsValid()const
 
 Vector4f Texture::Sample(Vector2f uv) const
 {
-    int x = std::trunc ( std::clamp<float>( uv.x * (m_Width  ) , 0 , m_Width - 1) );
-    int y = std::trunc ( std::clamp<float>( uv.y * (m_Height ) , 0 , m_Height - 1) );
+    int x = int( std::clamp<float>( uv.x * (m_Width ) + 0.001f , 0 , m_Width - 1) );
+    int y = int( std::clamp<float>( uv.y * (m_Height) + 0.001f , 0 , m_Height - 1) );
 
     int pixelIndex = y * m_Width + x;
 

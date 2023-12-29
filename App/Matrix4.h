@@ -33,14 +33,14 @@ public:
     static Matrix4f Rotation(Vector3f other);
     static Matrix4f Scale(Vector3f other);
 
-    bool GetFrustumNearPlane(Plane& OuTPln) const;
+    bool GetFrustumNearPlane(Plane& outPlane) const;
 
     Matrix4f Transposed()const;
     Matrix4f Inversed() const;
 
     float m_Matrix[4][4] = {};   // matrix elements; first index is for rows, second for columns (row-major)
 private:
-    static bool MakeFrustumPlane(float A, float B, float C, float D, Plane& OutPlane);
+    static bool MakeFrustumPlane(float a, float b, float c, float d, Plane& outPlane);
 };
 
 constexpr Matrix4f::Matrix4f()

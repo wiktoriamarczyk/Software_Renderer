@@ -18,7 +18,7 @@ using namespace std;
 
 const int SCREEN_WIDTH = 1024;
 const int SCREEN_HEIGHT = 768;
-const int MAX_MODEL_VERTICES = 100'000; // 100 K
+const int MAX_MODEL_TRIANGLES = 200'000; // 200 K
 const int MAX_TEXTURE_SIZE = 4096; // 4K
 const int FULL_ANGLE = 360;
 const float PI = std::numbers::pi;
