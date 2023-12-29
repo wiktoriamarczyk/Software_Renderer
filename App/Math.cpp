@@ -56,34 +56,32 @@ static T LerpT(const T& a, const T& b, float alpha)
 
 const vector<Vertex>& ClipTraingles(const Plane& clipPlane, const float epsilon, const vector<Vertex>& verts)
 {
-    static vector<Vertex> EMPTY;
     vector<uint8_t> vertsRelation;
-    vector<Vertex> splitedVertices;
-    vector<int> edgeSplitVertex;
-    static thread_local vector<Vertex> clippedVerts;
 
     using eSide = Plane::eSide;
 
-    float       distance = 0;
     const int   oldVerticesCount = verts.size();
     const int   oldEdgesCount = oldVerticesCount;
     const int   oldTrianglesCount = oldVerticesCount / 3;
     int         frontOnBackCount[3] = {};
     vertsRelation.resize(oldVerticesCount);
 
+    // get all vertices relation to clipping plane
     for (int i = 0; i < oldVerticesCount; ++i)
     {
         vertsRelation[i] = (uint8_t)clipPlane.GetSide(verts[i].position, epsilon);
+        // count vertices in front/on/back of clipping plane
         frontOnBackCount[vertsRelation[i]]++;
     }
 
-    // all vertices behind clipping plane - clip all
+    // all vertices are behind clipping plane - clip all
     if (!frontOnBackCount[(int)eSide::Back])
     {
+        static const vector<Vertex> EMPTY;
         return EMPTY;
     }
 
-    // all vertices in front of clipping plane - no clipping
+    // all vertices are in front of clipping plane - no clipping
     if (!frontOnBackCount[(int)eSide::Front])
     {
         return verts;
@@ -100,38 +98,47 @@ const vector<Vertex>& ClipTraingles(const Plane& clipPlane, const float epsilon,
         { 2,0 }
     };
 
-    splitedVertices.clear();
-    edgeSplitVertex.resize(oldEdgesCount);
+    vector<Vertex> splitedVertices;
+    vector<int> edgeSplitVertex(oldEdgesCount);
 
-    for (int t = 0, e = 0; t < oldTrianglesCount; ++t)
+    // go through all triangles ...
+    for (int triangle = 0, edgeIndex = 0; triangle < oldTrianglesCount; ++triangle)
     {
-        int baseVertex = t * 3;
+        int baseVertex = triangle * 3;
+        // ... and all edges of each triangle
         for (auto& edge : triangleEdges)
         {
             int vi0 = baseVertex + edge.VertexIndex[0];
             int vi1 = baseVertex + edge.VertexIndex[1];
 
+            // if edge is split by clip plane, add new vertex
             if ((vertsRelation[vi0] ^ vertsRelation[vi1]) && !((vertsRelation[vi0] | vertsRelation[vi1]) & (uint8_t)eSide::On))
             {
+                float distance = 0;
+                // calculate intersection point
                 clipPlane.LineIntersection(verts[vi0].position, verts[vi1].position, distance);
+                // create new vertex by interpolation of two vertices
                 Vertex newVertex = LerpT(verts[vi0], verts[vi1], distance);
 
-                edgeSplitVertex[e] = (int)splitedVertices.size();
+                // this edge is spitted - store index of new vertex
+                edgeSplitVertex[edgeIndex] = (int)splitedVertices.size();
 
                 splitedVertices.push_back(newVertex);
             }
             else
             {
-                // no split
-                edgeSplitVertex[e] = -1;
+                // no split - store -1 as index
+                edgeSplitVertex[edgeIndex] = -1;
             }
-            ++e;
+            ++edgeIndex;
         }
     }
 
+    static thread_local vector<Vertex> clippedVerts;
     clippedVerts.reserve(oldVerticesCount + splitedVertices.size() / 2);
     clippedVerts.clear();
 
+    // go through all edges ...
     for (int e = 0; e < oldEdgesCount; e += 3)
     {
         const int edgeSplit0 = edgeSplitVertex[e + 0];
@@ -142,8 +149,13 @@ const vector<Vertex>& ClipTraingles(const Plane& clipPlane, const float epsilon,
         const int vi1 = e + 1;
         const int vi2 = e + 2;
 
-        const uint8_t val = IsIntSignBitNotSet(edgeSplit0) | (IsIntSignBitNotSet(edgeSplit1) << 1) | (IsIntSignBitNotSet(edgeSplit2) << 2);
-        switch (val)
+        // create mask of split edges by using IsIntSignBitNotSet
+        // if edge is split, then IsIntSignBitNotSet returns 1, otherwise 0
+        // mask is 3 bits, each bit represents one edge
+        const uint8_t edgesSplitMask = IsIntSignBitNotSet(edgeSplit0) | (IsIntSignBitNotSet(edgeSplit1) << 1) | (IsIntSignBitNotSet(edgeSplit2) << 2);
+
+        // handle all cases
+        switch (edgesSplitMask)
         {
         case 0:
             // no split
@@ -172,6 +184,7 @@ const vector<Vertex>& ClipTraingles(const Plane& clipPlane, const float epsilon,
             }
             break;
         case 2:
+            // edge 1 slitted
             if (!(vertsRelation[vi1] & uint8_t(eSide::Front)))
             {
                 clippedVerts.push_back(verts[vi1]);
@@ -186,6 +199,7 @@ const vector<Vertex>& ClipTraingles(const Plane& clipPlane, const float epsilon,
             }
             break;
         case 4:
+            // edge 2 slitted
             if (!(vertsRelation[vi2] & uint8_t(eSide::Front)))
             {
                 clippedVerts.push_back(verts[vi2]);
