@@ -224,6 +224,18 @@ struct DrawSettings
     int         rendererType = 0;
 };
 
+sf::ContextSettings GetSFMLOpenGL4_0_WindowSettings()
+{
+    // specify the window context settings - require OpenGL 4.0
+    sf::ContextSettings windowSettings;
+    windowSettings.depthBits = 24;
+    windowSettings.stencilBits = 8;
+    windowSettings.antialiasingLevel = 0;
+    windowSettings.majorVersion = 4;
+    windowSettings.minorVersion = 0;
+    return windowSettings;
+}
+
 int main()
 {
     MyModelPaths lastModelPaths;
@@ -232,16 +244,8 @@ int main()
     // load default model
     vector<Model> modelsData = LoadFallbackModel();
 
-    // specify the window context settings - require OpenGL 4.0
-    sf::ContextSettings windowSettings;
-    windowSettings.depthBits = 24;
-    windowSettings.stencilBits = 8;
-    windowSettings.antialiasingLevel = 0;
-    windowSettings.majorVersion = 4;
-    windowSettings.minorVersion = 0;
-
     // create the window
-    sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer", sf::Style::Default, windowSettings);
+    sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer", sf::Style::Default, GetSFMLOpenGL4_0_WindowSettings());
     {
     window.setActive(true);
     window.setFramerateLimit(60);
