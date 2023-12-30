@@ -220,8 +220,8 @@ bool Application::Initialize()
     m_MainWindow.setFramerateLimit(60);
 
     // create renderers
-    m_Contexts[0].pRenderer = RendererFactory::CreateRenderer(eRendererType::SOFTWARE, SCREEN_WIDTH, SCREEN_HEIGHT);
-    m_Contexts[1].pRenderer = RendererFactory::CreateRenderer(eRendererType::HARDWARE, SCREEN_WIDTH, SCREEN_HEIGHT);
+    m_Contexts[0].pRenderer = RendererFactory::CreateRenderer(eRendererType::Software, SCREEN_WIDTH, SCREEN_HEIGHT);
+    m_Contexts[1].pRenderer = RendererFactory::CreateRenderer(eRendererType::Hardware, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     // load default textures
     m_Contexts[0].pModelTexture = m_Contexts[0].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());

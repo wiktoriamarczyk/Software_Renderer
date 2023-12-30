@@ -14,8 +14,8 @@
 
 enum class eRendererType : uint8_t
 {
-    SOFTWARE,
-    HARDWARE
+    Software,
+    Hardware
 };
 
 class ITexture

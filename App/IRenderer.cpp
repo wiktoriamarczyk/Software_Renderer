@@ -12,9 +12,9 @@ shared_ptr<IRenderer> RendererFactory::CreateRenderer(eRendererType rendererType
 {
     switch (rendererType)
     {
-    case eRendererType::SOFTWARE:
+    case eRendererType::Software:
         return std::make_shared<SoftwareRenderer>(screenWidth, screenHeight);
-    case eRendererType::HARDWARE:
+    case eRendererType::Hardware:
         return std::make_shared<GlRenderer>(screenWidth, screenHeight);
     default:
         return nullptr;
