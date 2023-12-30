@@ -1,5 +1,10 @@
-#pragma once
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
 
+#pragma once
 #include "IRenderer.h"
 #include "TransformedVertex.h"
 #include "Texture.h"
@@ -17,7 +22,7 @@ public:
     void Render(const vector<Vertex>& vertices)override;
     const vector<uint32_t>& GetScreenBuffer() const override;
 
-    void SetModelMatrixx(const Matrix4f& other)override;
+    void SetModelMatrix(const Matrix4f& other)override;
     void SetViewMatrix(const Matrix4f& other)override;
     void SetProjectionMatrix(const Matrix4f& other)override;
     void SetTexture(shared_ptr<ITexture> texture)override;
@@ -44,7 +49,6 @@ private:
     void DrawLine(Vector2f A, Vector2f B, const Vector4f& color, int MinY, int maxY);
     void PutPixel(int x, int y, uint32_t color);
     void PutPixelUnsafe(int x, int y, uint32_t color);
-    void RenderLightSource();
     void UpdateMVPMatrix();
     void DoRender(const vector<Vertex>& vertices, int MinY, int maxY, int threadID);
 

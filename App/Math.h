@@ -1,3 +1,9 @@
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
+
 #pragma once
 #include "Vector2f.h"
 #include "Vector3f.h"
@@ -67,4 +73,4 @@ private:
     float    m_D = 0;
 };
 
-const vector<Vertex>& ClipTraingles(const Plane& clipPlane, const float epsilon, const vector<Vertex>& verts);
+const vector<Vertex>& ClipTriangles(const Plane& clipPlane, const float epsilon, const vector<Vertex>& verts);

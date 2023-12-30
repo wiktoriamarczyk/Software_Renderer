@@ -1,3 +1,9 @@
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
+
 #pragma once
 #include "Common.h"
 #include "Matrix4.h"
@@ -73,12 +79,6 @@ const float& Matrix4f::operator[](int index)const {
    return m_Matrix[0][index];
 }
 
-/// <summary>
-/// Projects 3D coordinates into 2D space
-/// </summary>
-/// <param name="fieldOfView"> the field of view in degrees</param>
-/// <param name="near"> the near plane</param>
-/// <param name="far"> the far plane</param>
 Matrix4f Matrix4f::CreateProjectionMatrix(float fieldOfView, float aspectRatio, float near, float far)
 {
     Matrix4f result;
@@ -96,13 +96,6 @@ Matrix4f Matrix4f::CreateProjectionMatrix(float fieldOfView, float aspectRatio, 
     return result;
 }
 
-/// <summary>
-///
-/// </summary>
-/// <param name="eye"></param>
-/// <param name="target"></param>
-/// <param name="up"></param>
-/// <returns></returns>
 Matrix4f Matrix4f::CreateLookAtMatrix(const Vector3f& eye, const Vector3f& target, const Vector3f& up)
 {
     // Compute direction of gaze. (-Z)

@@ -1,3 +1,9 @@
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
+
 #include "SimpleThreadPool.h"
 
 SimpleThreadPool::SimpleThreadPool()
@@ -102,13 +108,13 @@ optional<SimpleThreadPool::Task> SimpleThreadPool::AcquireTask()
 {
     std::unique_lock lock(m_TasksCS);
 
-    optional<SimpleThreadPool::Task> Result;
+    optional<SimpleThreadPool::Task> result;
     if (m_Tasks.empty())
-        return Result;
+        return result;
 
-    Result = std::move(m_Tasks.front());
+    result = std::move(m_Tasks.front());
     m_Tasks.erase(m_Tasks.begin());
-    return Result;
+    return result;
 }
 
  uint8_t SimpleThreadPool::GetThreadCount()const

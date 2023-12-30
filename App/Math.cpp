@@ -1,5 +1,10 @@
-#include "Math.h"
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
 
+#include "Math.h"
 
 inline constexpr int IsIntSignBitNotSet(int i) { return (~static_cast<const unsigned long>(i)) >> 31; }
 
@@ -54,7 +59,7 @@ static T LerpT(const T& a, const T& b, float alpha)
     return a * a1 + b * alpha;
 }
 
-const vector<Vertex>& ClipTraingles(const Plane& clipPlane, const float epsilon, const vector<Vertex>& verts)
+const vector<Vertex>& ClipTriangles(const Plane& clipPlane, const float epsilon, const vector<Vertex>& verts)
 {
     vector<uint8_t> vertsRelation;
 

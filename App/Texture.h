@@ -1,5 +1,10 @@
-#pragma once
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
 
+#pragma once
 #include "IRenderer.h"
 
 class Texture : public ITexture

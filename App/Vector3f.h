@@ -1,3 +1,9 @@
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
+
 #pragma once
 #include "Common.h"
 
@@ -26,7 +32,6 @@ public:
     Vector3f CWiseMin(const Vector3f& other)const;
     Vector3f CWiseMax(const Vector3f& other)const;
     Vector3f CWiseAbs(const Vector3f& other)const;
-    // TO CHECK!
     Vector3f Reflect(const Vector3f& normal)const;
 
     float x = 0;

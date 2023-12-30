@@ -1,3 +1,9 @@
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
+
 #include "GlRenderer.h"
 #include <iostream>
 
@@ -98,9 +104,6 @@ bool GlProgram::LoadShaderFromMemory(const std::string& shaderData, ShaderType t
     {
     case ShaderType::Vertex:
         shaderID = buildShader(shaderData, GL_VERTEX_SHADER);
-        break;
-    case ShaderType::Geometry:
-        shaderID = buildShader(shaderData, GL_GEOMETRY_SHADER);
         break;
     case ShaderType::Fragment:
         shaderID = buildShader(shaderData, GL_FRAGMENT_SHADER);
@@ -225,17 +228,17 @@ GlVertexBuffer::GlVertexBuffer()
     glBufferData(GL_ARRAY_BUFFER, Vertex::Stride*m_BufferCapacity, nullptr, GL_DYNAMIC_DRAW);
 
 
-    glEnableVertexAttribArray( uint32_t(VertexAttribute::Position) );
-    glVertexAttribPointer( uint32_t(VertexAttribute::Position) , 3, GL_FLOAT, GL_FALSE, Vertex::Stride, ToGlOffset(Vertex::PositionOffset) );
+    glEnableVertexAttribArray(uint32_t(VertexAttribute::Position));
+    glVertexAttribPointer(uint32_t(VertexAttribute::Position), 3, GL_FLOAT, GL_FALSE, Vertex::Stride, ToGlOffset(Vertex::PositionOffset));
 
-    glEnableVertexAttribArray( uint32_t(VertexAttribute::Normal) );
-    glVertexAttribPointer( uint32_t(VertexAttribute::Normal) , 3, GL_FLOAT, GL_TRUE, Vertex::Stride, ToGlOffset(Vertex::NormalOffset) );
+    glEnableVertexAttribArray(int32_t(VertexAttribute::Normal));
+    glVertexAttribPointer(uint32_t(VertexAttribute::Normal), 3, GL_FLOAT, GL_TRUE, Vertex::Stride, ToGlOffset(Vertex::NormalOffset));
 
-    glEnableVertexAttribArray( uint32_t(VertexAttribute::Color) );
-    glVertexAttribPointer( uint32_t(VertexAttribute::Color) , 4, GL_FLOAT, GL_FALSE, Vertex::Stride, ToGlOffset(Vertex::ColorOffset) );
+    glEnableVertexAttribArray(uint32_t(VertexAttribute::Color));
+    glVertexAttribPointer(uint32_t(VertexAttribute::Color), 4, GL_FLOAT, GL_FALSE, Vertex::Stride, ToGlOffset(Vertex::ColorOffset));
 
-    glEnableVertexAttribArray( uint32_t(VertexAttribute::TexCoord) );
-    glVertexAttribPointer( uint32_t(VertexAttribute::TexCoord) , 2, GL_FLOAT, GL_FALSE, Vertex::Stride, ToGlOffset(Vertex::UVOffset) );
+    glEnableVertexAttribArray(uint32_t(VertexAttribute::TexCoord));
+    glVertexAttribPointer(uint32_t(VertexAttribute::TexCoord), 2, GL_FLOAT, GL_FALSE, Vertex::Stride, ToGlOffset(Vertex::UVOffset));
 
     //Make sure to bind the vertex array to null if you wish to define more objects.
     glBindVertexArray(0);
@@ -443,17 +446,17 @@ GlRenderer::GlRenderer(int screenWidth, int screenHeight)
 
     glGetIntegerv(GL_CURRENT_PROGRAM,&m_DefaultSFMLProgram);
 
-    m_DefaultVertexBuffer = make_shared<GlVertexBuffer>();
+    m_DefaultVertexBuffer = make_unique<GlVertexBuffer>();
 
-    m_DefaultProgram = std::make_shared<GlProgram>();
+    m_DefaultProgram = std::make_unique<GlProgram>();
     m_DefaultProgram->LoadShaderFromMemory(ShadersCode::defaultVertexShader, ShaderType::Vertex);
     m_DefaultProgram->LoadShaderFromMemory(ShadersCode::defaultFragShader  , ShaderType::Fragment);
 
-    m_LineProgram = std::make_shared<GlProgram>();
+    m_LineProgram = std::make_unique<GlProgram>();
     m_LineProgram->LoadShaderFromMemory(ShadersCode::lineVertexShader, ShaderType::Vertex);
     m_LineProgram->LoadShaderFromMemory(ShadersCode::lineFragShader  , ShaderType::Fragment);
 
-    m_WireframeProgram = std::make_shared<GlProgram>();
+    m_WireframeProgram = std::make_unique<GlProgram>();
     m_WireframeProgram->LoadShaderFromMemory(ShadersCode::wireframeVertexShader, ShaderType::Vertex);
     m_WireframeProgram->LoadShaderFromMemory(ShadersCode::wireframeFragShader  , ShaderType::Fragment);
 
@@ -499,7 +502,7 @@ void GlRenderer::ClearZBuffer()
 
 void GlRenderer::Render(const vector<Vertex>& vertices)
 {
-    auto pCurProgram = m_DrawWireframe ? m_WireframeProgram : m_DefaultProgram;
+    auto& pCurProgram = m_DrawWireframe ? m_WireframeProgram : m_DefaultProgram;
     pCurProgram->Bind();
     pCurProgram->LoadMatrix( m_MVPMatrix            , UniformType::TransformPVM );
     pCurProgram->LoadMatrix( m_ModelMatrix          , UniformType::World );
@@ -551,7 +554,7 @@ void GlRenderer::Render(const vector<Vertex>& vertices)
     GlTexture::Unbind();
 }
 
-void GlRenderer::SetModelMatrixx(const Matrix4f& other)
+void GlRenderer::SetModelMatrix(const Matrix4f& other)
 {
     m_ModelMatrix = other;
     m_MVPMatrix = m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix;

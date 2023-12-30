@@ -1,3 +1,9 @@
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
+
 #include "Common.h"
 #include "IRenderer.h"
 #include "Fallback.h"
@@ -10,6 +16,12 @@
 struct Model
 {
     vector<Vertex> vertices;
+};
+
+struct MyModelPaths
+{
+    string modelPath;
+    string texturePath;
 };
 
 vector<Model> LoadFromScene(const aiScene* pScene)
@@ -183,12 +195,12 @@ void OpenSceneDataDialog(MyModelPaths& selectedPaths)
 {
     ImGui::Begin("Settings");
 
-    OpenDialog("Choose Model", ".fbx,.glb,.gltf,.3ds,.blend,.obj", [&selectedPaths]
+    OpenDialog("Choose Model", MODEL_FORMATS, [&selectedPaths]
     {
         selectedPaths.modelPath = ImGuiFileDialog::Instance()->GetFilePathName();
     });
 
-    ImGui::SameLine(); OpenDialog("Choose Model Texture", ".png,.jpg,.jpeg,.bmp", [&selectedPaths]
+    ImGui::SameLine(); OpenDialog("Choose Model Texture", TEXTURE_FORMATS, [&selectedPaths]
     {
         selectedPaths.texturePath = ImGuiFileDialog::Instance()->GetFilePathName();
     });
@@ -252,8 +264,8 @@ int main()
 
     RendererContext contexts[2];
 
-    contexts[0].pRenderer = IRenderer::CreateRenderer(eRendererType::SOFTWARE,SCREEN_WIDTH, SCREEN_HEIGHT);
-    contexts[1].pRenderer = IRenderer::CreateRenderer(eRendererType::HARDWARE,SCREEN_WIDTH, SCREEN_HEIGHT);
+    contexts[0].pRenderer = RendererFactory::CreateRenderer(eRendererType::SOFTWARE,SCREEN_WIDTH, SCREEN_HEIGHT);
+    contexts[1].pRenderer = RendererFactory::CreateRenderer(eRendererType::HARDWARE,SCREEN_WIDTH, SCREEN_HEIGHT);
 
     contexts[0].pModelTexture = contexts[0].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
     contexts[1].pModelTexture = contexts[1].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
@@ -314,8 +326,8 @@ int main()
         if (lastModelPaths.modelPath != modelPaths.modelPath)
         {
             modelsData = LoadModelVertices(modelPaths.modelPath.c_str());
-            modelPaths.texturePath = DEFAULT_TEXTURE_PATH;
             lastModelPaths = modelPaths;
+            modelPaths.texturePath = DEFAULT_TEXTURE_PATH;
         }
 
         if (lastModelPaths.texturePath != modelPaths.texturePath)
@@ -328,7 +340,7 @@ int main()
         modelMatrix = Matrix4f::Rotation(drawSettings.modelRotation / 180.f * PI ) * Matrix4f::Scale(Vector3f(drawSettings.modelScale, drawSettings.modelScale, drawSettings.modelScale)) * Matrix4f::Translation(drawSettings.modelTranslation);
 
         renderer->SetTexture(modelTexture);
-        renderer->SetModelMatrixx(modelMatrix);
+        renderer->SetModelMatrix(modelMatrix);
         renderer->SetViewMatrix(cameraMatrix);
         renderer->SetProjectionMatrix(projectionMatrix);
 
@@ -352,7 +364,6 @@ int main()
         ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &drawSettings.colorizeThreads);
         ImGui::SameLine(); ImGui::Checkbox("BBoxes", &drawSettings.drawBBoxes);
         ImGui::SameLine(); ImGui::Checkbox("Use ZBuffer", &drawSettings.useZBuffer);
-      //ImGui::ColorEdit4("WireFrame Color", &drawSettings.wireFrameColor.x);
         ImGui::ColorEdit3("Ambient Color", &drawSettings.ambientColor.x);
         ImGui::ColorEdit3("Diffuse Color", &drawSettings.diffuseColor.x);
 

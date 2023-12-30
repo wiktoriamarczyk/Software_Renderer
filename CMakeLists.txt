@@ -27,8 +27,6 @@ SET(APP_SRC_FILES_LIST
     App/Vector2f.cpp
     App/Vector4f.h
     App/Vector4f.cpp
-    App/Line2D.h
-    App/Line2D.cpp
     App/Math.h
     App/Math.cpp
     App/VertexInterpolator.h
@@ -51,7 +49,6 @@ SET(APP_SRC_FILES_LIST
     imgui/imgui_widgets.cpp
 
     stb/stb_image.h
-    stb/stb_image.cpp
 
     ImGuiFileDialog/ImGuiFileDialog.h
     ImGuiFileDialog/ImGuiFileDialog.cpp

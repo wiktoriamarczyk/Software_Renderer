@@ -1,8 +1,14 @@
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
+
 #include "IRenderer.h"
 #include "SoftwareRenderer.h"
 #include "GlRenderer.h"
 
-shared_ptr<IRenderer> IRenderer::CreateRenderer(eRendererType rendererType, int screenWidth, int screenHeight)
+shared_ptr<IRenderer> RendererFactory::CreateRenderer(eRendererType rendererType, int screenWidth, int screenHeight)
 {
     switch (rendererType)
     {

@@ -1,10 +1,11 @@
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
+
 #pragma once
-
 #include "Common.h"
-
-#include <functional>
-#include <future>
-#include <semaphore>
 
 class SimpleThreadPool
 {
@@ -16,7 +17,7 @@ public:
     void SetThreadCount(uint8_t count);
     uint8_t GetThreadCount()const;
     void LaunchTasks(vector<TaskFunc> tasks);
-public:
+private:
     struct Task
     {
         promise<void>   m_FinishPromise;

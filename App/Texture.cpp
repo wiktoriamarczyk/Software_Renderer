@@ -1,3 +1,10 @@
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
+
+#define STB_IMAGE_IMPLEMENTATION
 #include "Texture.h"
 #include "../stb/stb_image.h"
 
@@ -10,16 +17,15 @@ bool Texture::Load(const char* fileName)
     if (!result)
         return false;
 
-    if (width>MAX_TEXTURE_SIZE || height>MAX_TEXTURE_SIZE)
+    if (width > MAX_TEXTURE_SIZE || height > MAX_TEXTURE_SIZE)
     {
         printf("Texture size is too big: %d x %d, max is %d x %d\n", width, height, MAX_TEXTURE_SIZE , MAX_TEXTURE_SIZE);
         return false;
     }
 
     STB::stbi_uc* data = STB::stbi_load(fileName, &width, &height, &channels, 4);
-    if (!data) {
+    if (!data)
         return false;
-    }
 
     m_Data.resize(width * height);
     memcpy(m_Data.data(), data, width * height * 4);

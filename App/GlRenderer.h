@@ -4,11 +4,11 @@
 #include "Math.h"
 
 // Shader Types
-enum class ShaderType { Vertex, Fragment, Geometry, Count };
+enum class ShaderType { Vertex, Fragment, Count };
 // Standard Uniforms in the shader.
 enum class UniformType { TransformPVM, World, LightPos, LightAmbientColor, LightDiffuseColor, AmbientStrength, DiffuseStrength, SpecularStrength, Shininess, CameraPos, WireframeColor, Count };
 // Vertex attributes for shaders and the input vertex array.
-enum class VertexAttribute { Position, Normal, Color, TexCoord, COUNT };
+enum class VertexAttribute { Position, Normal, Color, TexCoord, Count };
 
 class GlTexture : public ITexture
 {
@@ -30,10 +30,10 @@ public:
     ~GlProgram();
     bool LoadShaderFromMemory(const std::string& shaderData, ShaderType type);
 
-    bool LoadMatrix( const Matrix4f& mat , UniformType uniform);
-    bool LoadVector( const Vector3f& vec , UniformType uniform);
-    bool LoadVector( const Vector4f& vec , UniformType uniform);
-    bool LoadFloat( float val , UniformType uniform);
+    bool LoadMatrix(const Matrix4f& mat , UniformType uniform);
+    bool LoadVector(const Vector3f& vec , UniformType uniform);
+    bool LoadVector(const Vector4f& vec , UniformType uniform);
+    bool LoadFloat(float val , UniformType uniform);
     bool Bind()const;
     static void Unbind();
 private:
@@ -73,7 +73,7 @@ public:
     virtual void Render(const vector<Vertex>& vertices) override;
     virtual const vector<uint32_t>& GetScreenBuffer() const override;
 
-    virtual void SetModelMatrixx(const Matrix4f& other)override;
+    virtual void SetModelMatrix(const Matrix4f& other)override;
     virtual void SetViewMatrix(const Matrix4f& other)override;
     virtual void SetProjectionMatrix(const Matrix4f& other)override;
     virtual void SetTexture(shared_ptr<ITexture> texture)override;
@@ -96,10 +96,10 @@ private:
     int                         m_ScreenWidth = 0;
     int                         m_ScreenHeight = 0;
 
-    shared_ptr<GlProgram>       m_DefaultProgram;
-    shared_ptr<GlProgram>       m_LineProgram;
-    shared_ptr<GlProgram>       m_WireframeProgram;
-    shared_ptr<GlVertexBuffer>  m_DefaultVertexBuffer;
+    unique_ptr<GlProgram>       m_DefaultProgram;
+    unique_ptr<GlProgram>       m_LineProgram;
+    unique_ptr<GlProgram>       m_WireframeProgram;
+    unique_ptr<GlVertexBuffer>  m_DefaultVertexBuffer;
 
     Vector4f                    m_WireFrameColor = Vector4f(1, 1, 1, 1);
     Vector3f                    m_DiffuseColor = Vector3f(1, 1, 1);

@@ -1,4 +1,10 @@
-    #include "VertexInterpolator.h"
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
+
+#include "VertexInterpolator.h"
 
 VertexInterpolator::VertexInterpolator(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C)
 {

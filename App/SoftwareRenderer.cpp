@@ -1,9 +1,12 @@
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
+
 #include "SoftwareRenderer.h"
-#include "Line2D.h"
 #include "TransformedVertex.h"
 #include "VertexInterpolator.h"
-
-// ---------------------------- SoftwareRenderer ----------------------------
 
 SoftwareRenderer::SoftwareRenderer(int screenWidth, int screenHeight)
 {
@@ -45,7 +48,7 @@ void SoftwareRenderer::ClearZBuffer()
 void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 {
     int threadsCount = m_ThreadPool.GetThreadCount();
-    if (threadsCount>0)
+    if (threadsCount > 0)
     {
         int linesPerThread = SCREEN_HEIGHT / threadsCount;
         int lineStyartY = 0;
@@ -54,7 +57,7 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
         vector<function<void()>> tasks(threadsCount);
         for (int i = 0; i < threadsCount; ++i)
         {
-            if (i+1==threadsCount)
+            if (i + 1 == threadsCount)
                 lineEndY = SCREEN_HEIGHT - 1;
             tasks[i] = [this,&vertices, lineStyartY, lineEndY,i]
             {
@@ -77,7 +80,7 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int minY, int 
     Plane nearFrustumPlane;
     m_MVPMatrix.GetFrustumNearPlane(nearFrustumPlane);
 
-    const vector<Vertex>& vertices = ClipTraingles(nearFrustumPlane, 0.001f, inVertices);
+    const vector<Vertex>& vertices = ClipTriangles(nearFrustumPlane, 0.001f, inVertices);
 
     TransformedVertex transformedA;
     TransformedVertex transformedB;
@@ -111,26 +114,6 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int minY, int 
             transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, m_MVPMatrix);
 
             DrawFilledTriangle(transformedA, transformedB, transformedC, color, minY, maxY);
-        }
-    }
-}
-
-void SoftwareRenderer::RenderLightSource()
-{
-    // render light source as cube
-
-    TransformedVertex transformed;
-    Vertex vertex(m_LightPosition);
-    transformed.ProjToScreen(vertex, m_ModelMatrix, m_ViewMatrix*m_ProjectionMatrix);
-
-    Vector2f lightPos = transformed.screenPosition.xy();
-
-    float lightSize = 10;
-    for (int x = lightPos.x - lightSize; x < lightPos.x + lightSize; ++x)
-    {
-        for (int y = lightPos.y - lightSize; y < lightPos.y + lightSize; ++y)
-        {
-            PutPixel(x, y, Vector4f::ToARGB(Vector4f(m_AmbientColor,1.0f)));
         }
     }
 }
@@ -375,21 +358,14 @@ Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
     Vector3f pointToLightDir = (m_LightPosition- vertex.worldPosition).Normalized();
 
     // ambient - light that is reflected from other objects
-
     Vector3f ambient = m_AmbientColor * m_AmbientStrength;
-    // ----------------------------------------------
-
 
     // diffuse - light that is reflected from light source
-
     float diffuseFactor = std::max(pointToLightDir.Dot(vertex.normal), 0.0f);
     Vector3f diffuse = m_DiffuseColor * diffuseFactor * m_DiffuseStrength;
-    // ----------------------------------------------
-
 
     // specular - light that is reflected from light source and is reflected in one direction
     // specular = specularStrength * specularColor * pow(max(dot(viewDir, reflectDir), 0.0), shininess)
-
     Vector3f viewDir = (m_CameraPosition - vertex.worldPosition).Normalized();
     Vector3f reflectDir = (pointToLightDir * -1).Reflect(vertex.normal);
     float specularFactor = pow(max(viewDir.Dot(reflectDir), 0.0f), m_Shininess);
@@ -403,7 +379,7 @@ Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
     return finalColor;
 }
 
-void SoftwareRenderer::SetModelMatrixx(const Matrix4f& other)
+void SoftwareRenderer::SetModelMatrix(const Matrix4f& other)
 {
     m_ModelMatrix = other;
     UpdateMVPMatrix();
@@ -470,11 +446,11 @@ void SoftwareRenderer::SetShininess(float shininess)
 
 void SoftwareRenderer::SetThreadsCount(uint8_t threadsCount)
 {
-    if (threadsCount==1)
+    if (threadsCount == 1)
         // no need to use thread pool for just 1 thread - execute work on main thread
         threadsCount = 0;
 
-    if (m_ThreadsCount==threadsCount)
+    if (m_ThreadsCount == threadsCount)
         return;
 
     m_ThreadsCount = threadsCount;

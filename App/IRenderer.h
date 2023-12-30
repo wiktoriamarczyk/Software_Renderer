@@ -1,11 +1,22 @@
-#pragma once
+/*
+* Engineering thesis - Software-based 3D Graphics Renderer
+* Author: Wiktoria Marczyk
+* Year: 2023
+*/
 
+#pragma once
 #include "Common.h"
 #include "Vector3f.h"
 #include "Matrix4.h"
 #include "Vector4f.h"
 #include "Vector2f.h"
 #include "Math.h"
+
+enum class eRendererType : uint8_t
+{
+    SOFTWARE,
+    HARDWARE
+};
 
 class ITexture
 {
@@ -15,11 +26,17 @@ public:
     virtual bool IsValid()const=0;
 };
 
-class IRenderer
+class IRenderer;
+
+class RendererFactory
 {
 public:
     static shared_ptr<IRenderer> CreateRenderer(eRendererType rendererType, int screenWidth, int screenHeight);
+};
 
+class IRenderer
+{
+public:
     virtual shared_ptr<ITexture> LoadTexture(const char* fileName)const=0;
 
     virtual void ClearScreen()=0;
@@ -27,7 +44,7 @@ public:
     virtual void Render(const vector<Vertex>& vertices)=0;
     virtual const vector<uint32_t>& GetScreenBuffer() const=0;
 
-    virtual void SetModelMatrixx(const Matrix4f& other)=0;
+    virtual void SetModelMatrix(const Matrix4f& other)=0;
     virtual void SetViewMatrix(const Matrix4f& other)=0;
     virtual void SetProjectionMatrix(const Matrix4f& other)=0;
     virtual void SetTexture(shared_ptr<ITexture> texture)=0;
