@@ -13,6 +13,8 @@ project(SoftwareRenderer LANGUAGES CXX)
 #*****************************************************
 
 SET(APP_SRC_FILES_LIST
+    App/Application.h
+    App/Application.cpp
     App/main.cpp
     App/Common.h
     App/IRenderer.h
