@@ -491,6 +491,7 @@ void GlRenderer::ClearScreen()
     // Configure the viewport (the same size as the window)
     glViewport(0, 0, m_ScreenWidth, m_ScreenHeight);
 
+    glClearColor(m_ClearColor.x, m_ClearColor.y, m_ClearColor.z, m_ClearColor.w);
     // Clear the depth buffer
     glClear(GL_COLOR_BUFFER_BIT );
 }
@@ -589,6 +590,11 @@ const std::vector<uint32_t>& GlRenderer::GetScreenBuffer() const
 void GlRenderer::SetWireFrameColor(const Vector4f& wireFrameColor)
 {
     m_WireFrameColor = wireFrameColor;
+}
+
+void GlRenderer::SetClearColor(const Vector4f& clearColor)
+{
+    m_ClearColor = clearColor;
 }
 
 void GlRenderer::SetDiffuseColor(const Vector3f& diffuseColor)

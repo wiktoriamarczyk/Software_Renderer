@@ -55,6 +55,8 @@ SET(APP_SRC_FILES_LIST
     ImGuiFileDialog/ImGuiFileDialog.h
     ImGuiFileDialog/ImGuiFileDialog.cpp
 
+    Dependencies/Tracy/TracyClient.cpp
+
 )
 
 #*****************************************************
@@ -63,6 +65,9 @@ SET(APP_SRC_FILES_LIST
 
 SET(SFML_DIR "./Dependencies/SFML-2.6.0/lib/cmake/SFML" )
 set(SFML_STATIC_LIBRARIES TRUE)
+
+add_definitions(-DTRACY_ENABLE)
+add_definitions(-DTRACY_ON_DEMAND)
 
 find_package(SFML 2.6.0 COMPONENTS graphics audio REQUIRED)
 

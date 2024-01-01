@@ -14,6 +14,7 @@
 
 vector<Model> Application::LoadFromScene(const aiScene* pScene)
 {
+    ZoneScoped;
     if (!pScene->HasMeshes())
     {
         printf("No meshes\n");
@@ -90,6 +91,7 @@ vector<Model> Application::LoadFromScene(const aiScene* pScene)
 
 void Application::NormalizeModelPosition(vector<Model>& models)
 {
+    ZoneScoped;
     float maxValue = std::numeric_limits<float>::max();
     float minValue = std::numeric_limits<float>::lowest();
 
@@ -122,6 +124,7 @@ void Application::NormalizeModelPosition(vector<Model>& models)
 
 vector<Model> Application::LoadFallbackModel()
 {
+    ZoneScoped;
     vector<Model> result;
     result.push_back(Model());
 
@@ -136,6 +139,7 @@ vector<Model> Application::LoadFallbackModel()
 
 vector<Model> Application::LoadModelVertices(const char* path)
 {
+    ZoneScoped;
     vector<Model> result;
     auto scene = aiImportFile(path, aiProcessPreset_TargetRealtime_MaxQuality | aiProcess_Triangulate);
     if (scene)
@@ -211,6 +215,7 @@ sf::ContextSettings GetSFMLOpenGL4_0_WindowSettings()
 
 bool Application::Initialize()
 {
+    ZoneScoped;
     // load default model
     m_ModelsData = LoadFallbackModel();
 
@@ -248,9 +253,13 @@ bool Application::Initialize()
 
 int Application::Run()
 {
+    ZoneScoped;
     // run the program as long as the window is open
     while (m_MainWindow.isOpen())
     {
+        FrameMark;
+        ZoneScopedN("Main Loop");
+
         auto now = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_LastFrameTime).count();
         int fps = duration ? 1000 / duration : 0;
@@ -321,6 +330,7 @@ int Application::Run()
         ImGui::SameLine(); ImGui::Checkbox("Use ZBuffer", &m_DrawSettings.useZBuffer);
         ImGui::ColorEdit3("Ambient Color", &m_DrawSettings.ambientColor.x);
         ImGui::ColorEdit3("Diffuse Color", &m_DrawSettings.diffuseColor.x);
+        ImGui::ColorEdit3("Background Color", &m_DrawSettings.backgroundColor.x);
 
         ImGui::End();
 
@@ -339,6 +349,7 @@ int Application::Run()
         renderer->SetDrawBBoxes(m_DrawSettings.drawBBoxes);
         renderer->SetZTest(m_DrawSettings.useZBuffer);
         renderer->SetZWrite(m_DrawSettings.useZBuffer);
+        renderer->SetClearColor(Vector4f{m_DrawSettings.backgroundColor,1});
         renderer->ClearZBuffer();
         renderer->ClearScreen();
 
@@ -351,6 +362,7 @@ int Application::Run()
         // for software renderer render screen buffer to window (hardware renderer renders directly to window and calling GetScreenBuffer on it returns empty buffer)
         if (auto& buf = renderer->GetScreenBuffer() ; buf.size())
         {
+            ZoneScopedN("Update screen texture");
             // update texture
             m_ScreenTexture.update((uint8_t*)buf.data());
 

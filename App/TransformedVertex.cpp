@@ -9,8 +9,8 @@
 
 void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix)
 {
-    worldPosition = v.position.Transformed(worldMatrix);
-    normal = (v.normal.Transformed(worldMatrix) - Vector3f{ 0,0,0 }.Transformed(worldMatrix)).Normalized();
+    worldPosition = v.position.Multiplied(worldMatrix);
+    normal = (v.normal.Multiplied(worldMatrix) - Vector3f{ 0,0,0 }.Multiplied(worldMatrix)).Normalized();
     color = v.color;
     uv = v.uv;
 

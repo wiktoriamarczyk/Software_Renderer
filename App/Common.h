@@ -8,6 +8,7 @@
 #include <SFML/Graphics.hpp>
 #include "../imgui/imgui.h"
 #include "../imgui/imgui-SFML.h"
+#include <tracy/Tracy.hpp>
 #include <vector>
 #include <algorithm>
 #include <cmath>

@@ -27,6 +27,7 @@ public:
     float MaxComponent()const;
     Vector3f& Normalize();
     Vector3f Normalized()const;
+    Vector3f Multiplied(const Matrix4f& m) const;
     Vector3f Transformed(const Matrix4f& m) const;
     Vector3f Cross(const Vector3f& other)const;
     Vector3f CWiseMin(const Vector3f& other)const;

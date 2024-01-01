@@ -8,6 +8,7 @@
 
 int main()
 {
+    ZoneScoped;
     Application app;
     if (!app.Initialize())
         return -1;
