@@ -79,6 +79,7 @@ public:
     virtual void SetTexture(shared_ptr<ITexture> texture)override;
 
     virtual void SetWireFrameColor(const Vector4f& wireFrameColor)override;
+    virtual void SetClearColor(const Vector4f& clearColor)override;
     virtual void SetDiffuseColor(const Vector3f& diffuseColor)override;
     virtual void SetAmbientColor(const Vector3f& ambientColor)override;
     virtual void SetLightPosition(const Vector3f& lightPosition)override;
@@ -107,6 +108,7 @@ private:
     Vector3f                    m_LightPosition = Vector3f(0, 0, -20);
     Vector3f                    m_CameraPosition = Vector3f(0, 0, 0);
     Vector4f                    m_ThreadColors[12];
+    Vector4f                    m_ClearColor = Vector4f(0, 0, 0, 1);
 
     Matrix4f                    m_ModelMatrix;
     Matrix4f                    m_ViewMatrix;

@@ -37,7 +37,7 @@ shared_ptr<ITexture> SoftwareRenderer::LoadTexture(const char* fileName) const
 
 void SoftwareRenderer::ClearScreen()
 {
-    std::fill(m_ScreenBuffer.begin(), m_ScreenBuffer.end(), 0xFF000000);
+    std::fill(m_ScreenBuffer.begin(), m_ScreenBuffer.end(), m_ClearColor);
 }
 
 void SoftwareRenderer::ClearZBuffer()
@@ -47,6 +47,7 @@ void SoftwareRenderer::ClearZBuffer()
 
 void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 {
+    ZoneScoped;
     int threadsCount = m_ThreadPool.GetThreadCount();
     if (threadsCount > 0)
     {
@@ -61,6 +62,7 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
                 lineEndY = SCREEN_HEIGHT - 1;
             tasks[i] = [this,&vertices, lineStyartY, lineEndY,i]
             {
+                ZoneScopedN("Render Task");
                 DoRender(vertices, lineStyartY, lineEndY,i);
             };
             lineStyartY = lineEndY+1;
@@ -77,6 +79,7 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 
 void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int minY, int maxY, int threadID)
 {
+    ZoneScoped;
     Plane nearFrustumPlane;
     m_MVPMatrix.GetFrustumNearPlane(nearFrustumPlane);
 
@@ -143,6 +146,7 @@ inline void SoftwareRenderer::PutPixel(int x, int y, uint32_t color)
 
 void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color, int minY, int maxY)
 {
+    ZoneScoped;
     // filling algorithm is working that way that we are going through all pixels in rectangle that is created by min and max points
     // and we are checking if pixel is inside triangle by using three lines and checking if pixel is on the same side of each line
 
@@ -189,7 +193,7 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
     {
         for (int x = min.x; x <= max.x; ++x)
         {
-            const Vector2f P(x, y);
+            const Vector2f P(x+0.5f, y+0.5f);
             // calculate value of edge function for each line
             const float ABP = EdgeFunction(A, B, P);
             const float BCP = EdgeFunction(B, C, P);
@@ -260,7 +264,7 @@ void SoftwareRenderer::DrawLine(Vector2f A, Vector2f B, const Vector4f& color, i
     if ((A.x < 0 && B.x < 0) ||
         (A.y < minY && B.y < minY) ||
         (A.x >= SCREEN_WIDTH  && B.x >= SCREEN_WIDTH) ||
-        (A.y >= maxY && B.y > maxY) )
+        (A.y > maxY && B.y > maxY) )
         return;
 
     // Handle case when start end end point are on the same pixel
@@ -407,6 +411,11 @@ void SoftwareRenderer::SetTexture(shared_ptr<ITexture> texture)
 void SoftwareRenderer::SetWireFrameColor(const Vector4f& wireFrameColor)
 {
     m_WireFrameColor = wireFrameColor;
+}
+
+void SoftwareRenderer::SetClearColor(const Vector4f& clearColor)
+{
+    m_ClearColor = Vector4f::ToARGB(clearColor);
 }
 
 void SoftwareRenderer::SetDiffuseColor(const Vector3f& diffuseColor)
