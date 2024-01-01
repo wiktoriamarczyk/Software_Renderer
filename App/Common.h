@@ -52,3 +52,15 @@ const string INIT_TEXTURE_PATH = "../Data/Checkerboard.png";
 const string DEFAULT_TEXTURE_PATH = "../Data/Default.png";
 inline const char* MODEL_FORMATS = ".fbx,.glb,.gltf,.blend,.obj";
 inline const char* TEXTURE_FORMATS = ".png,.jpg,.jpeg,.bmp";
+
+struct DrawStats
+{
+    int m_FrameTriangles         = 0;
+    int m_FrameTrianglesDrawn    = 0;
+    int m_FramePixels            = 0;
+    int m_FramePixelsDrawn       = 0;
+    int m_DrawTimeUS            = 0;
+    int m_DrawTimePerThreadUS   = 0;
+    int m_FillrateKP            = 0;
+    int m_DT                    = 0;
+};

@@ -19,9 +19,12 @@ public:
 
     void ClearScreen()override;
     void ClearZBuffer()override;
+    void BeginFrame()override;
     void Render(const vector<Vertex>& vertices)override;
+    void EndFrame()override;
     void RenderDepthBuffer()override;
     const vector<uint32_t>& GetScreenBuffer() const override;
+    const DrawStats& GetDrawStats() const override;
 
     void SetModelMatrix(const Matrix4f& other)override;
     void SetViewMatrix(const Matrix4f& other)override;
@@ -44,7 +47,7 @@ public:
     void SetZWrite(bool zWrite)override;
     void SetZTest(bool zTest)override;
 private:
-    void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY);
+    void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
     void DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int maxY);
     void DrawTriangleBoundingBox(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int maxY);
     void DrawLine(const TransformedVertex& A, const TransformedVertex& B, const Vector4f& color, int MinY, int maxY);
@@ -84,6 +87,15 @@ private:
     float               m_SpecularStrength = 0.9f;
     float               m_Shininess = 32.0f;
     uint8_t             m_ThreadsCount = 0;
+
+    atomic_int          m_FrameTriangles = 0;
+    atomic_int          m_FrameTrianglesDrawn = 0;
+    atomic_int          m_FramePixels = 0;
+    atomic_int          m_FramePixelsDrawn = 0;
+    atomic_int          m_FrameDrawTimeUS = 0;
+    atomic_int          m_FillrateKP = 0;
+    DrawStats           m_DrawStats;
+
 
     shared_ptr<Texture> m_Texture;
     SimpleThreadPool    m_ThreadPool;

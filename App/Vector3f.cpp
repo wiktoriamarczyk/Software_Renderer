@@ -27,23 +27,6 @@ Vector3f Vector3f::Normalized()const
     return Vector3f(x / GetLength(), y / GetLength(), z / GetLength());
 }
 
-Vector3f Vector3f::Multiplied(const Matrix4f& m) const
-{
-    return Vector3f(
-        (m[0] * x + m[4] * y + m[8] * z + m[12])  ,
-        (m[1] * x + m[5] * y + m[9] * z + m[13])  ,
-        (m[2] * x + m[6] * y + m[10] * z + m[14]) );
-}
-
-Vector3f Vector3f::Transformed(const Matrix4f& m) const
-{
-    float w = 1.f / (m[3] * x + m[7] * y + m[11] * z + m[15]);
-    return Vector3f(
-        (m[0] * x + m[4] * y + m[8] * z + m[12]) * w,
-        (m[1] * x + m[5] * y + m[9] * z + m[13]) * w,
-        (m[2] * x + m[6] * y + m[10] * z + m[14]) * w);
-}
-
 float Vector3f::Dot(const Vector3f& other)const
 {
     return x * other.x + y * other.y + z * other.z;

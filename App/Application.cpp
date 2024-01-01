@@ -6,6 +6,7 @@
 
 #include "Application.h"
 #include "Fallback.h"
+#include "DrawStatsSystem.h"
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -243,7 +244,7 @@ bool Application::Initialize()
 
     // set initial matrices
     m_CameraMatrix      = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 0), Vector3f(0, 1, 0));
-    m_ProjectionMatrix  = Matrix4f::CreateProjectionMatrix(60, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.8f, 30.0f);
+    m_ProjectionMatrix  = Matrix4f::CreateProjectionMatrix(60, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.8f, 40.0f);
     m_ModelMatrix       = Matrix4f::Identity();
 
     m_LastFrameTime = std::chrono::high_resolution_clock::now();
@@ -260,9 +261,9 @@ int Application::Run()
         FrameMark;
         ZoneScopedN("Main Loop");
 
-        auto now = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_LastFrameTime).count();
-        int fps = duration ? 1000 / duration : 0;
+        const auto now = std::chrono::high_resolution_clock::now();
+        const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_LastFrameTime).count();
+        const int fps = duration ? 1000 / duration : 0;
         m_LastFrameTime = now;
 
         auto renderer     = m_Contexts[m_DrawSettings.rendererType].pRenderer;
@@ -354,11 +355,15 @@ int Application::Run()
         renderer->ClearZBuffer();
         renderer->ClearScreen();
 
+        renderer->BeginFrame();
+
         // render stuff to screen buffer
         for (auto& model : m_ModelsData)
         {
             renderer->Render(model.vertices);
         }
+
+        renderer->EndFrame();
 
         // for software renderer render screen buffer to window (hardware renderer renders directly to window and calling GetScreenBuffer on it returns empty buffer)
         if (auto& buf = renderer->GetScreenBuffer() ; buf.size())
@@ -382,6 +387,8 @@ int Application::Run()
         ImGui::Text("FPS: %d", fps);
         ImGui::End();
 
+        DrawRenderingStats();
+
         OpenSceneDataDialog(m_ModelPaths);
 
         // render UI on top
@@ -389,6 +396,11 @@ int Application::Run()
 
         // end the current frame
         m_MainWindow.display();
+
+        // update stats
+        auto drawStats = renderer->GetDrawStats();
+        drawStats.m_DT = duration;
+        DrawStatsSystem::AddSample(drawStats);
     }
 
     m_MainWindow.setActive(false);
@@ -398,4 +410,36 @@ int Application::Run()
     exit(0); // TODO: Creating OpenGl renderer causes application crash at exit
 
     return 0;
+}
+
+void Application::DrawRenderingStats()
+{
+    if( !ImGui::Begin( "Stats" ) )
+    {
+        ImGui::End();
+        return;
+    }
+
+    auto& avg   = DrawStatsSystem::GetAvg();
+    auto& min   = DrawStatsSystem::GetMin();
+    auto& max   = DrawStatsSystem::GetMax();
+    auto& med   = DrawStatsSystem::GetMed();
+    auto& std   = DrawStatsSystem::GetStd();
+
+    auto ScreenPixels = SCREEN_WIDTH * SCREEN_HEIGHT;
+
+    ImGui::Text( "_________________________________________________________________________________________________________" );
+    ImGui::Text( "                              |      AVG     |      MIN     |      MAX     |    MEDIAN    |    STD DEV   |" );
+    ImGui::Text( "------------------------------|--------------|--------------|--------------|--------------|--------------|" );
+    ImGui::Text( "FPS                           | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FPS)                , int(min.m_FPS)                , int(max.m_FPS)                 , int(med.m_FPS)                 , int(std.m_FPS)                 );
+    ImGui::Text( "Triangles analyzed per frame  | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTriangles)     , int(min.m_FrameTriangles)     , int(max.m_FrameTriangles)      , int(med.m_FrameTriangles)      , int(std.m_FrameTriangles)      );
+    ImGui::Text( "Triangles drawn per frame     | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTrianglesDrawn), int(min.m_FrameTrianglesDrawn), int(max.m_FrameTrianglesDrawn) , int(med.m_FrameTrianglesDrawn) , int(std.m_FrameTrianglesDrawn) );
+    ImGui::Text( "Pixels analyzed  per frame    | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixels)        , int(min.m_FramePixels)        , int(max.m_FramePixels)         , int(med.m_FramePixels)         , int(std.m_FramePixels)         );
+    ImGui::Text( "Pixels drawn per frame        | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixelsDrawn)   , int(min.m_FramePixelsDrawn)   , int(max.m_FramePixelsDrawn)    , int(med.m_FramePixelsDrawn)    , int(std.m_FramePixelsDrawn)    );
+    ImGui::Text( "Frame draw time (US)          | %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimeUS)         , int(min.m_DrawTimeUS)         , int(max.m_DrawTimeUS )         , int(med.m_DrawTimeUS)          , int(std.m_DrawTimeUS)          );
+    ImGui::Text( "Frame draw time per thread(US)| %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimePerThreadUS), int(min.m_DrawTimePerThreadUS), int(max.m_DrawTimePerThreadUS) , int(med.m_DrawTimePerThreadUS) , int(std.m_DrawTimePerThreadUS) );
+    ImGui::Text( "Fillrate (Kilo pixels/s)      | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FillrateKP)         , int(min.m_FillrateKP)         , int(max.m_FillrateKP)          , int(med.m_FillrateKP)          , int(std.m_FillrateKP)          );
+    ImGui::Text( "______________________________|______________|______________|______________|______________|______________|" );
+    ImGui::Text( "Screen coverage %u%% (%u pixels / %u pixels)", med.m_FramePixelsDrawn*100/ScreenPixels, med.m_FramePixelsDrawn, ScreenPixels);
+    ImGui::End();
 }

@@ -72,4 +72,3 @@ inline Vector3f operator*(float value, const Vector3f& v)
 {
     return Vector3f(v.x * value, v.y * value, v.z * value);
 }
-

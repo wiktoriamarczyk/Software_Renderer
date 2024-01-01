@@ -4,6 +4,7 @@
 * Year: 2023
 */
 
+#pragma once
 #include "Common.h"
 #include "IRenderer.h"
 #include "Math.h"
@@ -64,6 +65,7 @@ private:
     static vector<Model> LoadFallbackModel();
     static void OpenDialog(const char* title, const char* filters, function<void()> callback);
     void OpenSceneDataDialog(MyModelPaths& selectedPaths);
+    void DrawRenderingStats();
 
     const uint8_t MAX_THREADS_COUNT = uint8_t(std::min<int>(12, std::thread::hardware_concurrency()));
 

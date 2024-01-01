@@ -501,6 +501,11 @@ void GlRenderer::ClearZBuffer()
     glClear(GL_DEPTH_BUFFER_BIT);
 }
 
+void GlRenderer::BeginFrame()
+{
+
+}
+
 void GlRenderer::Render(const vector<Vertex>& vertices)
 {
     auto& pCurProgram = m_DrawWireframe ? m_WireframeProgram : m_DefaultProgram;
@@ -555,6 +560,11 @@ void GlRenderer::Render(const vector<Vertex>& vertices)
     GlTexture::Unbind();
 }
 
+void GlRenderer::EndFrame()
+{
+
+}
+
 void GlRenderer::RenderDepthBuffer()
 {
 }
@@ -589,6 +599,12 @@ const std::vector<uint32_t>& GlRenderer::GetScreenBuffer() const
 {
     static std::vector<uint32_t> None;
     return None;
+}
+
+const DrawStats& GlRenderer::GetDrawStats() const
+{
+    static const DrawStats DrawStats;
+    return DrawStats;
 }
 
 void GlRenderer::SetWireFrameColor(const Vector4f& wireFrameColor)

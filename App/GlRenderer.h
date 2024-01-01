@@ -70,9 +70,12 @@ public:
 
     virtual void ClearScreen() override;
     virtual void ClearZBuffer() override;
+    virtual void BeginFrame() override;
     virtual void Render(const vector<Vertex>& vertices) override;
+    virtual void EndFrame() override;
     virtual void RenderDepthBuffer()override;
     virtual const vector<uint32_t>& GetScreenBuffer() const override;
+    virtual const DrawStats& GetDrawStats() const override;
 
     virtual void SetModelMatrix(const Matrix4f& other)override;
     virtual void SetViewMatrix(const Matrix4f& other)override;

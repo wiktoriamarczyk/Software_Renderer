@@ -45,6 +45,27 @@ void SoftwareRenderer::ClearZBuffer()
     std::fill(m_ZBuffer.begin(), m_ZBuffer.end(), 1.f);
 }
 
+void SoftwareRenderer::BeginFrame()
+{
+    m_FramePixels = 0;
+    m_FrameTriangles = 0;
+    m_FramePixelsDrawn = 0;
+    m_FrameTrianglesDrawn = 0;
+    m_FrameDrawTimeUS = 0;
+    m_FillrateKP = 0;
+}
+
+void SoftwareRenderer::EndFrame()
+{
+    m_DrawStats.m_FramePixels         = m_FramePixels;
+    m_DrawStats.m_FramePixelsDrawn    = m_FramePixelsDrawn;
+    m_DrawStats.m_FrameTriangles      = m_FrameTriangles;
+    m_DrawStats.m_FrameTrianglesDrawn = m_FrameTrianglesDrawn;
+    m_DrawStats.m_DrawTimeUS          = m_FrameDrawTimeUS;
+    m_DrawStats.m_DrawTimePerThreadUS = m_FrameDrawTimeUS / ( m_ThreadPool.GetThreadCount() ? m_ThreadPool.GetThreadCount() : 1 );
+    m_DrawStats.m_FillrateKP          = m_FillrateKP;
+}
+
 void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 {
     ZoneScoped;
@@ -79,6 +100,7 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 
 void SoftwareRenderer::RenderDepthBuffer()
 {
+    ZoneScoped;
     for( int i= 0 ; i < m_ScreenBuffer.size() ; ++i )
     {
         uint32_t Col = std::clamp( int(255 * m_ZBuffer[i] ) , 0 , 255 );
@@ -92,11 +114,15 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int minY, int 
     Plane nearFrustumPlane;
     m_MVPMatrix.GetFrustumNearPlane(nearFrustumPlane);
 
+    const auto startTime = std::chrono::high_resolution_clock::now();
+
     const vector<Vertex>& vertices = ClipTriangles(nearFrustumPlane, 0.001f, inVertices);
 
     TransformedVertex transformedA;
     TransformedVertex transformedB;
     TransformedVertex transformedC;
+
+    DrawStats drawStats;
 
     if (m_DrawWireframe || m_DrawBBoxes)
     {
@@ -125,9 +151,18 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int minY, int 
             transformedB.ProjToScreen(vertices[i + 1], m_ModelMatrix, m_MVPMatrix);
             transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, m_MVPMatrix);
 
-            DrawFilledTriangle(transformedA, transformedB, transformedC, color, minY, maxY);
+            DrawFilledTriangle(transformedA, transformedB, transformedC, color, minY, maxY, drawStats);
         }
     }
+
+    auto timeUS = std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
+
+    m_FrameTriangles        += drawStats.m_FrameTriangles;
+    m_FrameTrianglesDrawn   += drawStats.m_FrameTrianglesDrawn;
+    m_FramePixels           += drawStats.m_FramePixels;
+    m_FramePixelsDrawn      += drawStats.m_FramePixelsDrawn;
+    m_FrameDrawTimeUS       += timeUS;
+    m_FillrateKP            += drawStats.m_FramePixelsDrawn * ( 1000.0f / timeUS );
 }
 
 void SoftwareRenderer::UpdateMVPMatrix()
@@ -138,6 +173,11 @@ void SoftwareRenderer::UpdateMVPMatrix()
 const vector<uint32_t>& SoftwareRenderer::GetScreenBuffer()const
 {
     return m_ScreenBuffer;
+}
+
+const DrawStats& SoftwareRenderer::GetDrawStats() const
+{
+    return m_DrawStats;
 }
 
 inline void SoftwareRenderer::PutPixelUnsafe(int x, int y, uint32_t color)
@@ -153,7 +193,12 @@ inline void SoftwareRenderer::PutPixel(int x, int y, uint32_t color)
     m_ScreenBuffer[y * SCREEN_WIDTH + x] = color;
 }
 
-void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color, int minY, int maxY)
+inline float SoftwareRenderer::EdgeFunction(const Vector2f& A, const Vector2f& B, const Vector2f& C)
+{
+    return (B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x);
+}
+
+void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color, int minY, int maxY, DrawStats& stats)
 {
     ZoneScoped;
     // filling algorithm is working that way that we are going through all pixels in rectangle that is created by min and max points
@@ -170,6 +215,7 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
     bool isBackFacing = ABC <= 0;
     if (isBackFacing)
     {
+        stats.m_FrameTriangles++;
         return;
     }
 
@@ -197,6 +243,8 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
     VertexInterpolator interpolator(VA, VB, VC);
     TransformedVertex interpolatedVertex;
 
+    int pixelsDrawn = 0;
+
     // loop through all pixels in rectangle
     for (int y = min.y; y <= max.y; ++y)
     {
@@ -205,32 +253,42 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
             const Vector2f P(x+0.5f, y+0.5f);
             // calculate value of edge function for each line
             const float ABP = EdgeFunction(A, B, P);
+            if (ABP < 0)
+                continue;
             const float BCP = EdgeFunction(B, C, P);
+            if (BCP < 0)
+                continue;
             const float CAP = EdgeFunction(C, A, P);
+            if (CAP < 0)
+                continue;
             // if pixel is inside triangle, draw it
-            if (ABP >= 0 && BCP >= 0 && CAP >= 0)
-            {
-                // dividing edge function values by ABC will give us barycentric coordinates - how much each vertex contributes to final color in point P
-                Vector3f baricentricCoordinates = Vector3f( BCP, CAP , ABP) * invABC;
-                interpolator.InterpolateZ(baricentricCoordinates, interpolatedVertex);
+            //
+            // dividing edge function values by ABC will give us barycentric coordinates - how much each vertex contributes to final color in point P
+            Vector3f baricentricCoordinates = Vector3f( BCP, CAP , ABP) * invABC;
+            interpolator.InterpolateZ(baricentricCoordinates, interpolatedVertex);
 
-                float& z = m_ZBuffer[y * SCREEN_WIDTH + x];
-                if (interpolatedVertex.screenPosition.z < z) {
-                    if (m_ZWrite)
-                        z = interpolatedVertex.screenPosition.z;
-                }
-                else if (m_ZTest){
-                    continue;
-                }
-
-                interpolator.InterpolateAllButZ(baricentricCoordinates, interpolatedVertex);
-                interpolatedVertex.normal.Normalize();
-                interpolatedVertex.color = interpolatedVertex.color * color;
-                Vector4f finalColor = FragmentShader(interpolatedVertex);
-                PutPixelUnsafe(x, y, Vector4f::ToARGB(finalColor));
+            float& z = m_ZBuffer[y * SCREEN_WIDTH + x];
+            if (interpolatedVertex.screenPosition.z < z) {
+                if (m_ZWrite)
+                    z = interpolatedVertex.screenPosition.z;
             }
+            else if (m_ZTest){
+                continue;
+            }
+
+            interpolator.InterpolateAllButZ(baricentricCoordinates, interpolatedVertex);
+            interpolatedVertex.normal.Normalize();
+            interpolatedVertex.color = interpolatedVertex.color * color;
+            Vector4f finalColor = FragmentShader(interpolatedVertex);
+            PutPixelUnsafe(x, y, Vector4f::ToARGB(finalColor));
+            pixelsDrawn++;
         }
     }
+
+    stats.m_FramePixels += (1+max.y-min.y)*(1+max.x-min.x);
+    stats.m_FramePixelsDrawn += pixelsDrawn;
+    stats.m_FrameTriangles++;
+    stats.m_FrameTrianglesDrawn++;
 }
 
 void SoftwareRenderer::DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY)
@@ -351,11 +409,6 @@ void SoftwareRenderer::DrawLine(Vector2f A, Vector2f B, const Vector4f& color, i
             PutPixel(x, y, intColor);
         }
     }
-}
-
-inline float SoftwareRenderer::EdgeFunction(const Vector2f& A, const Vector2f& B, const Vector2f& C)
-{
-    return (B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x);
 }
 
 Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
