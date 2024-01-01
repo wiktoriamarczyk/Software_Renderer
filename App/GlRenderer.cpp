@@ -278,6 +278,15 @@ void GlVertexBuffer::Unbind()
     glBindVertexArray(0);
 }
 
+bool GlTexture::CreateWhite4x4Tex()
+{
+    sf::Image image;
+    image.create(4, 4, sf::Color::White);
+    m_Texture.loadFromImage(image);
+    m_Loaded = true;
+    return true;
+}
+
 bool GlTexture::Load(const char* fileName)
 {
     sf::Texture texture;
@@ -461,6 +470,9 @@ GlRenderer::GlRenderer(int screenWidth, int screenHeight)
     m_WireframeProgram->LoadShaderFromMemory(ShadersCode::wireframeFragShader  , ShaderType::Fragment);
 
     m_DefaultProgram->Bind();
+
+    m_DefaultTexture = std::make_shared<GlTexture>();
+    m_DefaultTexture->CreateWhite4x4Tex();
 }
 
 GlRenderer::~GlRenderer()
@@ -480,6 +492,8 @@ GlRenderer::~GlRenderer()
 
 std::shared_ptr<ITexture> GlRenderer::LoadTexture(const char* fileName) const
 {
+    if (!fileName || fileName[0]==0)
+        return m_DefaultTexture;
     auto texture = std::make_shared<GlTexture>();
     if (!texture->Load(fileName))
         return nullptr;
@@ -526,8 +540,7 @@ void GlRenderer::Render(const vector<Vertex>& vertices)
     m_DefaultVertexBuffer->Bind();
     m_DefaultVertexBuffer->Load(vertices);
 
-    if (m_Texture)
-        m_Texture->Bind();
+    m_Texture->Bind();
 
     if (m_ZTest && !m_DrawWireframe)
         glEnable(GL_DEPTH_TEST);
@@ -593,6 +606,8 @@ void GlRenderer::SetProjectionMatrix(const Matrix4f& other)
 void GlRenderer::SetTexture(shared_ptr<ITexture> texture)
 {
     m_Texture = std::dynamic_pointer_cast<GlTexture>(texture);
+    if (!m_Texture)
+        m_Texture = m_DefaultTexture;
 }
 
 const std::vector<uint32_t>& GlRenderer::GetScreenBuffer() const
@@ -605,6 +620,11 @@ const DrawStats& GlRenderer::GetDrawStats() const
 {
     static const DrawStats DrawStats;
     return DrawStats;
+}
+
+shared_ptr<ITexture> GlRenderer::GetDefaultTexture() const
+{
+    return m_DefaultTexture;
 }
 
 void GlRenderer::SetWireFrameColor(const Vector4f& wireFrameColor)

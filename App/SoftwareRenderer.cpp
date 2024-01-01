@@ -25,10 +25,17 @@ SoftwareRenderer::SoftwareRenderer(int screenWidth, int screenHeight)
     m_ThreadColors[9]  = Vector4f(0.5f, 0.5f, 1.0f, 1.0f);
     m_ThreadColors[10] = Vector4f(1.0f, 1.0f, 0.5f, 1.0f);
     m_ThreadColors[11] = Vector4f(1.0f, 0.5f, 1.0f, 1.0f);
+
+    m_DefaultTexture = std::make_shared<Texture>();
+    m_DefaultTexture->CreateWhite4x4Tex();
+
+    m_Texture = m_DefaultTexture;
 }
 
 shared_ptr<ITexture> SoftwareRenderer::LoadTexture(const char* fileName) const
 {
+    if (!fileName || fileName[0]==0)
+        return m_DefaultTexture;
     auto texture = std::make_shared<Texture>();
     if (texture->Load(fileName))
         return texture;
@@ -53,6 +60,9 @@ void SoftwareRenderer::BeginFrame()
     m_FrameTrianglesDrawn = 0;
     m_FrameDrawTimeUS = 0;
     m_FillrateKP = 0;
+
+    m_FrameRasterTimeUS = 0;
+    m_FrameTransformTimeUS = 0;
 }
 
 void SoftwareRenderer::EndFrame()
@@ -64,6 +74,10 @@ void SoftwareRenderer::EndFrame()
     m_DrawStats.m_DrawTimeUS          = m_FrameDrawTimeUS;
     m_DrawStats.m_DrawTimePerThreadUS = m_FrameDrawTimeUS / ( m_ThreadPool.GetThreadCount() ? m_ThreadPool.GetThreadCount() : 1 );
     m_DrawStats.m_FillrateKP          = m_FillrateKP;
+
+    m_DrawStats.m_RasterTimeUS        = m_FrameRasterTimeUS;
+    m_DrawStats.m_RasterTimePerThreadUS=m_FrameRasterTimeUS / ( m_ThreadPool.GetThreadCount() ? m_ThreadPool.GetThreadCount() : 1 );
+    m_DrawStats.m_TransformTimeUS     = m_FrameTransformTimeUS;
 }
 
 void SoftwareRenderer::Render(const vector<Vertex>& vertices)
@@ -117,42 +131,48 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int minY, int 
     const auto startTime = std::chrono::high_resolution_clock::now();
 
     const vector<Vertex>& vertices = ClipTriangles(nearFrustumPlane, 0.001f, inVertices);
-
-    TransformedVertex transformedA;
-    TransformedVertex transformedB;
-    TransformedVertex transformedC;
-
     DrawStats drawStats;
+
+    thread_local static vector<TransformedVertex> transformedVertices;
+    transformedVertices.resize(vertices.size());
+
+    {
+        ZoneScopedN( "Transform" );
+        const auto startTime = std::chrono::high_resolution_clock::now();
+
+        for (int i = 0; i < vertices.size(); ++i)
+            transformedVertices[i].ProjToScreen(vertices[i], m_ModelMatrix, m_MVPMatrix);
+
+        m_FrameTransformTimeUS += std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
+    }
 
     if (m_DrawWireframe || m_DrawBBoxes)
     {
+        ZoneScopedN("Debug");
         const Vector4f color = m_ColorizeThreads ? m_ThreadColors[threadID] : m_WireFrameColor;
 
         for (int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
         {
-            transformedA.ProjToScreen(vertices[i + 0], m_ModelMatrix, m_MVPMatrix);
-            transformedB.ProjToScreen(vertices[i + 1], m_ModelMatrix, m_MVPMatrix);
-            transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, m_MVPMatrix);
-
             if (m_DrawWireframe)
-                DrawTriangle(transformedA, transformedB, transformedC, color, minY, maxY);
+                DrawTriangle(transformedVertices[i+0], transformedVertices[i+1], transformedVertices[i+2], color, minY, maxY);
 
             if (m_DrawBBoxes)
-                DrawTriangleBoundingBox(transformedA, transformedB, transformedC, color, minY, maxY);
+                DrawTriangleBoundingBox(transformedVertices[i+0], transformedVertices[i+1], transformedVertices[i+2], color, minY, maxY);
         }
     }
     else
     {
+        ZoneScopedN("Draw");
+        const auto startTime = std::chrono::high_resolution_clock::now();
+
         const Vector4f color = m_ColorizeThreads ? m_ThreadColors[threadID] : Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
 
         for (int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
         {
-            transformedA.ProjToScreen(vertices[i + 0], m_ModelMatrix, m_MVPMatrix);
-            transformedB.ProjToScreen(vertices[i + 1], m_ModelMatrix, m_MVPMatrix);
-            transformedC.ProjToScreen(vertices[i + 2], m_ModelMatrix, m_MVPMatrix);
-
-            DrawFilledTriangle(transformedA, transformedB, transformedC, color, minY, maxY, drawStats);
+            DrawFilledTriangle(transformedVertices[i+0], transformedVertices[i+1], transformedVertices[i+2], color, minY, maxY, drawStats);
         }
+
+        m_FrameRasterTimeUS += std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
     }
 
     auto timeUS = std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
@@ -178,6 +198,11 @@ const vector<uint32_t>& SoftwareRenderer::GetScreenBuffer()const
 const DrawStats& SoftwareRenderer::GetDrawStats() const
 {
     return m_DrawStats;
+}
+
+shared_ptr<ITexture> SoftwareRenderer::GetDefaultTexture() const
+{
+    return m_DefaultTexture;
 }
 
 inline void SoftwareRenderer::PutPixelUnsafe(int x, int y, uint32_t color)
@@ -413,13 +438,7 @@ void SoftwareRenderer::DrawLine(Vector2f A, Vector2f B, const Vector4f& color, i
 
 Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
 {
-    Vector4f sampledPixel;
-    if (m_Texture) {
-        sampledPixel = m_Texture->Sample(vertex.uv);
-    }
-    else {
-        sampledPixel = Vector4f(1, 1, 1, 1);
-    }
+    Vector4f sampledPixel = m_Texture->Sample(vertex.uv);
 
     Vector3f pointToLightDir = (m_LightPosition- vertex.worldPosition).Normalized();
 
@@ -468,6 +487,8 @@ void SoftwareRenderer::SetProjectionMatrix(const Matrix4f& other)
 void SoftwareRenderer::SetTexture(shared_ptr<ITexture> texture)
 {
     m_Texture = dynamic_pointer_cast<Texture>(texture);
+    if (!m_Texture)
+        m_Texture = m_DefaultTexture;
 }
 
 void SoftwareRenderer::SetWireFrameColor(const Vector4f& wireFrameColor)

@@ -11,6 +11,7 @@ class Texture : public ITexture
 {
 public:
     Texture() = default;
+    bool CreateWhite4x4Tex();
     bool Load(const char* fileName);
     bool IsValid()const override;
     Vector4f Sample(Vector2f uv)const;

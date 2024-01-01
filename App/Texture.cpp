@@ -8,6 +8,16 @@
 #include "Texture.h"
 #include "../stb/stb_image.h"
 
+bool Texture::CreateWhite4x4Tex()
+{
+    m_Data.resize(4 * 4);
+    for (int i = 0; i < 4 * 4; ++i)
+        m_Data[i] = 0xFFFFFFFF;
+    m_Width = 4;
+    m_Height = 4;
+    return true;
+}
+
 bool Texture::Load(const char* fileName)
 {
     int width, height, channels;

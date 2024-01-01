@@ -25,6 +25,7 @@ public:
     void RenderDepthBuffer()override;
     const vector<uint32_t>& GetScreenBuffer() const override;
     const DrawStats& GetDrawStats() const override;
+    shared_ptr<ITexture> GetDefaultTexture() const override;
 
     void SetModelMatrix(const Matrix4f& other)override;
     void SetViewMatrix(const Matrix4f& other)override;
@@ -92,11 +93,15 @@ private:
     atomic_int          m_FrameTrianglesDrawn = 0;
     atomic_int          m_FramePixels = 0;
     atomic_int          m_FramePixelsDrawn = 0;
+    atomic_int          m_FrameRasterTimeUS = 0;
+    atomic_int          m_FrameTransformTimeUS = 0;
     atomic_int          m_FrameDrawTimeUS = 0;
     atomic_int          m_FillrateKP = 0;
+
     DrawStats           m_DrawStats;
 
 
     shared_ptr<Texture> m_Texture;
+    shared_ptr<Texture> m_DefaultTexture;
     SimpleThreadPool    m_ThreadPool;
 };

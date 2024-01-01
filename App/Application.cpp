@@ -233,6 +233,9 @@ bool Application::Initialize()
     m_Contexts[0].pModelTexture = m_Contexts[0].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
     m_Contexts[1].pModelTexture = m_Contexts[1].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
 
+    m_ModelPaths.texturePath = INIT_TEXTURE_PATH;
+    m_LastModelPaths = m_ModelPaths;
+
     // initialize ImGui
     ImGui::SFML::Init(m_MainWindow);
 
@@ -292,7 +295,7 @@ int Application::Run()
         {
             m_ModelsData = LoadModelVertices(m_ModelPaths.modelPath.c_str());
             m_LastModelPaths = m_ModelPaths;
-            m_ModelPaths.texturePath = DEFAULT_TEXTURE_PATH;
+            m_ModelPaths.texturePath = "";
         }
 
         if (m_LastModelPaths.texturePath != m_ModelPaths.texturePath)
@@ -428,18 +431,24 @@ void Application::DrawRenderingStats()
 
     auto ScreenPixels = SCREEN_WIDTH * SCREEN_HEIGHT;
 
-    ImGui::Text( "_________________________________________________________________________________________________________" );
-    ImGui::Text( "                              |      AVG     |      MIN     |      MAX     |    MEDIAN    |    STD DEV   |" );
-    ImGui::Text( "------------------------------|--------------|--------------|--------------|--------------|--------------|" );
-    ImGui::Text( "FPS                           | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FPS)                , int(min.m_FPS)                , int(max.m_FPS)                 , int(med.m_FPS)                 , int(std.m_FPS)                 );
-    ImGui::Text( "Triangles analyzed per frame  | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTriangles)     , int(min.m_FrameTriangles)     , int(max.m_FrameTriangles)      , int(med.m_FrameTriangles)      , int(std.m_FrameTriangles)      );
-    ImGui::Text( "Triangles drawn per frame     | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTrianglesDrawn), int(min.m_FrameTrianglesDrawn), int(max.m_FrameTrianglesDrawn) , int(med.m_FrameTrianglesDrawn) , int(std.m_FrameTrianglesDrawn) );
-    ImGui::Text( "Pixels analyzed  per frame    | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixels)        , int(min.m_FramePixels)        , int(max.m_FramePixels)         , int(med.m_FramePixels)         , int(std.m_FramePixels)         );
-    ImGui::Text( "Pixels drawn per frame        | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixelsDrawn)   , int(min.m_FramePixelsDrawn)   , int(max.m_FramePixelsDrawn)    , int(med.m_FramePixelsDrawn)    , int(std.m_FramePixelsDrawn)    );
-    ImGui::Text( "Frame draw time (US)          | %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimeUS)         , int(min.m_DrawTimeUS)         , int(max.m_DrawTimeUS )         , int(med.m_DrawTimeUS)          , int(std.m_DrawTimeUS)          );
-    ImGui::Text( "Frame draw time per thread(US)| %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimePerThreadUS), int(min.m_DrawTimePerThreadUS), int(max.m_DrawTimePerThreadUS) , int(med.m_DrawTimePerThreadUS) , int(std.m_DrawTimePerThreadUS) );
-    ImGui::Text( "Fillrate (Kilo pixels/s)      | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FillrateKP)         , int(min.m_FillrateKP)         , int(max.m_FillrateKP)          , int(med.m_FillrateKP)          , int(std.m_FillrateKP)          );
-    ImGui::Text( "______________________________|______________|______________|______________|______________|______________|" );
-    ImGui::Text( "Screen coverage %u%% (%u pixels / %u pixels)", med.m_FramePixelsDrawn*100/ScreenPixels, med.m_FramePixelsDrawn, ScreenPixels);
+    ImVec4 Col1{1.0f,1.0f,1.0f,1.0f};
+    ImVec4 Col2{0.4f,0.8f,0.9f,1.0f};
+
+    ImGui::TextColored( Col1 , " __________________________________________________________________________________________________________" );
+    ImGui::TextColored( Col1 , "|                               |      AVG     |      MIN     |      MAX     |    MEDIAN    |    STD DEV   |" );
+    ImGui::TextColored( Col1 , "|-------------------------------|--------------|--------------|--------------|--------------|--------------|" );
+    ImGui::TextColored( Col1 , "| FPS                           | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FPS)                   , int(min.m_FPS)                    , int(max.m_FPS)                    , int(med.m_FPS)                    , int(std.m_FPS)                    );
+    ImGui::TextColored( Col2 , "| Triangles analyzed per frame  | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTriangles)        , int(min.m_FrameTriangles)         , int(max.m_FrameTriangles)         , int(med.m_FrameTriangles)         , int(std.m_FrameTriangles)         );
+    ImGui::TextColored( Col1 , "| Triangles drawn per frame     | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTrianglesDrawn)   , int(min.m_FrameTrianglesDrawn)    , int(max.m_FrameTrianglesDrawn)    , int(med.m_FrameTrianglesDrawn)    , int(std.m_FrameTrianglesDrawn)    );
+    ImGui::TextColored( Col2 , "| Pixels analyzed  per frame    | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixels)           , int(min.m_FramePixels)            , int(max.m_FramePixels)            , int(med.m_FramePixels)            , int(std.m_FramePixels)            );
+    ImGui::TextColored( Col1 , "| Pixels drawn per frame        | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixelsDrawn)      , int(min.m_FramePixelsDrawn)       , int(max.m_FramePixelsDrawn)       , int(med.m_FramePixelsDrawn)       , int(std.m_FramePixelsDrawn)       );
+    ImGui::TextColored( Col2 , "| Frame draw time (US)          | %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimeUS)            , int(min.m_DrawTimeUS)             , int(max.m_DrawTimeUS )            , int(med.m_DrawTimeUS)             , int(std.m_DrawTimeUS)             );
+    ImGui::TextColored( Col1 , "| Frame draw time per thread(US)| %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimePerThreadUS)   , int(min.m_DrawTimePerThreadUS)    , int(max.m_DrawTimePerThreadUS)    , int(med.m_DrawTimePerThreadUS)    , int(std.m_DrawTimePerThreadUS)    );
+    ImGui::TextColored( Col2 , "| Transform Time (US)           | %12d | %12d | %12d | %12d | %12d |", int(avg.m_TransformTimeUS)       , int(min.m_TransformTimeUS)        , int(max.m_TransformTimeUS )       , int(med.m_TransformTimeUS)        , int(std.m_TransformTimeUS)        );
+    ImGui::TextColored( Col1 , "| Raster time (US)              | %12d | %12d | %12d | %12d | %12d |", int(avg.m_RasterTimeUS)          , int(min.m_RasterTimeUS)           , int(max.m_RasterTimeUS)           , int(med.m_RasterTimeUS)           , int(std.m_RasterTimeUS)           );
+    ImGui::TextColored( Col2 , "| Raster time per thread(US)    | %12d | %12d | %12d | %12d | %12d |", int(avg.m_RasterTimePerThreadUS) , int(min.m_RasterTimePerThreadUS)  , int(max.m_RasterTimePerThreadUS)  , int(med.m_RasterTimePerThreadUS)  , int(std.m_RasterTimePerThreadUS)  );
+    ImGui::TextColored( Col1 , "| Fillrate (Kilo pixels/s)      | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FillrateKP)            , int(min.m_FillrateKP)             , int(max.m_FillrateKP)             , int(med.m_FillrateKP)             , int(std.m_FillrateKP)             );
+    ImGui::TextColored( Col1 , "|_______________________________|______________|______________|______________|______________|______________|" );
+    ImGui::TextColored( Col1 , " Screen coverage %u%% (%u pixels / %u pixels)", med.m_FramePixelsDrawn*100/ScreenPixels, med.m_FramePixelsDrawn, ScreenPixels);
     ImGui::End();
 }

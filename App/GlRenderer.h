@@ -14,6 +14,7 @@ class GlTexture : public ITexture
 {
 public:
     GlTexture()=default;
+    bool CreateWhite4x4Tex();
     bool Load(const char* fileName);
     bool Bind()const;
     virtual bool IsValid()const;
@@ -76,6 +77,7 @@ public:
     virtual void RenderDepthBuffer()override;
     virtual const vector<uint32_t>& GetScreenBuffer() const override;
     virtual const DrawStats& GetDrawStats() const override;
+    virtual shared_ptr<ITexture> GetDefaultTexture() const override;
 
     virtual void SetModelMatrix(const Matrix4f& other)override;
     virtual void SetViewMatrix(const Matrix4f& other)override;
@@ -129,4 +131,5 @@ private:
     int                         m_DefaultSFMLProgram = 0;
 
     shared_ptr<GlTexture>       m_Texture;
+    shared_ptr<GlTexture>       m_DefaultTexture;
 };

@@ -47,6 +47,7 @@ public:
     virtual void RenderDepthBuffer()=0;
     virtual const vector<uint32_t>& GetScreenBuffer() const=0;
     virtual const DrawStats& GetDrawStats() const=0;
+    virtual shared_ptr<ITexture> GetDefaultTexture() const=0;
 
     virtual void SetModelMatrix(const Matrix4f& other)=0;
     virtual void SetViewMatrix(const Matrix4f& other)=0;
