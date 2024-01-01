@@ -71,6 +71,7 @@ public:
     virtual void ClearScreen() override;
     virtual void ClearZBuffer() override;
     virtual void Render(const vector<Vertex>& vertices) override;
+    virtual void RenderDepthBuffer()override;
     virtual const vector<uint32_t>& GetScreenBuffer() const override;
 
     virtual void SetModelMatrix(const Matrix4f& other)override;

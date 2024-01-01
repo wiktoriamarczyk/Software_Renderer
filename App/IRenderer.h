@@ -42,6 +42,7 @@ public:
     virtual void ClearScreen()=0;
     virtual void ClearZBuffer()=0;
     virtual void Render(const vector<Vertex>& vertices)=0;
+    virtual void RenderDepthBuffer()=0;
     virtual const vector<uint32_t>& GetScreenBuffer() const=0;
 
     virtual void SetModelMatrix(const Matrix4f& other)=0;

@@ -27,6 +27,7 @@ struct DrawSettings
     bool        drawBBoxes = false;
     bool        colorizeThreads = false;
     bool        useZBuffer = true;
+    bool        renderDepthBuffer = false;
     int         rendererType = 0;
 };
 

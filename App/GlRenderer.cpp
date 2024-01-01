@@ -555,6 +555,10 @@ void GlRenderer::Render(const vector<Vertex>& vertices)
     GlTexture::Unbind();
 }
 
+void GlRenderer::RenderDepthBuffer()
+{
+}
+
 void GlRenderer::SetModelMatrix(const Matrix4f& other)
 {
     m_ModelMatrix = other;

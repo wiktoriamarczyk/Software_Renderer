@@ -20,6 +20,7 @@ public:
     void ClearScreen()override;
     void ClearZBuffer()override;
     void Render(const vector<Vertex>& vertices)override;
+    void RenderDepthBuffer()override;
     const vector<uint32_t>& GetScreenBuffer() const override;
 
     void SetModelMatrix(const Matrix4f& other)override;

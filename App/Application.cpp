@@ -243,7 +243,7 @@ bool Application::Initialize()
 
     // set initial matrices
     m_CameraMatrix      = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 0), Vector3f(0, 1, 0));
-    m_ProjectionMatrix  = Matrix4f::CreateProjectionMatrix(60, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.8f, 1000.0f);
+    m_ProjectionMatrix  = Matrix4f::CreateProjectionMatrix(60, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.8f, 30.0f);
     m_ModelMatrix       = Matrix4f::Identity();
 
     m_LastFrameTime = std::chrono::high_resolution_clock::now();
@@ -331,6 +331,7 @@ int Application::Run()
         ImGui::ColorEdit3("Ambient Color", &m_DrawSettings.ambientColor.x);
         ImGui::ColorEdit3("Diffuse Color", &m_DrawSettings.diffuseColor.x);
         ImGui::ColorEdit3("Background Color", &m_DrawSettings.backgroundColor.x);
+        ImGui::Checkbox( "Visualize ZBuffer", &m_DrawSettings.renderDepthBuffer);
 
         ImGui::End();
 
@@ -364,6 +365,10 @@ int Application::Run()
         {
             ZoneScopedN("Update screen texture");
             // update texture
+
+            if (m_DrawSettings.renderDepthBuffer)
+                renderer->RenderDepthBuffer();
+
             m_ScreenTexture.update((uint8_t*)buf.data());
 
             // render texture to screen

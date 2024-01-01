@@ -42,7 +42,7 @@ void SoftwareRenderer::ClearScreen()
 
 void SoftwareRenderer::ClearZBuffer()
 {
-    std::fill(m_ZBuffer.begin(), m_ZBuffer.end(), std::numeric_limits<float>::max());
+    std::fill(m_ZBuffer.begin(), m_ZBuffer.end(), 1.f);
 }
 
 void SoftwareRenderer::Render(const vector<Vertex>& vertices)
@@ -74,6 +74,15 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
     else
     {
         DoRender(vertices, 0, SCREEN_HEIGHT - 1,0);
+    }
+}
+
+void SoftwareRenderer::RenderDepthBuffer()
+{
+    for( int i= 0 ; i < m_ScreenBuffer.size() ; ++i )
+    {
+        uint32_t Col = std::clamp( int(255 * m_ZBuffer[i] ) , 0 , 255 );
+        m_ScreenBuffer[i] = 0xFF000000 | (Col<<16) | (Col<<8) | (Col);
     }
 }
 
