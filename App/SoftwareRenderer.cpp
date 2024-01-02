@@ -58,7 +58,8 @@ void SoftwareRenderer::BeginFrame()
     m_FrameTriangles = 0;
     m_FramePixelsDrawn = 0;
     m_FrameTrianglesDrawn = 0;
-    m_FrameDrawTimeUS = 0;
+    m_FrameDrawTimeMainUS = 0;
+    m_FrameDrawTimeThreadUS = 0;
     m_FillrateKP = 0;
 
     m_FrameRasterTimeUS = 0;
@@ -67,22 +68,24 @@ void SoftwareRenderer::BeginFrame()
 
 void SoftwareRenderer::EndFrame()
 {
+    const int ThreadsDivide = ( m_ThreadPool.GetThreadCount() ? m_ThreadPool.GetThreadCount() : 1 );
+
     m_DrawStats.m_FramePixels         = m_FramePixels;
     m_DrawStats.m_FramePixelsDrawn    = m_FramePixelsDrawn;
     m_DrawStats.m_FrameTriangles      = m_FrameTriangles;
     m_DrawStats.m_FrameTrianglesDrawn = m_FrameTrianglesDrawn;
-    m_DrawStats.m_DrawTimeUS          = m_FrameDrawTimeUS;
-    m_DrawStats.m_DrawTimePerThreadUS = m_FrameDrawTimeUS / ( m_ThreadPool.GetThreadCount() ? m_ThreadPool.GetThreadCount() : 1 );
+    m_DrawStats.m_DrawTimeUS          = m_FrameDrawTimeMainUS;
+    m_DrawStats.m_DrawTimePerThreadUS = m_FrameDrawTimeThreadUS / ThreadsDivide;
     m_DrawStats.m_FillrateKP          = m_FillrateKP;
-
     m_DrawStats.m_RasterTimeUS        = m_FrameRasterTimeUS;
-    m_DrawStats.m_RasterTimePerThreadUS=m_FrameRasterTimeUS / ( m_ThreadPool.GetThreadCount() ? m_ThreadPool.GetThreadCount() : 1 );
-    m_DrawStats.m_TransformTimeUS     = m_FrameTransformTimeUS;
+    m_DrawStats.m_RasterTimePerThreadUS=m_FrameRasterTimeUS / ThreadsDivide;
+    m_DrawStats.m_TransformTimeUS     = m_FrameTransformTimeUS / ThreadsDivide;
 }
 
 void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 {
     ZoneScoped;
+    const auto startTime = std::chrono::high_resolution_clock::now();
     int threadsCount = m_ThreadPool.GetThreadCount();
     if (threadsCount > 0)
     {
@@ -110,6 +113,8 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
     {
         DoRender(vertices, 0, SCREEN_HEIGHT - 1,0);
     }
+    const auto timeUS = std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
+    m_FrameDrawTimeMainUS += timeUS;
 }
 
 void SoftwareRenderer::RenderDepthBuffer()
@@ -175,14 +180,14 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int minY, int 
         m_FrameRasterTimeUS += std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
     }
 
-    auto timeUS = std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
+    const auto timeUS = std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
 
     m_FrameTriangles        += drawStats.m_FrameTriangles;
     m_FrameTrianglesDrawn   += drawStats.m_FrameTrianglesDrawn;
     m_FramePixels           += drawStats.m_FramePixels;
     m_FramePixelsDrawn      += drawStats.m_FramePixelsDrawn;
-    m_FrameDrawTimeUS       += timeUS;
     m_FillrateKP            += drawStats.m_FramePixelsDrawn * ( 1000.0f / timeUS );
+    m_FrameDrawTimeThreadUS += timeUS;
 }
 
 void SoftwareRenderer::UpdateMVPMatrix()

@@ -95,7 +95,8 @@ private:
     atomic_int          m_FramePixelsDrawn = 0;
     atomic_int          m_FrameRasterTimeUS = 0;
     atomic_int          m_FrameTransformTimeUS = 0;
-    atomic_int          m_FrameDrawTimeUS = 0;
+    atomic_int          m_FrameDrawTimeThreadUS = 0;
+    atomic_int          m_FrameDrawTimeMainUS = 0;
     atomic_int          m_FillrateKP = 0;
 
     DrawStats           m_DrawStats;

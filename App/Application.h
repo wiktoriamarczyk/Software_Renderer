@@ -29,6 +29,7 @@ struct DrawSettings
     bool        colorizeThreads = false;
     bool        useZBuffer = true;
     bool        renderDepthBuffer = false;
+    bool        vSync = true;
     int         rendererType = 0;
 };
 
@@ -82,4 +83,5 @@ private:
     sf::Sprite m_ScreenSprite;
     sf::Clock m_DeltaClock;
     std::chrono::steady_clock::time_point m_LastFrameTime;
+    bool m_VSync = true;
 };

@@ -265,8 +265,8 @@ int Application::Run()
         ZoneScopedN("Main Loop");
 
         const auto now = std::chrono::high_resolution_clock::now();
-        const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_LastFrameTime).count();
-        const int fps = duration ? 1000 / duration : 0;
+        const auto durationUS = std::chrono::duration_cast<std::chrono::microseconds>(now - m_LastFrameTime).count();
+        const int fps = int(durationUS ? 1000'000.0f / durationUS : 0.0f);
         m_LastFrameTime = now;
 
         auto renderer     = m_Contexts[m_DrawSettings.rendererType].pRenderer;
@@ -336,8 +336,16 @@ int Application::Run()
         ImGui::ColorEdit3("Diffuse Color", &m_DrawSettings.diffuseColor.x);
         ImGui::ColorEdit3("Background Color", &m_DrawSettings.backgroundColor.x);
         ImGui::Checkbox( "Visualize ZBuffer", &m_DrawSettings.renderDepthBuffer);
+        ImGui::SameLine();
+        ImGui::Checkbox( "Vertical Sync", &m_DrawSettings.vSync);
 
         ImGui::End();
+
+        if (m_VSync!=m_DrawSettings.vSync)
+        {
+            m_VSync = m_DrawSettings.vSync;
+            m_MainWindow.setFramerateLimit(m_VSync ? 60 : 0);
+        }
 
         // set render params
         renderer->SetWireFrameColor(m_DrawSettings.wireFrameColor);
@@ -402,7 +410,7 @@ int Application::Run()
 
         // update stats
         auto drawStats = renderer->GetDrawStats();
-        drawStats.m_DT = duration;
+        drawStats.m_DT = durationUS;
         DrawStatsSystem::AddSample(drawStats);
     }
 
