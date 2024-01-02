@@ -46,9 +46,9 @@ struct TransformedVertex
 inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix)
 {
     worldPosition = v.position.Multiplied(worldMatrix);
-    normal = (v.normal.Multiplied(worldMatrix) - Vector3f{ 0,0,0 }.Multiplied(worldMatrix)).Normalized();
-    color = v.color;
-    uv = v.uv;
+    normal        = v.normal.TransformedVec(worldMatrix).Normalized();
+    color         = v.color;
+    uv            = v.uv;
 
     screenPosition = Vector4f(v.position, 1.0f).Transformed(mvpMatrix);
 

@@ -79,3 +79,12 @@ inline Vector3f Vector3f::Transformed(const Matrix4f& m) const
         (m[1] * x + m[5] * y + m[9] * z + m[13]) * w,
         (m[2] * x + m[6] * y + m[10] * z + m[14]) * w);
 }
+
+inline Vector3f Vector3f::TransformedVec(const Matrix4f& m) const
+{
+    return Vector3f(
+        m[0] * x + m[4] * y + m[ 8] * z,
+        m[1] * x + m[5] * y + m[ 9] * z,
+        m[2] * x + m[6] * y + m[10] * z);
+}
+
