@@ -71,7 +71,7 @@ set(SFML_STATIC_LIBRARIES TRUE)
 add_definitions(-DTRACY_ENABLE)
 add_definitions(-DTRACY_ON_DEMAND)
 
-find_package(SFML 2.6.0 COMPONENTS graphics audio REQUIRED)
+find_package(SFML 2.6.0 COMPONENTS graphics REQUIRED)
 
 include_directories(SoftwareRenderer "${CMAKE_SOURCE_DIR}/imgui")
 include_directories(SoftwareRenderer "${CMAKE_SOURCE_DIR}/Dependencies/assimp/include")
@@ -90,11 +90,31 @@ ADD_EXECUTABLE(SoftwareRenderer ${APP_SRC_FILES_LIST} )
 set_property(TARGET SoftwareRenderer PROPERTY CXX_STANDARD 20)
 
 #*****************************************************
+# Set proper MSVC runtime library ( /MT and /MTd for debug)
+#*****************************************************
+
+set_property(TARGET SoftwareRenderer PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+#*****************************************************
+# Specify multiprocessor compilation for MSVC
+#*****************************************************
+
+target_compile_options(SoftwareRenderer PRIVATE "/MP")
+
+#*****************************************************
 # Specify which SFML libraries to link with exe
 #*****************************************************
 
-target_link_libraries(SoftwareRenderer sfml-graphics sfml-audio)
+target_link_libraries(SoftwareRenderer sfml-graphics)
+
+#*****************************************************
+# Specify which assimp libraries to link with exe
+#*****************************************************
+
 target_link_libraries(SoftwareRenderer ${CMAKE_SOURCE_DIR}/Dependencies/assimp/lib/assimp-vc143-mt.lib )
-set_target_properties(SoftwareRenderer PROPERTIES
-    VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/Data"
-)
+
+#*****************************************************
+# Set working directory for exe
+#*****************************************************
+
+set_target_properties(SoftwareRenderer PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/Data" )
