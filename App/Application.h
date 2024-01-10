@@ -36,6 +36,8 @@ struct DrawSettings
 struct Model
 {
     vector<Vertex> vertices;
+    Vector3f Min;
+    Vector3f Max;
 };
 
 struct MyModelPaths

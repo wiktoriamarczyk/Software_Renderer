@@ -101,10 +101,16 @@ void Application::NormalizeModelPosition(vector<Model>& models)
 
     for (auto& model : models)
     {
+        model.Min = Vector3f(maxValue, maxValue, maxValue);
+        model.Max = Vector3f(minValue, minValue, minValue);
+
         for (auto& v : model.vertices)
         {
             min = min.CWiseMin(v.position);
             max = max.CWiseMax(v.position);
+
+            model.Min = model.Min.CWiseMin(v.position);
+            model.Max = model.Max.CWiseMax(v.position);
         }
     }
 
@@ -133,6 +139,7 @@ vector<Model> Application::LoadFallbackModel()
     vertices.resize(FALLBACK_MODEL_VERT_COUNT);
     std::copy(fallbackVertices, fallbackVertices + FALLBACK_MODEL_VERT_COUNT, vertices.begin());
 
+    NormalizeModelPosition(result);
     return result;
 }
 
@@ -147,6 +154,8 @@ vector<Model> Application::LoadModelVertices(const char* path)
     {
         result = LoadFromScene(scene);
         aiReleaseImport(scene);
+
+        NormalizeModelPosition(result);
     }
     else
     {
@@ -156,8 +165,6 @@ vector<Model> Application::LoadModelVertices(const char* path)
 
         result = LoadFallbackModel();
     }
-
-    NormalizeModelPosition(result);
 
     return result;
 }
@@ -257,6 +264,53 @@ bool Application::Initialize()
 
 int Application::Run()
 {
+    struct Frustum
+    {
+    public:
+        static Frustum FromMatrix(const Matrix4f& m)
+        {
+            Frustum F;
+            m.GetFrustumNearPlane   ( F.m_Planes[0] );
+            m.GetFrustumFarPlane    ( F.m_Planes[1] );
+            m.GetFrustumLeftPlane   ( F.m_Planes[2] );
+            m.GetFrustumRightPlane  ( F.m_Planes[3] );
+            m.GetFrustumTopPlane    ( F.m_Planes[4] );
+            m.GetFrustumBottomPlane ( F.m_Planes[5] );
+            return F;
+        }
+        bool IsInside(const Model& model) const
+        {
+            Vector3f Points[8];
+            Points[0] = Vector3f(model.Min.x, model.Min.y, model.Min.z);
+            Points[1] = Vector3f(model.Max.x, model.Min.y, model.Min.z);
+            Points[2] = Vector3f(model.Min.x, model.Min.y, model.Max.z);
+            Points[3] = Vector3f(model.Max.x, model.Min.y, model.Max.z);
+            Points[4] = Vector3f(model.Min.x, model.Max.y, model.Min.z);
+            Points[5] = Vector3f(model.Max.x, model.Max.y, model.Min.z);
+            Points[6] = Vector3f(model.Min.x, model.Max.y, model.Max.z);
+            Points[7] = Vector3f(model.Max.x, model.Max.y, model.Max.z);
+
+            auto AllPointsInFront = [&Points](const Plane& plane)
+            {
+                for (auto& point : Points)
+                {
+                    if (plane.GetSide(point) != Plane::eSide::Front)
+                        return false;
+                }
+                return true;
+            };
+
+            for (auto& plane : m_Planes)
+            {
+                if (AllPointsInFront(plane))
+                    return false;
+            }
+            return true;
+        }
+        Plane m_Planes[6];
+    };
+
+
     ZoneScoped;
     // run the program as long as the window is open
     while (m_MainWindow.isOpen())
@@ -368,10 +422,13 @@ int Application::Run()
 
         renderer->BeginFrame();
 
+        Frustum frustum = Frustum::FromMatrix(m_ModelMatrix * m_CameraMatrix * m_ProjectionMatrix);
+
         // render stuff to screen buffer
         for (auto& model : m_ModelsData)
         {
-            renderer->Render(model.vertices);
+            if (frustum.IsInside(model))
+                renderer->Render(model.vertices);
         }
 
         renderer->EndFrame();

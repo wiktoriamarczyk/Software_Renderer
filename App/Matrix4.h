@@ -40,6 +40,11 @@ public:
     static Matrix4f Scale(Vector3f other);
 
     bool GetFrustumNearPlane(Plane& outPlane) const;
+    bool GetFrustumFarPlane(Plane& OutPlane) const;
+    bool GetFrustumLeftPlane(Plane& OutPlane) const;
+    bool GetFrustumRightPlane(Plane& OutPlane) const;
+    bool GetFrustumTopPlane(Plane& OutPlane) const;
+    bool GetFrustumBottomPlane(Plane& OutPlane) const;
 
     Matrix4f Transposed()const;
     Matrix4f Inversed() const;
