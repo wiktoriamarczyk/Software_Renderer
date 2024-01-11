@@ -194,10 +194,10 @@ bool Matrix4f::MakeFrustumPlane(float a, float b, float c, float d, Plane& outPl
 bool Matrix4f::GetFrustumNearPlane(Plane& outPlane) const
 {
     return MakeFrustumPlane(
-        m_Matrix[0][2],
-        m_Matrix[1][2],
-        m_Matrix[2][2],
-        m_Matrix[3][2],
+        m_Matrix[0][3] + m_Matrix[0][2],
+        m_Matrix[1][3] + m_Matrix[1][2],
+        m_Matrix[2][3] + m_Matrix[2][2],
+        m_Matrix[3][3] + m_Matrix[3][2],
         outPlane
     );
 }
