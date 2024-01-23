@@ -10,6 +10,9 @@
 
 class Plane;
 
+/**
+* Klasa reprezentuj¹ca macierz 4x4.
+*/
 class Matrix4f
 {
 public:
@@ -26,19 +29,75 @@ public:
     {
     }
 
+    /**
+    * Zwraca macierz jednostkow¹.
+    * @return macierz jednostkowa
+    */
     static constexpr Matrix4f Identity();
-
+    /**
+    * Operator mno¿enia macierzy przez inn¹ macierz.
+    * @param other macierz
+    * @return macierz wynikowa
+    */
     Matrix4f operator*(const Matrix4f& other) const;
+    /**
+    * Operator mno¿enia macierzy przez inn¹ macierz z przypisaniem.
+    * @param other macierz
+    * @return macierz wynikowa
+    */
     Matrix4f& operator*=(const Matrix4f& other);
+    /**
+    * Operator tablicowy.
+    * @param index liniowy indeks
+    * @return referencja do elementu macierzy
+    */
     float& operator[](int index);
+    /**
+    * Operator tablicowy nie modyfikuj¹cy.
+    * @param index liniowy indeks
+    * @return referencja do elementu macierzy
+    */
     const float& operator[](int index)const;
-
+    /**
+    * Tworzy macierz projekcji.
+    * @param fieldOfView pole widzenia
+    * @param aspectRatio wspó³czynnik proporcji ekranu
+    * @param near odleg³oœæ od kamery do najbli¿szego punktu renderowania
+    * @param far odleg³oœæ od kamery do najdalszego punktu renderowania
+    * @return macierz projekcji
+    */
     static Matrix4f CreateProjectionMatrix(float fieldOfView, float aspectRatio, float near, float far);
+    /**
+    * Tworzy macierz widoku.
+    * @param eye pozycja kamery
+    * @param target punkt, w którym kamera jest skierowana
+    * @param up wektor okreœlaj¹cy kierunek góry
+    * @return macierz widoku
+    */
     static Matrix4f CreateLookAtMatrix(const Vector3f& eye, const Vector3f& target, const Vector3f& up);
+    /**
+    * Tworzy macierz translacji.
+    * @param other wektor translacji
+    * @return macierz translacji
+    */
     static Matrix4f Translation(Vector3f other);
+    /**
+    * Tworzy macierz rotacji.
+    * @param other wektor rotacji
+    * @return macierz rotacji
+    */
     static Matrix4f Rotation(Vector3f other);
+    /**
+    * Tworzy macierz skali.
+    * @param other wektor skali
+    * @return macierz skali
+    */
     static Matrix4f Scale(Vector3f other);
-
+    /**
+    * Zwraca obiekt bliskiej p³aszczyzny odcinania.
+    * @param outPlane p³aszczyzna odcinania
+    * @return true, jeœli operacja siê powiod³a, false w przeciwnym wypadku
+    */
     bool GetFrustumNearPlane(Plane& outPlane) const;
     bool GetFrustumFarPlane(Plane& OutPlane) const;
     bool GetFrustumLeftPlane(Plane& OutPlane) const;
@@ -46,11 +105,28 @@ public:
     bool GetFrustumTopPlane(Plane& OutPlane) const;
     bool GetFrustumBottomPlane(Plane& OutPlane) const;
 
+    /**
+    * Transponuje macierz.
+    * @return macierz transponowana
+    */
     Matrix4f Transposed()const;
+    /**
+    * Odwraca macierz.
+    * @return macierz odwrotna
+    */
     Matrix4f Inversed() const;
-
-    float m_Matrix[4][4] = {};   // matrix elements; first index is for rows, second for columns (row-major)
+    // matrix elements; first index is for rows, second for columns (row-major)
+    float m_Matrix[4][4] = {}; ///< macierz
 private:
+    /**
+    * Tworzy macierz przycinania.
+    * @param a wspó³czynnik p³aszczyzny
+    * @param b wspó³czynnik p³aszczyzny
+    * @param c wspó³czynnik p³aszczyzny
+    * @param d wspó³czynnik p³aszczyzny
+    * @param outPlane p³aszczyzna przycinania
+    * @return true, jeœli operacja siê powiod³a, false w przeciwnym wypadku
+    */
     static bool MakeFrustumPlane(float a, float b, float c, float d, Plane& outPlane);
 };
 

@@ -8,27 +8,49 @@
 #include "Common.h"
 #include "TransformedVertex.h"
 
+/**
+* Klasa pomocnicza s³u¿¹ca do interpolacji parametrów punktu w trójk¹cie.
+*/
 class VertexInterpolator
 {
 public:
+    /**
+    * Konstruktor klasy.
+    * @param A pierwszy wierzcho³ek
+    * @param B drugi wierzcho³ek
+    * @param C trzeci wierzcho³ek
+    */
     VertexInterpolator(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C);
+    /**
+    * Interpoluje wartoœæ Z dla punktu w trójk¹cie.
+    * @param baricentric wspó³rzêdne barycentryczne punktu
+    * @param out punkt wynikowy
+    */
     void InterpolateZ(const Vector3f& baricentric, TransformedVertex& out);
+    /**
+    * Interpoluje pozosta³e atrybuty punktu w trójk¹cie.
+    * @param baricentric wspó³rzêdne barycentryczne punktu
+    * @param out punkt wynikowy
+    */
     void InterpolateAllButZ(const Vector3f& baricentric, TransformedVertex& out);
 
 private:
+    /**
+    * Struktura reprezentuj¹ca Ÿród³o interpolacji.
+    */
     struct InterpolatedSource
     {
-        Vector3f    worldPositionOverW;
-        Vector3f    normalOverW;
-        Vector2f    uvOverW;
-        Vector4f    colorOverW;
-        float       oneOverW;
-        float       screenPositionZ;
+        Vector3f    worldPositionOverW; ///< pozycja w œwiecie
+        Vector3f    normalOverW; ///< normalna
+        Vector2f    uvOverW; ///< wspó³rzêdne tekstury
+        Vector4f    colorOverW; ///< kolor
+        float       oneOverW; ///< odwrotnoœæ wspó³rzêdnej w
+        float       screenPositionZ; ///< pozycja na ekranie wspó³rzêdnej z
     };
 
-    InterpolatedSource m_A;
-    InterpolatedSource m_B;
-    InterpolatedSource m_C;
+    InterpolatedSource m_A; ///< pierwszy wierzcho³ek
+    InterpolatedSource m_B; ///< drugi wierzcho³ek
+    InterpolatedSource m_C; ///< trzeci wierzcho³ek
 };
 
 inline void VertexInterpolator::InterpolateZ(const Vector3f& baricentric, TransformedVertex& out)

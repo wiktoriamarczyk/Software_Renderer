@@ -7,35 +7,68 @@
 #pragma once
 #include "Common.h"
 
+/**
+* Klasa odpowiedzialna za organizacjê statystyk rysowania.
+*/
 class DrawStatsSystem
 {
     DrawStatsSystem()=default;
 public:
-    static inline constexpr int FRAME_SAMPLES_COUNT = 60;
+    static inline constexpr int FRAME_SAMPLES_COUNT = 60; ///< liczba próbek
 
+    /**
+    * Struktura reprezentuj¹ca statystykê rysowania.
+    */
     struct Stats : DrawStats
     {
-        float   m_FPS = 0;
+        float m_FPS = 0;
     };
 
+    /**
+    * Dodaje próbkê statystyk rysowania z danej klatki.
+    * @param sample próbka statystyk rysowania
+    */
     static void AddSample(DrawStats sample);
+    /**
+    * Zwraca œredni¹ statystyk rysowania.
+    * @return obiekt zawieraj¹cy œredni¹ statystyk rysowania
+    */
     static const Stats& GetAvg();
+    /**
+    * Zwraca minimum ze statystyk rysowania.
+    * @return obiekt zawieraj¹cy minimum statystyk rysowania
+    */
     static const Stats& GetMin();
+    /**
+    * Zwraca maksimum ze statystyk rysowania.
+    * @return obiekt zawieraj¹cy maksimum statystyk rysowania
+    */
     static const Stats& GetMax();
+    /**
+    * Zwraca medianê ze statystyk rysowania.
+    * @return obiekt zawieraj¹cy medianê statystyk rysowania
+    */
     static const Stats& GetMed();
+    /**
+    * Zwraca odchylenie standardowe ze statystyk rysowania.
+    * @return obiekt zawieraj¹cy odchylenie standardowe statystyk rysowania
+    */
     static const Stats& GetStd();
 private:
+    /**
+    * Funkcja aktualizuj¹ca statystyki rysowania dla klatki.
+    */
     void Update();
 
-    static DrawStatsSystem s_Instance;
-    DrawStats m_FrameSamples[FRAME_SAMPLES_COUNT];
-    DrawStats m_MedianBuf[FRAME_SAMPLES_COUNT];
-    Stats m_Avg;
-    Stats m_Min;
-    Stats m_Max;
-    Stats m_Median;
-    Stats m_StdDev;
-    int m_FrameSampleIndex = 0;
+    static DrawStatsSystem s_Instance; ///< instancja klasy
+    DrawStats m_FrameSamples[FRAME_SAMPLES_COUNT]; ///< próbki statystyk rysowania
+    DrawStats m_MedianBuf[FRAME_SAMPLES_COUNT]; ///< bufor mediany
+    Stats m_Avg; ///< œrednia statystyk rysowania
+    Stats m_Min; ///< minimum statystyk rysowania
+    Stats m_Max; ///< maksimum statystyk rysowania
+    Stats m_Median; ///< mediana statystyk rysowania
+    Stats m_StdDev; ///< odchylenie standardowe statystyk rysowania
+    int m_FrameSampleIndex = 0; ///< indeks próbki statystyk rysowania
 };
 
 inline void DrawStatsSystem::AddSample(DrawStats sample)

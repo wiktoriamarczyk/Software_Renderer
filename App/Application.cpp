@@ -36,7 +36,7 @@ vector<Model> Application::LoadFromScene(const aiScene* pScene)
 
     if (totalTriangles > MAX_MODEL_TRIANGLES)
     {
-        printf("Total triangles count %d exceeds max allowed number of triangles %d\n" , totalTriangles , MAX_MODEL_TRIANGLES );
+        printf("Total triangles count %d exceeds max allowed number of triangles %d\n", totalTriangles, MAX_MODEL_TRIANGLES);
         return vector<Model>();
     }
 

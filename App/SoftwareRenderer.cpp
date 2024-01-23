@@ -68,7 +68,7 @@ void SoftwareRenderer::BeginFrame()
 
 void SoftwareRenderer::EndFrame()
 {
-    const int ThreadsDivide = ( m_ThreadPool.GetThreadCount() ? m_ThreadPool.GetThreadCount() : 1 );
+    const int ThreadsDivide = (m_ThreadPool.GetThreadCount() ? m_ThreadPool.GetThreadCount() : 1);
 
     m_DrawStats.m_FramePixels         = m_FramePixels;
     m_DrawStats.m_FramePixelsDrawn    = m_FramePixelsDrawn;

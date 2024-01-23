@@ -84,7 +84,6 @@ GlProgram::~GlProgram()
         glDeleteProgram(m_Program);
 }
 
-///Function to load the shaders from string data.
 bool GlProgram::LoadShaderFromMemory(const std::string& shaderData, ShaderType type)
 {
     if (shaderData.empty())

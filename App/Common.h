@@ -52,19 +52,22 @@ const string INIT_TEXTURE_PATH = "../Data/Checkerboard.png";
 inline const char* MODEL_FORMATS = ".fbx,.glb,.gltf,.blend,.obj";
 inline const char* TEXTURE_FORMATS = ".png,.jpg,.jpeg,.bmp";
 
+/**
+* Przechowuje statystyki rysowania.
+*/
 struct DrawStats
 {
-    int m_FrameTriangles         = 0;
-    int m_FrameTrianglesDrawn    = 0;
-    int m_FramePixels            = 0;
-    int m_FramePixelsDrawn       = 0;
+    int m_FrameTriangles         = 0; ///< liczba przetworzonych trójk¹tów
+    int m_FrameTrianglesDrawn    = 0; ///< liczba narysowanych trójk¹tów
+    int m_FramePixels            = 0; ///< liczba przetworzonych pikseli
+    int m_FramePixelsDrawn       = 0; ///< liczba narysowanych pikseli
 
-    int m_RasterTimeUS           = 0;
-    int m_RasterTimePerThreadUS  = 0;
-    int m_TransformTimeUS        = 0;
+    int m_RasterTimeUS           = 0; ///< czas rasteryzacji
+    int m_RasterTimePerThreadUS  = 0; ///< czas rasteryzacji na w¹tek
+    int m_TransformTimeUS        = 0; ///< czas transformacji
 
-    int m_DrawTimeUS             = 0;
-    int m_DrawTimePerThreadUS    = 0;
-    int m_FillrateKP             = 0;
-    int m_DT                     = 0;
+    int m_DrawTimeUS             = 0; ///< czas rysowania
+    int m_DrawTimePerThreadUS    = 0; ///< czas rysowania na w¹tek
+    int m_FillrateKP             = 0; ///< iloœæ pikseli wype³nionych na sekundê
+    int m_DT                     = 0; ///< czas rysowania jednego piksela
 };

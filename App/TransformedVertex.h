@@ -8,14 +8,22 @@
 #include "Common.h"
 #include "Math.h"
 
+/**
+* Struktura reprezentuj¹ca wierzcho³ek po transformacji.
+*/
 struct TransformedVertex
 {
-    Vector4f screenPosition;
-    Vector3f normal;
-    Vector3f worldPosition;
-    Vector4f color;
-    Vector2f uv;
+    Vector4f screenPosition; ///< pozycja na ekranie
+    Vector3f normal; ///< normalna
+    Vector3f worldPosition; ///< pozycja w œwiecie
+    Vector4f color; ///< kolor
+    Vector2f uv; ///< wspó³rzêdne tekstury
 
+    /**
+    * Operator mno¿enia wierzcho³ka przez liczbê.
+    * @param value liczba
+    * @return wierzcho³ek wynikowy
+    */
     TransformedVertex operator*(float value)const
     {
         TransformedVertex result;
@@ -28,6 +36,11 @@ struct TransformedVertex
         return result;
     }
 
+    /**
+    * Operator dodawania wierzcho³ków.
+    * @param vertex drugi parametr dodawania
+    * @return wierzcho³ek wynikowy
+    */
     TransformedVertex operator+(const TransformedVertex& vertex)const
     {
         TransformedVertex result;
@@ -40,6 +53,12 @@ struct TransformedVertex
         return result;
     }
 
+    /**
+    * Transformuje wierzcho³ek z przestrzeni œwiata do przestrzeni ekranu.
+    * @param v wierzcho³ek
+    * @param worldMatrix macierz œwiata
+    * @param mvpMatrix macierz MVP
+    */
     void ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix);
 };
 
