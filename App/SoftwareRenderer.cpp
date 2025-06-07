@@ -84,6 +84,9 @@ void SoftwareRenderer::EndFrame()
 
 void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 {
+    m_pSelectedMath = m_MathArray[std::clamp(m_MathIndex,0,2)];
+    //m_pSelectedMath->log();
+
     ZoneScoped;
     const auto startTime = std::chrono::high_resolution_clock::now();
     int threadsCount = m_ThreadPool.GetThreadCount();
@@ -234,9 +237,9 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
     // filling algorithm is working that way that we are going through all pixels in rectangle that is created by min and max points
     // and we are checking if pixel is inside triangle by using three lines and checking if pixel is on the same side of each line
 
-    Vector2f A = VA.screenPosition.xy();
-    Vector2f B = VB.screenPosition.xy();
-    Vector2f C = VC.screenPosition.xy();
+    Vector2f A = VA.m_ScreenPosition.xy();
+    Vector2f B = VB.m_ScreenPosition.xy();
+    Vector2f C = VC.m_ScreenPosition.xy();
 
     // clockwise order so we check if point is on the right side of line
     const float ABC = EdgeFunction(A, B, C);
@@ -295,20 +298,22 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
             //
             // dividing edge function values by ABC will give us barycentric coordinates - how much each vertex contributes to final color in point P
             Vector3f baricentricCoordinates = Vector3f( BCP, CAP , ABP) * invABC;
-            interpolator.InterpolateZ(baricentricCoordinates, interpolatedVertex);
+            //interpolator.InterpolateZ(baricentricCoordinates, interpolatedVertex);
+
+            interpolator.Interpolate(*m_pSelectedMath, baricentricCoordinates, interpolatedVertex);
 
             float& z = m_ZBuffer[y * SCREEN_WIDTH + x];
-            if (interpolatedVertex.screenPosition.z < z) {
+            if (interpolatedVertex.m_ScreenPosition.z < z) {
                 if (m_ZWrite)
-                    z = interpolatedVertex.screenPosition.z;
+                    z = interpolatedVertex.m_ScreenPosition.z;
             }
             else if (m_ZTest){
                 continue;
             }
 
-            interpolator.InterpolateAllButZ(baricentricCoordinates, interpolatedVertex);
-            interpolatedVertex.normal.Normalize();
-            interpolatedVertex.color = interpolatedVertex.color * color;
+            //interpolator.InterpolateAllButZ(baricentricCoordinates, interpolatedVertex);
+            interpolatedVertex.m_Normal.Normalize();
+            interpolatedVertex.m_Color = interpolatedVertex.m_Color * color;
             Vector4f finalColor = FragmentShader(interpolatedVertex);
             PutPixelUnsafe(x, y, Vector4f::ToARGB(finalColor));
             pixelsDrawn++;
@@ -330,8 +335,8 @@ void SoftwareRenderer::DrawTriangle(const TransformedVertex& A, const Transforme
 
 void SoftwareRenderer::DrawTriangleBoundingBox(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY)
 {
-    Vector2f min = A.screenPosition.CWiseMin( B.screenPosition ).CWiseMin( C.screenPosition ).xy();
-    Vector2f max = A.screenPosition.CWiseMax( B.screenPosition ).CWiseMax( C.screenPosition ).xy();
+    Vector2f min = A.m_ScreenPosition.CWiseMin( B.m_ScreenPosition ).CWiseMin( C.m_ScreenPosition ).xy();
+    Vector2f max = A.m_ScreenPosition.CWiseMax( B.m_ScreenPosition ).CWiseMax( C.m_ScreenPosition ).xy();
 
     if( max.y < minY ||
         min.y > maxY )
@@ -349,8 +354,8 @@ void SoftwareRenderer::DrawTriangleBoundingBox(const TransformedVertex& A, const
 
 void SoftwareRenderer::DrawLine(const TransformedVertex& VA, const TransformedVertex& VB, const Vector4f& color, int minY, int maxY)
 {
-    Vector2f A = VA.screenPosition.xy();
-    Vector2f B = VB.screenPosition.xy();
+    Vector2f A = VA.m_ScreenPosition.xy();
+    Vector2f B = VB.m_ScreenPosition.xy();
 
     return DrawLine(A, B, color, minY,  maxY);
 }
@@ -443,28 +448,28 @@ void SoftwareRenderer::DrawLine(Vector2f A, Vector2f B, const Vector4f& color, i
 
 Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
 {
-    Vector4f sampledPixel = m_Texture->Sample(vertex.uv);
+    Vector4f sampledPixel = m_Texture->Sample(vertex.m_UV);
 
-    Vector3f pointToLightDir = (m_LightPosition- vertex.worldPosition).Normalized();
+    Vector3f pointToLightDir = (m_LightPosition- vertex.m_WorldPosition).Normalized();
 
     // ambient - light that is reflected from other objects
     Vector3f ambient = m_AmbientColor * m_AmbientStrength;
 
     // diffuse - light that is reflected from light source
-    float diffuseFactor = std::max(pointToLightDir.Dot(vertex.normal), 0.0f);
+    float diffuseFactor = std::max(pointToLightDir.Dot(vertex.m_Normal), 0.0f);
     Vector3f diffuse = m_DiffuseColor * diffuseFactor * m_DiffuseStrength;
 
     // specular - light that is reflected from light source and is reflected in one direction
     // specular = specularStrength * specularColor * pow(max(dot(viewDir, reflectDir), 0.0), shininess)
-    Vector3f viewDir = (m_CameraPosition - vertex.worldPosition).Normalized();
-    Vector3f reflectDir = (pointToLightDir * -1).Reflect(vertex.normal);
+    Vector3f viewDir = (m_CameraPosition - vertex.m_WorldPosition).Normalized();
+    Vector3f reflectDir = (pointToLightDir * -1).Reflect(vertex.m_Normal);
     float specularFactor = pow(max(viewDir.Dot(reflectDir), 0.0f), m_Shininess);
     Vector3f specular = m_DiffuseColor * m_SpecularStrength * specularFactor;
 
     // final light color = (ambient + diffuse + specular) * modelColor
     Vector3f sumOfLight = ambient + diffuse + specular;
     sumOfLight = sumOfLight.CWiseMin(Vector3f(1, 1, 1));
-    Vector4f finalColor = Vector4f(sumOfLight,1.0f) * sampledPixel * vertex.color;
+    Vector4f finalColor = Vector4f(sumOfLight,1.0f) * sampledPixel * vertex.m_Color;
 
     return finalColor;
 }
@@ -577,4 +582,9 @@ void SoftwareRenderer::SetZWrite(bool zwrite)
 void SoftwareRenderer::SetZTest(bool ztest)
 {
     m_ZTest = ztest;
+}
+
+void SoftwareRenderer::SetMathType(eMathType mathType)
+{
+    m_MathIndex = static_cast<uint8_t>(mathType);
 }

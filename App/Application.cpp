@@ -392,6 +392,7 @@ int Application::Run()
         ImGui::Checkbox( "Visualize ZBuffer", &m_DrawSettings.renderDepthBuffer);
         ImGui::SameLine();
         ImGui::Checkbox( "Vertical Sync", &m_DrawSettings.vSync);
+        ImGui::Combo("Math Type", &m_DrawSettings.mathType, "CPU\0SSE\0AVX\0");
 
         ImGui::End();
 
@@ -419,6 +420,7 @@ int Application::Run()
         renderer->SetClearColor(Vector4f{m_DrawSettings.backgroundColor,1});
         renderer->ClearZBuffer();
         renderer->ClearScreen();
+        renderer->SetMathType(static_cast<eMathType>(m_DrawSettings.mathType));
 
         renderer->BeginFrame();
 

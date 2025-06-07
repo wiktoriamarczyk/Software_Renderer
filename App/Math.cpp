@@ -278,3 +278,51 @@ const vector<Vertex>& ClipTriangles(const Plane& clipPlane, const float epsilon,
     }
     return clippedVerts;
 }
+
+void Frustum::Update( const Matrix4f& mvpMatrix )
+{
+    mvpMatrix.GetFrustumNearPlane  ( m_Planes[0] );
+    mvpMatrix.GetFrustumFarPlane   ( m_Planes[1] );
+    mvpMatrix.GetFrustumLeftPlane  ( m_Planes[2] );
+    mvpMatrix.GetFrustumRightPlane ( m_Planes[3] );
+    mvpMatrix.GetFrustumTopPlane   ( m_Planes[4] );
+    mvpMatrix.GetFrustumBottomPlane( m_Planes[5] );
+}
+
+bool Frustum::IsInside( const Vector3f& point ) const
+{
+    for( const Plane& plane : m_Planes )
+    {
+        if( plane.GetSide( point ) == Plane::eSide::Back )
+            return false;
+    }
+    return true;
+}
+
+bool Frustum::IsBoundingBoxInside(const Vector3f& Min, const Vector3f& Max) const
+{
+    Vector3f BBPoints[] =
+    {
+        Vector3f(Min.x, Min.y, Min.z),
+        Vector3f(Max.x, Min.y, Min.z),
+        Vector3f(Min.x, Max.y, Min.z),
+        Vector3f(Max.x, Max.y, Min.z),
+        Vector3f(Min.x, Min.y, Max.z),
+        Vector3f(Max.x, Min.y, Max.z),
+        Vector3f(Min.x, Max.y, Max.z),
+        Vector3f(Max.x, Max.y, Max.z)
+    };
+
+    // check box outside/inside of frustum
+    for( int i=0; i<6; i++ )
+    {
+        int out = 0;
+        for( auto& p : BBPoints )
+            out += m_Planes[i].GetSide(p) == Plane::eSide::Front ? 1: 0;
+
+        if( out==8 )
+            return false;
+    }
+
+    return true;
+}

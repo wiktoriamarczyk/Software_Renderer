@@ -1,13 +1,9 @@
-/*
-* Engineering thesis - Software-based 3D Graphics Renderer
-* Author: Wiktoria Marczyk
-* Year: 2024
-*/
-
 #pragma once
+
 #include "Vector2f.h"
 #include "Vector3f.h"
 #include "Vector4f.h"
+#include "Matrix4.h"
 
 struct Vertex
 {
@@ -49,6 +45,149 @@ constexpr inline const uint32_t Vertex::NormalOffset    = offsetof(Vertex, norma
 constexpr inline const uint32_t Vertex::ColorOffset     = offsetof(Vertex, color);
 constexpr inline const uint32_t Vertex::UVOffset        = offsetof(Vertex, uv);
 
+class IMath
+{
+public:
+    virtual void MultiplyVec4ByScalar( const float* v, float scalar , float* pOut )const=0;
+    virtual void MultiplyVec8ByScalar( const float* v, float scalar , float* pOut )const=0;
+    virtual void AddVec4( const float* a, const float* b , float* pOut )const=0;
+    virtual void AddVec8( const float* a, const float* b , float* pOut )const=0;
+    virtual void log()const = 0;
+};
+
+class MathCPU final : public IMath
+{
+public:
+    virtual void MultiplyVec4ByScalar( const float* v, float scalar , float* pOut )const override;
+    virtual void MultiplyVec8ByScalar( const float* v, float scalar , float* pOut )const override;
+    virtual void AddVec4( const float* a, const float* b , float* pOut )const override;
+    virtual void AddVec8( const float* a, const float* b , float* pOut )const override;
+    virtual void log()const override { printf("MathCPU\n"); }
+};
+
+class MathSSE final : public IMath
+{
+public:
+    virtual void MultiplyVec4ByScalar( const float* v, float scalar , float* pOut )const override;
+    virtual void MultiplyVec8ByScalar( const float* v, float scalar , float* pOut )const override;
+    virtual void AddVec4( const float* a, const float* b , float* pOut )const override;
+    virtual void AddVec8( const float* a, const float* b , float* pOut )const override;
+    virtual void log()const override { printf("MathSSE\n"); }
+};
+
+class MathAVX final : public IMath
+{
+public:
+    virtual void MultiplyVec4ByScalar( const float* v, float scalar , float* pOut )const override;
+    virtual void MultiplyVec8ByScalar( const float* v, float scalar , float* pOut )const override;
+    virtual void AddVec4( const float* a, const float* b , float* pOut )const override;
+    virtual void AddVec8( const float* a, const float* b , float* pOut )const override;
+    virtual void log()const override { printf("MathAVX\n"); }
+};
+
+
+
+
+//****************************************************************
+//                          Math CPU
+//****************************************************************
+
+inline void MathCPU::MultiplyVec4ByScalar( const float* v, float scalar , float* pOut )const
+{
+    pOut[0] = v[0] * scalar;
+    pOut[1] = v[1] * scalar;
+    pOut[2] = v[2] * scalar;
+    pOut[3] = v[3] * scalar;
+}
+
+inline void MathCPU::MultiplyVec8ByScalar( const float* v, float scalar , float* pOut )const
+{
+    MultiplyVec4ByScalar( v + 0 , scalar , pOut + 0 );
+    MultiplyVec4ByScalar( v + 4 , scalar , pOut + 4 );
+}
+
+inline void MathCPU::AddVec4( const float* a, const float* b , float* pOut )const
+{
+    pOut[0] = a[0] + b[0];
+    pOut[1] = a[1] + b[1];
+    pOut[2] = a[2] + b[2];
+    pOut[3] = a[3] + b[3];
+}
+
+inline void MathCPU::AddVec8(const float* a, const float* b, float* pOut) const
+{
+    AddVec4(a + 0, b + 0, pOut + 0);
+    AddVec4(a + 4, b + 4, pOut + 4);
+}
+
+//****************************************************************
+//                          Math SSE
+//****************************************************************
+
+inline void MathSSE::MultiplyVec4ByScalar( const float* v, float scalar , float* pOut )const
+{
+    __m128 a = _mm_load_ps (v);         // _mm_loadu_ps (float const* mem_addr)
+    __m128 b = _mm_set1_ps (scalar);    // _mm_set_ps1 (float a)
+    __m128 c = _mm_mul_ps  (a, b);      // _mm_mul_ps (__m128 a, __m128 b)
+                _mm_store_ps(pOut, c);   // _mm_storeu_ps (float* mem_addr, __m128 a)
+}
+
+inline void MathSSE::MultiplyVec8ByScalar( const float* v, float scalar , float* pOut )const
+{
+    MultiplyVec4ByScalar( v + 0 , scalar , pOut + 0 );
+    MultiplyVec4ByScalar( v + 4 , scalar , pOut + 4 );
+}
+
+inline void MathSSE::AddVec4( const float* a, const float* b , float* pOut )const
+{
+    __m128 a1 = _mm_load_ps (a);         // _mm_loadu_ps (float const* mem_addr)
+    __m128 b1 = _mm_load_ps (b);         // _mm_loadu_ps (float const* mem_addr)
+    __m128 c  = _mm_add_ps  (a1, b1);    // _mm_add_ps (__m128 a, __m128 b)
+                _mm_store_ps(pOut, c);   // _mm_storeu_ps (float* mem_addr, __m128 a)
+}
+
+inline void MathSSE::AddVec8(const float* a, const float* b, float* pOut) const
+{
+    AddVec4(a + 0, b + 0, pOut + 0);
+    AddVec4(a + 4, b + 4, pOut + 4);
+}
+
+//****************************************************************
+//                          Math AVX
+//****************************************************************
+
+inline void MathAVX::MultiplyVec4ByScalar( const float* v, float scalar , float* pOut )const
+{
+    __m128 a = _mm_load_ps (v);             // _mm_loadu_ps (float const* mem_addr)
+    __m128 b = _mm_set1_ps (scalar);        // _mm_set_ps1 (float a)
+    __m128 c = _mm_mul_ps  (a, b);          // _mm_mul_ps (__m128 a, __m128 b)
+                _mm_store_ps(pOut, c);      // _mm_storeu_ps (float* mem_addr, __m128 a)
+}
+
+inline void MathAVX::MultiplyVec8ByScalar( const float* v, float scalar , float* pOut )const
+{
+    __m256 a = _mm256_load_ps (v);          // _mm_loadu_ps (float const* mem_addr)
+    __m256 b = _mm256_set1_ps (scalar);     // _mm_set_ps1 (float a)
+    __m256 c = _mm256_mul_ps  (a, b);       // _mm_mul_ps (__m128 a, __m128 b)
+               _mm256_store_ps(pOut, c);    // _mm_storeu_ps (float* mem_addr, __m128 a)
+}
+
+inline void MathAVX::AddVec4( const float* a, const float* b , float* pOut )const
+{
+    __m128 a1 = _mm_load_ps (a);            // _mm_loadu_ps (float const* mem_addr)
+    __m128 b1 = _mm_load_ps (b);            // _mm_loadu_ps (float const* mem_addr)
+    __m128 c  = _mm_add_ps  (a1, b1);       // _mm_add_ps (__m128 a, __m128 b)
+                _mm_store_ps(pOut, c);      // _mm_storeu_ps (float* mem_addr, __m128 a)
+}
+
+inline void MathAVX::AddVec8(const float* a, const float* b, float* pOut) const
+{
+    __m256 a1 = _mm256_load_ps (a);         // _mm_loadu_ps (float const* mem_addr)
+    __m256 b1 = _mm256_load_ps (b);         // _mm_loadu_ps (float const* mem_addr)
+    __m256 c  = _mm256_add_ps  (a1, b1);    // _mm_add_ps (__m128 a, __m128 b)
+               _mm256_store_ps(pOut, c);    // _mm_storeu_ps (float* mem_addr, __m128 a)
+}
+
 class Plane
 {
 public:
@@ -71,6 +210,17 @@ public:
 private:
     Vector3f m_Normal;
     float    m_D = 0;
+};
+
+class Frustum
+{
+public:
+    Frustum() = default;
+    void Update(const Matrix4f& mvpMatrix);
+    bool IsInside(const Vector3f& point)const;
+    bool IsBoundingBoxInside(const Vector3f& Min, const Vector3f& Max)const;
+private:
+    Plane m_Planes[6];
 };
 
 const vector<Vertex>& ClipTriangles(const Plane& clipPlane, const float epsilon, const vector<Vertex>& verts);

@@ -31,6 +31,7 @@ struct DrawSettings
     bool        renderDepthBuffer = false;
     bool        vSync = true;
     int         rendererType = 0;
+    int         mathType = 0;
 };
 
 struct Model

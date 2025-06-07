@@ -47,6 +47,7 @@ public:
     void SetDrawBBoxes(bool drawBBoxes)override;
     void SetZWrite(bool zWrite)override;
     void SetZTest(bool zTest)override;
+    void SetMathType(eMathType mathType)override;
 private:
     void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
     void DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int maxY);
@@ -105,4 +106,11 @@ private:
     shared_ptr<Texture> m_Texture;
     shared_ptr<Texture> m_DefaultTexture;
     SimpleThreadPool    m_ThreadPool;
+
+    int                 m_MathIndex = 0;
+    MathCPU             m_MathCPU;
+    MathSSE             m_MathSSE;
+    MathAVX             m_MathAVX;
+    const IMath*        m_MathArray[3] = { &m_MathCPU , &m_MathSSE , &m_MathAVX };
+    const IMath*        m_pSelectedMath = &m_MathCPU;
 };

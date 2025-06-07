@@ -8,24 +8,24 @@
 
 VertexInterpolator::VertexInterpolator(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C)
 {
-    m_A.oneOverW = 1.0f / A.screenPosition.w;
-    m_A.colorOverW = A.color * m_A.oneOverW;
-    m_A.normalOverW = A.normal * m_A.oneOverW;
-    m_A.uvOverW = A.uv * m_A.oneOverW;
-    m_A.worldPositionOverW = A.worldPosition * m_A.oneOverW;
-    m_A.screenPositionZ = A.screenPosition.z;
+    m_A.m_OneOverW = 1.0f / A.m_ScreenPosition.w;
+    m_A.m_ColorOverW = A.m_Color * m_A.m_OneOverW;
+    m_A.m_NormalOverW = A.m_Normal * m_A.m_OneOverW;
+    m_A.m_UVOverW = A.m_UV * m_A.m_OneOverW;
+    m_A.m_WorldPositionOverW = A.m_WorldPosition * m_A.m_OneOverW;
+    m_A.m_ScreenPositionZ = A.m_ScreenPosition.z;
 
-    m_B.oneOverW = 1.0f / B.screenPosition.w;
-    m_B.colorOverW = B.color * m_B.oneOverW;
-    m_B.normalOverW = B.normal * m_B.oneOverW;
-    m_B.uvOverW = B.uv * m_B.oneOverW;
-    m_B.worldPositionOverW = B.worldPosition * m_B.oneOverW;
-    m_B.screenPositionZ = B.screenPosition.z;
+    m_B.m_OneOverW = 1.0f / B.m_ScreenPosition.w;
+    m_B.m_ColorOverW = B.m_Color * m_B.m_OneOverW;
+    m_B.m_NormalOverW = B.m_Normal * m_B.m_OneOverW;
+    m_B.m_UVOverW = B.m_UV * m_B.m_OneOverW;
+    m_B.m_WorldPositionOverW = B.m_WorldPosition * m_B.m_OneOverW;
+    m_B.m_ScreenPositionZ = B.m_ScreenPosition.z;
 
-    m_C.oneOverW = 1.0f / C.screenPosition.w;
-    m_C.colorOverW = C.color * m_C.oneOverW;
-    m_C.normalOverW = C.normal * m_C.oneOverW;
-    m_C.uvOverW = C.uv * m_C.oneOverW;
-    m_C.worldPositionOverW = C.worldPosition * m_C.oneOverW;
-    m_C.screenPositionZ = C.screenPosition.z;
+    m_C.m_OneOverW = 1.0f / C.m_ScreenPosition.w;
+    m_C.m_ColorOverW = C.m_Color * m_C.m_OneOverW;
+    m_C.m_NormalOverW = C.m_Normal * m_C.m_OneOverW;
+    m_C.m_UVOverW = C.m_UV * m_C.m_OneOverW;
+    m_C.m_WorldPositionOverW = C.m_WorldPosition * m_C.m_OneOverW;
+    m_C.m_ScreenPositionZ = C.m_ScreenPosition.z;
 }
