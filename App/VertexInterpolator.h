@@ -57,23 +57,42 @@ inline void VertexInterpolator::Interpolate(const IMath& math, const Vector3f& b
     float* CData = reinterpret_cast<float*>(&m_C);
     float* result = reinterpret_cast<float*>(&out);
 
-    alignas(16) float TmpAResult[8];
-    alignas(16) float TmpBResult[8];
-    alignas(16) float TmpCResult[8];
+    InterpolatedSource tmpA, tmpB, tmpC;
+
+    //alignas(16) float TmpAResult[8];
+    //alignas(16) float TmpBResult[8];
+    //alignas(16) float TmpCResult[8];
+
+    float* TmpAResult = reinterpret_cast<float*>(&tmpA);
+    //float* TmpBResult = reinterpret_cast<float*>(&tmpB);
+    //float* TmpCResult = reinterpret_cast<float*>(&tmpC);
+
+    //math.MultiplyVec8ByScalar(AData, baricentric.x, TmpAResult);
+    //math.MultiplyVec8ByScalar(BData, baricentric.y, TmpBResult);
+    //math.MultiplyVec8ByScalar(CData, baricentric.z, TmpCResult);
+
+    //math.AddVec8(TmpAResult, TmpBResult, TmpAResult);
+    //math.AddVec8(TmpAResult, TmpCResult, TmpAResult);
+
+    //math.MultiplyVec8ByScalar(AData + 8, baricentric.x, TmpAResult + 8);
+    //math.MultiplyVec8ByScalar(BData + 8, baricentric.y, TmpBResult + 8);
+    //math.MultiplyVec8ByScalar(CData + 8, baricentric.z, TmpCResult + 8);
+
+    //math.AddVec8(TmpAResult + 8 , TmpBResult + 8 , TmpAResult + 8 );
+    //math.AddVec8(TmpAResult + 8 , TmpCResult + 8 , TmpAResult + 8 );
+
+
+
 
     math.MultiplyVec8ByScalar(AData, baricentric.x, TmpAResult);
-    math.MultiplyVec8ByScalar(BData, baricentric.y, TmpBResult);
-    math.MultiplyVec8ByScalar(CData, baricentric.z, TmpCResult);
+    math.MulVec8ByScalarAdd  (BData, baricentric.y, TmpAResult , TmpAResult );
+    math.MulVec8ByScalarAdd  (CData, baricentric.z, TmpAResult , TmpAResult );
 
-    math.AddVec8(TmpAResult, TmpBResult, TmpAResult);
-    math.AddVec8(TmpAResult, TmpCResult, result);
 
-    math.MultiplyVec8ByScalar(AData + 8, baricentric.x, TmpAResult);
-    math.MultiplyVec8ByScalar(BData + 8, baricentric.y, TmpBResult);
-    math.MultiplyVec8ByScalar(CData + 8, baricentric.z, TmpCResult);
+    math.MultiplyVec8ByScalar(AData + 8, baricentric.x, TmpAResult + 8 );
+    math.MulVec8ByScalarAdd  (BData + 8, baricentric.y, TmpAResult + 8 , TmpAResult + 8 );
+    math.MulVec8ByScalarAdd  (CData + 8, baricentric.z, TmpAResult + 8 , TmpAResult + 8 );
 
-    math.AddVec8(TmpAResult, TmpBResult, TmpAResult);
-    math.AddVec8(TmpAResult, TmpCResult, result + 8);
 
     ////// First part of data (8 floats)
     ////out.m_Color.x = (baricentric.x * m_A.m_ColorOverW.x + baricentric.y * m_B.m_ColorOverW.x + baricentric.z * m_C.m_ColorOverW.x);
@@ -86,7 +105,7 @@ inline void VertexInterpolator::Interpolate(const IMath& math, const Vector3f& b
     ////out.m_Normal.z = (baricentric.x * m_A.m_NormalOverW.z + baricentric.y * m_B.m_NormalOverW.z + baricentric.z * m_C.m_NormalOverW.z);
 
     ////out.m_UV.x = (baricentric.x * m_A.m_UVOverW.x + baricentric.y * m_B.m_UVOverW.x + baricentric.z * m_C.m_UVOverW.x);
-    ////// Second part of data (6 floats)
+    ////// Second part of data (5 floats)
     ////out.m_UV.y = (baricentric.x * m_A.m_UVOverW.y + baricentric.y * m_B.m_UVOverW.y + baricentric.z * m_C.m_UVOverW.y);
 
     ////out.m_WorldPosition.x = (baricentric.x * m_A.m_WorldPositionOverW.x + baricentric.y * m_B.m_WorldPositionOverW.x + baricentric.z * m_C.m_WorldPositionOverW.x);
@@ -95,11 +114,13 @@ inline void VertexInterpolator::Interpolate(const IMath& math, const Vector3f& b
 
     ////out.m_ScreenPosition.z = baricentric.x * m_A.m_ScreenPositionZ + baricentric.y * m_B.m_ScreenPositionZ + baricentric.z * m_C.m_ScreenPositionZ;
 
-    float oneOverW = baricentric.x * m_A.m_OneOverW + baricentric.y * m_B.m_OneOverW + baricentric.z * m_C.m_OneOverW;
-    float w = 1.0f / oneOverW;
+    //float oneOverW = baricentric.x * m_A.m_OneOverW + baricentric.y * m_B.m_OneOverW + baricentric.z * m_C.m_OneOverW;
+    float w = 1.0f / tmpA.m_OneOverW;
 
-    math.MultiplyVec8ByScalar(result, w, result);
-    math.MultiplyVec4ByScalar(result + 8, w, result + 8);
+    math.MultiplyVec8ByScalar(TmpAResult    , w, result    );
+    math.MultiplyVec4ByScalar(TmpAResult + 8, w, result + 8);
+
+    out.m_ScreenPosition.z = tmpA.m_ScreenPositionZ;
 
     //// First part of data (8 floats)
     //out.m_Color.x = out.m_Color.x * w;

@@ -30,6 +30,9 @@ public:
     Vector2f CWiseMin(const Vector2f& other)const;
     Vector2f CWiseMax(const Vector2f& other)const;
 
+    float* Data() { return &x; }
+    const float* Data() const { return &x; }
+
     float x = 0;
     float y = 0;
 };

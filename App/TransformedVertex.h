@@ -10,10 +10,10 @@
 
 struct alignas(32) TransformedVertex
 {
-    Vector4f m_Color;
-    Vector3f m_Normal;
-    Vector2f m_UV;
-    Vector3f m_WorldPosition;
+    Vector4f m_Color;           // 0-3
+    Vector3f m_Normal;          // 4-6
+    Vector2f m_UV;              // 7-8
+    Vector3f m_WorldPosition;   // 9-11
     Vector4f m_ScreenPosition;
 
     TransformedVertex operator*(float value)const
