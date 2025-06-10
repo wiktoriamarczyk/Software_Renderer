@@ -17,7 +17,7 @@ public:
     void Interpolate(const IMath& math, const Vector3f& baricentric, TransformedVertex& out);
 
 private:
-    struct alignas(32) InterpolatedSource
+    struct ALIGN_FOR_AVX InterpolatedSource
     {
         Vector4f    m_ColorOverW;
         Vector3f    m_NormalOverW;

@@ -8,7 +8,7 @@
 #include "Common.h"
 #include "Math.h"
 
-struct alignas(32) TransformedVertex
+struct ALIGN_FOR_AVX TransformedVertex
 {
     Vector4f m_Color;           // 0-3
     Vector3f m_Normal;          // 4-6

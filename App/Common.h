@@ -68,3 +68,6 @@ struct DrawStats
     int m_FillrateKP             = 0;
     int m_DT                     = 0;
 };
+
+#define ALIGN_FOR_AVX alignas(32)
+//#define ALIGN_FOR_AVX

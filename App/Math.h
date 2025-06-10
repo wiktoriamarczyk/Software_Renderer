@@ -279,11 +279,8 @@ inline void MathSSE::MulAddVec4( const float* a, const float* b , const float* c
 
 inline void MathSSE::MulAddVec8( const float* a, const float* b , const float* c , float* pOut )const
 {
-    __m256 a1 = _mm256_load_ps (a);         // _mm_loadu_ps (float const* mem_addr)
-    __m256 b1 = _mm256_load_ps (b);         // _mm_loadu_ps (float const* mem_addr)
-    __m256 c1 = _mm256_load_ps (c);         // _mm_loadu_ps (float const* mem_addr)
-    __m256 r  = _mm256_fmadd_ps(a1, b1, c1);// _mm_add_ps (__m128 a, __m128 b)
-               _mm256_store_ps(pOut, r);    // _mm_storeu_ps (float* mem_addr, __m128 a)
+    MulAddVec4(a + 0, b + 0, c + 0, pOut + 0);
+    MulAddVec4(a + 4, b + 4, c + 4, pOut + 4);
 }
 
 inline void MathSSE::MulVec4ByScalarAdd( const float* a, float b , const float* c , float* pOut )const
