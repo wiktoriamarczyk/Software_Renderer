@@ -175,10 +175,12 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int minY, int 
 
         const Vector4f color = m_ColorizeThreads ? m_ThreadColors[threadID] : Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
 
-        for (int i = 0; i < vertices.size(); i += TRIANGLE_VERT_COUNT)
-        {
-            DrawFilledTriangle(transformedVertices[i+0], transformedVertices[i+1], transformedVertices[i+2], color, minY, maxY, drawStats);
-        }
+        if( m_MathIndex == 1 )
+            DrawFilledTriangles<MathSSE>(transformedVertices.data(), transformedVertices.size(), color, minY, maxY, drawStats);
+        else if( m_MathIndex == 2 )
+            DrawFilledTriangles<MathAVX>(transformedVertices.data(), transformedVertices.size(), color, minY, maxY, drawStats);
+        else
+            DrawFilledTriangles<MathCPU>(transformedVertices.data(), transformedVertices.size(), color, minY, maxY, drawStats);
 
         m_FrameRasterTimeUS += std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
     }
@@ -231,6 +233,16 @@ inline float SoftwareRenderer::EdgeFunction(const Vector2f& A, const Vector2f& B
     return (B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x);
 }
 
+template< typename MathT >
+void SoftwareRenderer::DrawFilledTriangles(const TransformedVertex* pVerts, size_t Count, const Vector4f& color, int minY, int maxY, DrawStats& stats)
+{
+    for (size_t i = 0; i < Count; i += TRIANGLE_VERT_COUNT)
+    {
+        DrawFilledTriangle<MathT>(pVerts[i+0], pVerts[i+1], pVerts[i+2], color, minY, maxY, stats);
+    }
+}
+
+template< typename MathT >
 void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color, int minY, int maxY, DrawStats& stats)
 {
     ZoneScoped;
@@ -278,6 +290,165 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
 
     int pixelsDrawn = 0;
 
+    struct EdgeResult_t
+    {
+        float ABP;
+        float BCP;
+        float CAP;
+        float _[5];
+    };
+    ALIGN_FOR_AVX float Arg0[8] =
+    {
+        - (B.y - A.y) ,
+          (B.x - A.x) ,
+        - (C.y - B.y) ,
+          (C.x - B.x) ,
+        - (A.y - C.y) ,
+          (A.x - C.x) ,
+    };
+    ALIGN_FOR_AVX float Arg2[8] =
+    {
+        - Arg0[0] * A.x ,
+        - Arg0[1] * A.y ,
+        - Arg0[2] * B.x ,
+        - Arg0[3] * B.y ,
+        - Arg0[4] * C.x ,
+        - Arg0[5] * C.y ,
+    };
+    ALIGN_FOR_AVX float Arg1[8] = {};
+    ALIGN_FOR_AVX EdgeResult_t EdgeResult;
+
+    MathT math;
+    VertexInterpolator::InterpolatedSource tmpA;
+
+    // loop through all pixels in rectangle
+    for (int y = min.y; y <= max.y; ++y)
+    {
+        for (int x = min.x; x <= max.x; ++x)
+        {
+            const Vector2f P(x+0.5f, y+0.5f);
+
+            ///math.Interleave8( P.x , P.y , Arg1 );
+            ///math.MulAddVec8( Arg0 , Arg1 , Arg2 , Arg1 );
+            ///math.PairAddVec4( Arg1 , Arg1 + 4 , &EdgeResult.ABP );
+
+            math.EdgeFunction( P , Arg0 , Arg2 , &EdgeResult.ABP );
+
+            //const float CAP = (A.x - C.x) * (P.y - C.y)
+            //                - (A.y - C.y) * (P.x - C.x);
+            //const float ABP = (B.x - A.x) * (P.y - A.y)
+            //                - (B.y - A.y) * (P.x - A.x);
+            //const float BCP = (C.x - B.x) * (P.y - B.y)
+            //                - (C.y - B.y) * (P.x - B.x);
+
+            if (EdgeResult.ABP < 0)
+                continue;
+            if (EdgeResult.BCP < 0)
+                continue;
+            if (EdgeResult.CAP < 0)
+                continue;
+
+            // if pixel is inside triangle, draw it
+
+            // dividing edge function values by ABC will give us barycentric coordinates - how much each vertex contributes to final color in point P
+            Vector3f baricentricCoordinates = Vector3f( EdgeResult.BCP, EdgeResult.CAP , EdgeResult.ABP) * invABC;
+
+            interpolator.InterpolateT<MathT>( baricentricCoordinates, interpolatedVertex);
+
+            float& z = m_ZBuffer[y * SCREEN_WIDTH + x];
+            if (interpolatedVertex.m_ScreenPosition.z < z) {
+                if (m_ZWrite)
+                    z = interpolatedVertex.m_ScreenPosition.z;
+            }
+            else if (m_ZTest){
+                continue;
+            }
+
+            interpolatedVertex.m_Normal.Normalize();
+            interpolatedVertex.m_Color = interpolatedVertex.m_Color * color;
+            Vector4f finalColor = FragmentShader(interpolatedVertex);
+            PutPixelUnsafe(x, y, Vector4f::ToARGB(finalColor));
+            pixelsDrawn++;
+        }
+    }
+
+    stats.m_FramePixels += (1+max.y-min.y)*(1+max.x-min.x);
+    stats.m_FramePixelsDrawn += pixelsDrawn;
+    stats.m_FrameTriangles++;
+    stats.m_FrameTrianglesDrawn++;
+}
+
+void SoftwareRenderer::DrawFilledTriangleWTF(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color, int minY, int maxY, DrawStats& stats)
+{
+    ZoneScoped;
+    // filling algorithm is working that way that we are going through all pixels in rectangle that is created by min and max points
+    // and we are checking if pixel is inside triangle by using three lines and checking if pixel is on the same side of each line
+
+    Vector2f A = VA.m_ScreenPosition.xy();
+    Vector2f B = VB.m_ScreenPosition.xy();
+    Vector2f C = VC.m_ScreenPosition.xy();
+
+    // clockwise order so we check if point is on the right side of line
+    const float ABC = EdgeFunction(A, B, C);
+
+    // if our edge function (signed area x2) is negative, it's a back facing triangle and we can cull it
+    bool isBackFacing = ABC <= 0;
+    if (isBackFacing)
+    {
+        stats.m_FrameTriangles++;
+        return;
+    }
+
+    //            max
+    //    -------B
+    //   |      /|
+    //   |     /*|
+    //   |    /**|
+    //   |   /***|
+    //   |  /****|
+    //   | /*****|
+    //   A-------C
+    // min
+
+    // min and max points of rectangle
+    Vector2f min = A.CWiseMin(B).CWiseMin(C);
+    Vector2f max = A.CWiseMax(B).CWiseMax(C);
+
+    // clamp min and max points to screen size so we don't calculate points that we don't see
+    min = min.CWiseMin(Vector2f(SCREEN_WIDTH-1, maxY)).CWiseMax(Vector2f(0, minY));
+    max = max.CWiseMin(Vector2f(SCREEN_WIDTH-1, maxY)).CWiseMax(Vector2f(0, minY));
+
+    const float invABC = 1.0f / ABC;
+
+    VertexInterpolator interpolator(VA, VB, VC);
+    TransformedVertex interpolatedVertex;
+
+    int pixelsDrawn = 0;
+
+
+    ALIGN_FOR_AVX Vector2f PABC [4] = { A, B, C };
+    ALIGN_FOR_AVX float    PREF[8] =
+    {
+        - (B.y - A.y) ,
+          (B.x - A.x) ,
+        - (C.y - B.y) ,
+          (C.x - B.x) ,
+        - (A.y - C.y) ,
+          (A.x - C.x) ,
+    };
+    ALIGN_FOR_AVX float SUFF[8] =
+    {
+        - PREF[0] * PABC[0].x ,
+        - PREF[1] * PABC[0].y ,
+        - PREF[2] * PABC[1].x ,
+        - PREF[3] * PABC[1].y ,
+        - PREF[4] * PABC[2].x ,
+        - PREF[5] * PABC[2].y ,
+    };
+    ALIGN_FOR_AVX float PS[8] = {};
+
+    //PABC
+
     // loop through all pixels in rectangle
     for (int y = min.y; y <= max.y; ++y)
     {
@@ -285,13 +456,24 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
         {
             const Vector2f P(x+0.5f, y+0.5f);
             // calculate value of edge function for each line
-            const float ABP = EdgeFunction(A, B, P);
+
+            PS[0] = P.x;
+            PS[1] = P.y;
+            PS[2] = P.x;
+            PS[3] = P.y;
+            PS[4] = P.x;
+            PS[5] = P.y;
+
+            m_pSelectedMath->MulAddVec8( PREF , PS , SUFF , PS );
+
+            const float ABP = PS[0] + PS[1];
+            const float BCP = PS[2] + PS[3];
+            const float CAP = PS[4] + PS[5];
+
             if (ABP < 0)
                 continue;
-            const float BCP = EdgeFunction(B, C, P);
             if (BCP < 0)
                 continue;
-            const float CAP = EdgeFunction(C, A, P);
             if (CAP < 0)
                 continue;
             // if pixel is inside triangle, draw it
@@ -449,6 +631,7 @@ void SoftwareRenderer::DrawLine(Vector2f A, Vector2f B, const Vector4f& color, i
 Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
 {
     Vector4f sampledPixel = m_Texture->Sample(vertex.m_UV);
+    return sampledPixel * vertex.m_Color;
 
     Vector3f pointToLightDir = (m_LightPosition- vertex.m_WorldPosition).Normalized();
 

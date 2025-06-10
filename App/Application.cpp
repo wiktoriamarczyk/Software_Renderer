@@ -378,7 +378,7 @@ int Application::Run()
         ImGui::SliderFloat("Shininess Power", &m_DrawSettings.shininessPower, 1.f , 10.0f );
         ImGui::SliderFloat3("Rotation", &m_DrawSettings.modelRotation.x, 0, FULL_ANGLE);
         ImGui::SliderFloat3("Translation", &m_DrawSettings.modelTranslation.x, -15, 15);
-        ImGui::SliderFloat("Scale", &m_DrawSettings.modelScale, 0, 5);
+        ImGui::SliderFloat("Scale", &m_DrawSettings.modelScale, 0, 6);
         ImGui::SliderFloat3("Light Position", &m_DrawSettings.lightPosition.x, -20, 20);
         ImGui::SliderInt("Thread Count", &m_DrawSettings.threadsCount, 1, MAX_THREADS_COUNT);
         ImGui::Combo("Renderer Type", &m_DrawSettings.rendererType, "Software\0Hardware\0");
@@ -455,6 +455,7 @@ int Application::Run()
         ImGui::Begin("FPS", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::SetWindowPos(ImVec2(0, 0));
         ImGui::Text("FPS: %d", fps);
+        ImGui::Text("Build: %s" , sizeof(void*) == 8 ? "x64" : "x86");
         ImGui::End();
 
         DrawRenderingStats();

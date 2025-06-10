@@ -16,7 +16,10 @@ public:
     void InterpolateAllButZ(const Vector3f& baricentric, TransformedVertex& out);
     void Interpolate(const IMath& math, const Vector3f& baricentric, TransformedVertex& out);
 
-private:
+    template< typename MathT >
+    void InterpolateT(const Vector3f& baricentric, TransformedVertex& out);
+
+//private:
     struct ALIGN_FOR_AVX InterpolatedSource
     {
         Vector4f    m_ColorOverW;
@@ -26,6 +29,9 @@ private:
         float       m_OneOverW;
         float       _unused[2]; // Padding to ensure 16-byte alignment for SIMD operations
         float       m_ScreenPositionZ;
+
+        float*       Data()      { return m_ColorOverW.Data(); }
+        const float* Data()const { return m_ColorOverW.Data(); }
     };
 
     InterpolatedSource m_A;
@@ -139,4 +145,32 @@ inline void VertexInterpolator::Interpolate(const IMath& math, const Vector3f& b
     //out.m_WorldPosition.x = out.m_WorldPosition.x * w;
     //out.m_WorldPosition.y = out.m_WorldPosition.y * w;
     //out.m_WorldPosition.z = out.m_WorldPosition.z * w;
+}
+
+
+template< typename MathT >
+__forceinline void VertexInterpolator::InterpolateT(const Vector3f& baricentricCoordinates, TransformedVertex& out)
+{
+    InterpolatedSource tmp;
+    MathT math;
+
+    float* AData  = m_A.Data();
+    float* BData  = m_B.Data();
+    float* CData  = m_C.Data();
+    float* pTmp   = tmp.Data();
+
+    math.MultiplyVec8ByScalar(AData    , baricentricCoordinates.x, pTmp     );
+    math.MulVec8ByScalarAdd  (BData    , baricentricCoordinates.y, pTmp     , pTmp );
+    math.MulVec8ByScalarAdd  (CData    , baricentricCoordinates.z, pTmp     , pTmp );
+
+    math.MultiplyVec8ByScalar(AData + 8, baricentricCoordinates.x, pTmp + 8 );
+    math.MulVec8ByScalarAdd  (BData + 8, baricentricCoordinates.y, pTmp + 8 , pTmp + 8 );
+    math.MulVec8ByScalarAdd  (CData + 8, baricentricCoordinates.z, pTmp + 8 , pTmp + 8 );
+
+    float w = 1.0f / tmp.m_OneOverW;
+
+    math.MultiplyVec8ByScalar(pTmp    , w, out.Data()    );
+    math.MultiplyVec4ByScalar(pTmp + 8, w, out.Data() + 8);
+
+    out.m_ScreenPosition.z = tmp.m_ScreenPositionZ;
 }

@@ -39,6 +39,9 @@ public:
     Vector2f xy()const;
     Vector3f xyz()const;
 
+    float* Data() { return &x; }
+    const float* Data() const { return &x; }
+
     static uint32_t ToARGB(const Vector4f& color);
     static Vector4f FromARGB(uint32_t color);
 

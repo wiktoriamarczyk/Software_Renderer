@@ -49,7 +49,11 @@ public:
     void SetZTest(bool zTest)override;
     void SetMathType(eMathType mathType)override;
 private:
+    template< typename MathT >
+    void DrawFilledTriangles(const TransformedVertex* pVerts, size_t Count, const Vector4f& color, int minY, int maxY, DrawStats& stats);
+    template< typename MathT >
     void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
+    void DrawFilledTriangleWTF(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
     void DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int maxY);
     void DrawTriangleBoundingBox(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int maxY);
     void DrawLine(const TransformedVertex& A, const TransformedVertex& B, const Vector4f& color, int MinY, int maxY);

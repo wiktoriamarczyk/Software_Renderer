@@ -60,7 +60,13 @@ public:
     virtual void MulVec8( const float* a, const float* b , float* pOut )const=0;
     virtual void MulAddVec4( const float* a, const float* b , const float* c , float* pOut )const=0;
     virtual void MulAddVec8( const float* a, const float* b , const float* c , float* pOut )const=0;
+    virtual void PairAddVec4( const float* a, const float* b , float* pOut )const = 0;
+    virtual void PairAddVec8( const float* a, const float* b , float* pOut )const = 0;
+    virtual void Interleave4( float a, float b , float* pOut )const = 0;
+    virtual void Interleave8( float a, float b , float* pOut )const = 0;
     virtual void log()const = 0;
+
+    virtual void EdgeFunction( const Vector2f& P , float* TBL0 , float* TBL1 , float* pResult )const = 0;
 };
 
 class MathCPU final : public IMath
@@ -78,7 +84,13 @@ public:
     virtual void MulVec8( const float* a, const float* b , float* pOut )const override;
     virtual void MulAddVec4( const float* a, const float* b , const float* c , float* pOut )const override;
     virtual void MulAddVec8( const float* a, const float* b , const float* c , float* pOut )const override;
+    virtual void PairAddVec4( const float* a, const float* b , float* pOut )const override;
+    virtual void PairAddVec8( const float* a, const float* b , float* pOut )const override;
+    virtual void Interleave4( float a, float b , float* pOut )const override;
+    virtual void Interleave8( float a, float b , float* pOut )const override;
     virtual void log()const override { printf("MathCPU\n"); }
+
+    virtual void EdgeFunction( const Vector2f& P , float* TBL0 , float* TBL1 , float* pResult )const override;
 };
 
 class MathSSE final : public IMath
@@ -96,7 +108,13 @@ public:
     virtual void MulVec8( const float* a, const float* b , float* pOut )const override;
     virtual void MulAddVec4( const float* a, const float* b , const float* c , float* pOut )const override;
     virtual void MulAddVec8( const float* a, const float* b , const float* c , float* pOut )const override;
+    virtual void PairAddVec4( const float* a, const float* b , float* pOut )const override;
+    virtual void PairAddVec8( const float* a, const float* b , float* pOut )const override;
+    virtual void Interleave4( float a, float b , float* pOut )const override;
+    virtual void Interleave8( float a, float b , float* pOut )const override;
     virtual void log()const override { printf("MathSSE\n"); }
+
+    virtual void EdgeFunction( const Vector2f& P , float* TBL0 , float* TBL1 , float* pResult )const override;
 };
 
 class MathAVX final : public IMath
@@ -114,7 +132,13 @@ public:
     virtual void MulVec8( const float* a, const float* b , float* pOut )const override;
     virtual void MulAddVec4( const float* a, const float* b , const float* c , float* pOut )const override;
     virtual void MulAddVec8( const float* a, const float* b , const float* c , float* pOut )const override;
+    virtual void PairAddVec4( const float* a, const float* b , float* pOut )const override;
+    virtual void PairAddVec8( const float* a, const float* b , float* pOut )const override;
+    virtual void Interleave4( float a, float b , float* pOut )const override;
+    virtual void Interleave8( float a, float b , float* pOut )const override;
     virtual void log()const override { printf("MathAVX\n"); }
+
+    virtual void EdgeFunction( const Vector2f& P , float* TBL0 , float* TBL1 , float* pResult )const override;
 };
 
 
@@ -208,6 +232,69 @@ inline void MathCPU::MulVec8ByScalarAdd( const float* a, float scalar , const fl
     MulVec4ByScalarAdd( a + 4 , scalar , c + 4 , pOut + 4 );
 }
 
+inline void MathCPU::PairAddVec4( const float* a, const float* b , float* pOut )const
+{
+    pOut[0] = a[0] + a[1];
+    pOut[1] = a[2] + a[3];
+    pOut[2] = b[0] + b[1];
+    pOut[3] = b[2] + b[3];
+}
+
+inline void MathCPU::PairAddVec8( const float* a, const float* b , float* pOut )const
+{
+    pOut[0] = a[0] + a[1];
+    pOut[1] = a[2] + a[3];
+    pOut[2] = a[4] + a[5];
+    pOut[3] = a[6] + a[7];
+    pOut[4] = b[0] + b[1];
+    pOut[5] = b[2] + b[3];
+    pOut[6] = b[4] + b[5];
+    pOut[7] = b[6] + b[7];
+}
+
+inline void MathCPU::Interleave4( float a, float b , float* pOut )const
+{
+    pOut[0] = a;
+    pOut[1] = b;
+    pOut[2] = a;
+    pOut[3] = b;
+}
+
+inline void MathCPU::Interleave8( float a, float b , float* pOut )const
+{
+    pOut[0] = a;
+    pOut[1] = b;
+    pOut[2] = a;
+    pOut[3] = b;
+    pOut[4] = a;
+    pOut[5] = b;
+    pOut[6] = a;
+    pOut[7] = b;
+}
+
+inline void MathCPU::EdgeFunction( const Vector2f& P , float* TBL0 , float* TBL1 , float* pResult )const
+{
+    float PS[8];
+
+    Interleave8( P.x , P.y , PS );
+    MulAddVec8( TBL0 , PS , TBL1 , PS );
+    PairAddVec4( PS , PS + 4 , pResult );
+
+    //PS[0] = ( TBL0[0] * P.x ) + TBL1[0];
+    //PS[1] = ( TBL0[1] * P.y ) + TBL1[1];
+    //PS[2] = ( TBL0[2] * P.x ) + TBL1[2];
+    //PS[3] = ( TBL0[3] * P.y ) + TBL1[3];
+    //PS[4] = ( TBL0[4] * P.x ) + TBL1[4];
+    //PS[5] = ( TBL0[5] * P.y ) + TBL1[5];
+    //PS[6] = ( TBL0[6] * P.x ) + TBL1[6];
+    //PS[7] = ( TBL0[7] * P.y ) + TBL1[7];
+
+    //pResult[0] = PS[0+0] + PS[0+1];
+    //pResult[1] = PS[0+2] + PS[0+3];
+    //pResult[2] = PS[4+0] + PS[4+1];
+    //pResult[3] = PS[4+2] + PS[4+3];
+}
+
 //****************************************************************
 //                          Math SSE
 //****************************************************************
@@ -285,12 +372,6 @@ inline void MathSSE::MulAddVec8( const float* a, const float* b , const float* c
 
 inline void MathSSE::MulVec4ByScalarAdd( const float* a, float b , const float* c , float* pOut )const
 {
-    //__m128 a1 = _mm_load_ps (a);         // _mm_loadu_ps (float const* mem_addr)
-    //__m128 b1 = _mm_set1_ps (b);         // _mm_loadu_ps (float const* mem_addr)
-    //__m128 c1 = _mm_load_ps (c);         // _mm_loadu_ps (float const* mem_addr)
-    //__m128 r  = _mm_fmadd_ps(a1, b1, c1);// _mm_fmadd_ps (__m128 a, __m128 b)
-    //            _mm_store_ps(pOut, r);   // _mm_storeu_ps (float* mem_addr, __m128 a)
-
     __m128 a1 = _mm_load_ps (a);         // _mm_loadu_ps (float const* mem_addr)
     __m128 b1 = _mm_set1_ps (b);         // _mm_loadu_ps (float const* mem_addr)
     __m128 c1 = _mm_load_ps (c);         // _mm_loadu_ps (float const* mem_addr)
@@ -301,14 +382,62 @@ inline void MathSSE::MulVec4ByScalarAdd( const float* a, float b , const float* 
 
 inline void MathSSE::MulVec8ByScalarAdd( const float* a, float b , const float* c , float* pOut )const
 {
-    //__m256 a1 = _mm256_load_ps (a);         // _mm_loadu_ps (float const* mem_addr)
-    //__m256 b1 = _mm256_set1_ps (b);         // _mm_loadu_ps (float const* mem_addr)
-    //__m256 c1 = _mm256_load_ps (c);         // _mm_loadu_ps (float const* mem_addr)
-    //__m256 r  = _mm256_fmadd_ps(a1, b1, c1);// _mm_add_ps (__m128 a, __m128 b)
-    //           _mm256_store_ps(pOut, r);    // _mm_storeu_ps (float* mem_addr, __m128 a)
-
     MulVec4ByScalarAdd( a + 0, b, c + 0, pOut + 0 );
     MulVec4ByScalarAdd( a + 4, b, c + 4, pOut + 4 );
+}
+
+inline void MathSSE::PairAddVec4( const float* a, const float* b , float* pOut )const
+{
+    __m128 a1 = _mm_load_ps (a);         // _mm_load_ps (float const* mem_addr)
+    __m128 b1 = _mm_load_ps (b);         // _mm_load_ps (float const* mem_addr)
+    __m128 c  = _mm_hadd_ps (a1, b1);    // _mm_hadd_ps (__m128 a, __m128 b)
+                _mm_store_ps(pOut, c);   // _mm_store_ps (float* mem_addr, __m128 a)
+}
+
+inline void MathSSE::PairAddVec8( const float* a, const float* b , float* pOut )const
+{
+    PairAddVec4(a + 0, b + 0, pOut + 0);
+    PairAddVec4(a + 4, b + 4, pOut + 4);
+}
+
+inline void MathSSE::Interleave4( float a, float b , float* pOut )const
+{
+    __m128 a1 = _mm_set1_ps (a);
+    __m128 b1 = _mm_set1_ps (b);
+    __m128 r1 = _mm_blend_ps( a1 , b1 , 0xA );
+                _mm_store_ps(pOut, r1);
+}
+
+inline void MathSSE::Interleave8( float a, float b , float* pOut )const
+{
+    __m128 a1 = _mm_set1_ps (a);
+    __m128 b1 = _mm_set1_ps (b);
+    reinterpret_cast<__m128*>(pOut)[0] = _mm_blend_ps( a1 , b1 , 0xA );
+    reinterpret_cast<__m128*>(pOut)[1] = _mm_blend_ps( a1 , b1 , 0xA );
+}
+
+inline void MathSSE::EdgeFunction( const Vector2f& P , float* TBL0 , float* TBL1 , float* pResult )const
+{
+    // Interleave8( P.x , P.y , Arg1 );
+    // MulAddVec8( Arg0 , Arg1 , Arg2 , Arg1 );
+    // PairAddVec4( Arg1 , Arg1 + 4 , &EdgeResult.ABP );
+
+    //__m128 a1 = _mm_set1_ps (P.x);              //  x ->  x , x , x , x
+    //__m128 b1 = _mm_set1_ps (P.y);              //  y ->  y , y , y , y
+    //__m128 PS = _mm_blend_ps( a1 , b1 , 0xA );  // PS ->  x , y , x , y
+
+    __m128 PS = _mm_set_ps ( P.y , P.x , P.y , P.x ); // PS ->  x , y , x , y
+    __m128 a1 = _mm_fmadd_ps( reinterpret_cast<__m128*>(TBL0)[0] , PS , reinterpret_cast<__m128*>(TBL1)[0] ); // TBL0[0] * x + TBL1[0]
+                                                                                                              // TBL0[1] * y + TBL1[1]
+                                                                                                              // TBL0[2] * x + TBL1[2]
+                                                                                                              // TBL0[3] * y + TBL1[3]
+
+    __m128 b1 = _mm_fmadd_ps( reinterpret_cast<__m128*>(TBL0)[1] , PS , reinterpret_cast<__m128*>(TBL1)[1] ); // TBL0[4] * x + TBL1[4]
+                                                                                                              // TBL0[5] * y + TBL1[5]
+                                                                                                              // TBL0[6] * x + TBL1[6]
+                                                                                                              // TBL0[7] * y + TBL1[7]
+
+    reinterpret_cast<__m128*>(pResult)[0] = _mm_hadd_ps( a1 , b1 );
 }
 
 //****************************************************************
@@ -413,6 +542,56 @@ inline void MathAVX::MulVec8ByScalarAdd( const float* a, float b , const float* 
     __m256 c1 = _mm256_load_ps (c);         // _mm_loadu_ps (float const* mem_addr)
     __m256 r  = _mm256_fmadd_ps(a1, b1, c1);// _mm_add_ps (__m128 a, __m128 b)
                _mm256_store_ps(pOut, r);    // _mm_storeu_ps (float* mem_addr, __m128 a)
+}
+
+inline void MathAVX::PairAddVec4( const float* a, const float* b , float* pOut )const
+{
+    __m128 a1 = _mm_load_ps (a);         // _mm_load_ps (float const* mem_addr)
+    __m128 b1 = _mm_load_ps (b);         // _mm_load_ps (float const* mem_addr)
+    __m128 c  = _mm_hadd_ps (a1, b1);    // _mm_hadd_ps (__m128 a, __m128 b)
+                _mm_store_ps(pOut, c);   // _mm_store_ps (float* mem_addr, __m128 a)
+}
+
+inline void MathAVX::PairAddVec8( const float* a, const float* b , float* pOut )const
+{
+    __m256 a1 = _mm256_load_ps (a);         // _mm_load_ps (float const* mem_addr)
+    __m256 b1 = _mm256_load_ps (b);         // _mm_load_ps (float const* mem_addr)
+    __m256 c  = _mm256_hadd_ps (a1, b1);    // _mm_hadd_ps (__m128 a, __m128 b)
+                _mm256_store_ps(pOut, c);   // _mm_store_ps (float* mem_addr, __m128 a)
+}
+
+inline void MathAVX::Interleave4( float a, float b , float* pOut )const
+{
+    __m128 a1 = _mm_set1_ps (a);
+    __m128 b1 = _mm_set1_ps (b);
+    __m128 r1 = _mm_blend_ps( a1 , b1 , 0xA );
+                _mm_store_ps(pOut, r1);
+}
+
+inline void MathAVX::Interleave8( float a, float b , float* pOut )const
+{
+    __m256 a1 = _mm256_set1_ps (a);
+    __m256 b1 = _mm256_set1_ps (b);
+    __m256 r1 = _mm256_blend_ps( a1 , b1 , 0xAA );
+                _mm256_store_ps(pOut, r1);
+}
+
+inline void MathAVX::EdgeFunction( const Vector2f& P , float* TBL0 , float* TBL1 , float* pResult )const
+{
+    __m256 a1 = _mm256_set1_ps (P.x);              //  x ->  x , x , x , x , x , x , x , x
+    __m256 b1 = _mm256_set1_ps (P.y);              //  y ->  y , y , y , y , y , y , y , y
+    __m256 PS = _mm256_blend_ps( a1 , b1 , 0xAA ); // PS ->  x , y , x , y , x , y , x , y
+
+    PS = _mm256_fmadd_ps( reinterpret_cast<__m256*>(TBL0)[0] , PS , reinterpret_cast<__m256*>(TBL1)[0] ); // TBL0[0] * x + TBL1[0]
+                                                                                                          // TBL0[1] * y + TBL1[1]
+                                                                                                          // TBL0[2] * x + TBL1[2]
+                                                                                                          // TBL0[3] * y + TBL1[3]
+                                                                                                          // TBL0[4] * x + TBL1[4]
+                                                                                                          // TBL0[5] * y + TBL1[5]
+                                                                                                          // TBL0[6] * x + TBL1[6]
+                                                                                                          // TBL0[7] * y + TBL1[7]
+
+    reinterpret_cast<__m128*>(pResult)[0] = _mm_hadd_ps( *reinterpret_cast<__m128*>(PS.m256_f32+0) , *reinterpret_cast<__m128*>(PS.m256_f32+4) );
 }
 
 class Plane

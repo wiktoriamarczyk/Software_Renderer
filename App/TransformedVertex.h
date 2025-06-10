@@ -16,6 +16,9 @@ struct ALIGN_FOR_AVX TransformedVertex
     Vector3f m_WorldPosition;   // 9-11
     Vector4f m_ScreenPosition;
 
+    float*       Data()      { return m_Color.Data(); }
+    const float* Data()const { return m_Color.Data(); }
+
     TransformedVertex operator*(float value)const
     {
         TransformedVertex result;

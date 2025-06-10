@@ -12,8 +12,8 @@
 struct DrawSettings
 {
     Vector3f    modelRotation;
-    Vector3f    modelTranslation;
-    float       modelScale = 1.0;
+    Vector3f    modelTranslation = Vector3f(0, 0, 0);//.75f);
+    float       modelScale = 5.5;
     Vector4f    wireFrameColor = Vector4f(1, 0, 1, 1);
     Vector3f    diffuseColor = Vector3f(1, 1, 1);
     Vector3f    ambientColor = Vector3f(1, 1, 1);

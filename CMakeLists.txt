@@ -65,7 +65,16 @@ SET(APP_SRC_FILES_LIST
 # Find SFML library (set proper path and run find_package)
 #*****************************************************
 
-SET(SFML_DIR "./Dependencies/SFML-2.6.0/lib/cmake/SFML" )
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    # 64-bit
+    set(SFML_DIR "./Dependencies/SFML-2.6.0/lib/cmake/SFML")
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    # 32-bit
+    set(SFML_DIR "./Dependencies/SFML-2.6.0-32/lib/cmake/SFML")
+else()
+    message(FATAL_ERROR "Nieznana architektura (CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P})")
+endif()
+
 set(SFML_STATIC_LIBRARIES TRUE)
 
 add_definitions(-DTRACY_ENABLE)
@@ -111,7 +120,11 @@ target_link_libraries(SoftwareRenderer sfml-graphics)
 # Specify which assimp libraries to link with exe
 #*****************************************************
 
-target_link_libraries(SoftwareRenderer ${CMAKE_SOURCE_DIR}/Dependencies/assimp/lib/assimp-vc143-mt.lib )
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    target_link_libraries(SoftwareRenderer ${CMAKE_SOURCE_DIR}/Dependencies/assimp/libx64/assimp-vc143-mt.lib )
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    target_link_libraries(SoftwareRenderer ${CMAKE_SOURCE_DIR}/Dependencies/assimp/libx32/assimp-vc143-mt.lib )
+endif()
 
 #*****************************************************
 # Set working directory for exe
