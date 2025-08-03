@@ -6,6 +6,14 @@
 
 #include "SimpleThreadPool.h"
 
+thread_local int32_t g_ThreadID = -1;
+
+
+int32_t SimpleThreadPool::GetThreadID()
+{
+    return g_ThreadID;
+}
+
 SimpleThreadPool::SimpleThreadPool()
     : m_NewTaskSemaphore(0)
 {
@@ -60,6 +68,22 @@ void SimpleThreadPool::SetThreadCount(uint8_t count)
 
 void SimpleThreadPool::Worker()
 {
+    unique_ptr<int> m_ID;
+    {
+        std::unique_lock lock(m_IDsCS);
+        if( m_FreeThreadIds.empty() )
+        {
+            m_ID = make_unique<int>( m_ThreadCount );
+        }
+        else
+        {
+            m_ID = std::move( m_FreeThreadIds.back() );
+            m_FreeThreadIds.pop_back();
+        }
+
+        g_ThreadID = *m_ID;
+    }
+
     m_ThreadCount++;
     while (true)
     {
@@ -73,6 +97,12 @@ void SimpleThreadPool::Worker()
 
         Task->m_Func();
         Task->m_FinishPromise.set_value();
+    }
+
+    {
+        g_ThreadID = -1;
+        std::unique_lock lock(m_IDsCS);
+        m_FreeThreadIds.push_back(std::move(m_ID));
     }
     m_ThreadCount--;
 }

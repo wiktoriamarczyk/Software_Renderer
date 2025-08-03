@@ -11,27 +11,59 @@
 class VertexInterpolator
 {
 public:
+    VertexInterpolator( std::nullptr_t ){};
     VertexInterpolator(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C);
+    VertexInterpolator(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& Color);
     void InterpolateZ(const Vector3f& baricentric, TransformedVertex& out);
     void InterpolateAllButZ(const Vector3f& baricentric, TransformedVertex& out);
     void Interpolate(const IMath& math, const Vector3f& baricentric, TransformedVertex& out);
 
     template< typename MathT >
-    void InterpolateT(const Vector3f& baricentric, TransformedVertex& out);
+    void InterpolateT(Vector3f baricentric, TransformedVertex& out)const;
 
+    template< eSimdType Type >
+    void InterpolateZ(const Vector3f256<Type>& baricentric, SimdTransformedVertex<Type>& out)const;
+    template< eSimdType Type >
+    void InterpolateAllButZ(const Vector3f256<Type>& baricentric, SimdTransformedVertex<Type>& out)const;
 //private:
     struct ALIGN_FOR_AVX InterpolatedSource
     {
-        Vector4f    m_ColorOverW;
         Vector3f    m_NormalOverW;
+        Vector4f    m_ColorOverW;
         Vector2f    m_UVOverW;
         Vector3f    m_WorldPositionOverW;
         float       m_OneOverW;
         float       _unused[2]; // Padding to ensure 16-byte alignment for SIMD operations
         float       m_ScreenPositionZ;
 
-        float*       Data()      { return m_ColorOverW.Data(); }
-        const float* Data()const { return m_ColorOverW.Data(); }
+        float*       Data()      { return m_NormalOverW.data(); }
+        const float* Data()const { return m_NormalOverW.data(); }
+    };
+
+    InterpolatedSource m_A;
+    InterpolatedSource m_B;
+    InterpolatedSource m_C;
+
+};
+
+template< eSimdType Type >
+struct SimdVertexInterpolator
+{
+    void InterpolateZ(const Vector3f256<Type>& baricentric, SimdTransformedVertex<Type>& out)const;
+    void InterpolateAllButZ(const Vector3f256<Type>& baricentric, SimdTransformedVertex<Type>& out)const;
+
+    using Vec2 = Vector2< f256<Type> >;
+    using Vec3 = Vector3< f256<Type> >;
+    using Vec4 = Vector4< f256<Type> >;
+
+    struct ALIGN_FOR_AVX InterpolatedSource
+    {
+        Vec3        m_NormalOverW;
+        Vec4        m_ColorOverW;
+        Vec2        m_UVOverW;
+        Vec3        m_WorldPositionOverW;
+        f256<Type>  m_OneOverW;
+        f256<Type>  m_ScreenPositionZ;
     };
 
     InterpolatedSource m_A;
@@ -46,14 +78,22 @@ inline void VertexInterpolator::InterpolateZ(const Vector3f& baricentric, Transf
 
 inline void VertexInterpolator::InterpolateAllButZ(const Vector3f& baricentric, TransformedVertex& out)
 {
+    // 3 multiplications and 2 additions + ....
     float oneOverW = baricentric.x * m_A.m_OneOverW + baricentric.y * m_B.m_OneOverW + baricentric.z * m_C.m_OneOverW;
 
+    // 1 division
     float w = 1.0f / oneOverW;
 
-    out.m_Color           = (baricentric.x * m_A.m_ColorOverW + baricentric.y * m_B.m_ColorOverW + baricentric.z * m_C.m_ColorOverW) * w;
-    out.m_Normal          = (baricentric.x * m_A.m_NormalOverW + baricentric.y * m_B.m_NormalOverW + baricentric.z * m_C.m_NormalOverW) * w;
-    out.m_UV              = (baricentric.x * m_A.m_UVOverW + baricentric.y * m_B.m_UVOverW + baricentric.z * m_C.m_UVOverW) * w;
-    out.m_WorldPosition   = (baricentric.x * m_A.m_WorldPositionOverW + baricentric.y * m_B.m_WorldPositionOverW + baricentric.z * m_C.m_WorldPositionOverW) * w;
+    //  4*( 3 + 2 ) = 20 multiplications + 6 additions
+    //  3*( 3 + 2 ) = 15 multiplications + 6 additions
+    //  2*( 3 + 2 ) = 10 multiplications + 6 additions
+    //  3*( 3 + 2 ) = 15 multiplications + 6 additions
+    out.m_Normal          = (baricentric.x * m_A.m_NormalOverW          + baricentric.y * m_B.m_NormalOverW         + baricentric.z * m_C.m_NormalOverW) * w;
+    out.m_Color           = (baricentric.x * m_A.m_ColorOverW           + baricentric.y * m_B.m_ColorOverW          + baricentric.z * m_C.m_ColorOverW) * w;
+    out.m_UV              = (baricentric.x * m_A.m_UVOverW              + baricentric.y * m_B.m_UVOverW             + baricentric.z * m_C.m_UVOverW) * w;
+    out.m_WorldPosition   = (baricentric.x * m_A.m_WorldPositionOverW   + baricentric.y * m_B.m_WorldPositionOverW  + baricentric.z * m_C.m_WorldPositionOverW) * w;
+
+    // all sums up to = 63 multiplications + 26 additions and one division
 }
 
 inline void VertexInterpolator::Interpolate(const IMath& math, const Vector3f& baricentric, TransformedVertex& out)
@@ -149,15 +189,15 @@ inline void VertexInterpolator::Interpolate(const IMath& math, const Vector3f& b
 
 
 template< typename MathT >
-__forceinline void VertexInterpolator::InterpolateT(const Vector3f& baricentricCoordinates, TransformedVertex& out)
+__forceinline void VertexInterpolator::InterpolateT(Vector3f baricentricCoordinates, TransformedVertex& out)const
 {
-    InterpolatedSource tmp;
     MathT math;
+    InterpolatedSource tmp;
 
-    float* AData  = m_A.Data();
-    float* BData  = m_B.Data();
-    float* CData  = m_C.Data();
-    float* pTmp   = tmp.Data();
+    const float* AData  = m_A.Data();
+    const float* BData  = m_B.Data();
+    const float* CData  = m_C.Data();
+          float* pTmp   = tmp.Data();
 
     math.MultiplyVec8ByScalar(AData    , baricentricCoordinates.x, pTmp     );
     math.MulVec8ByScalarAdd  (BData    , baricentricCoordinates.y, pTmp     , pTmp );
@@ -173,4 +213,129 @@ __forceinline void VertexInterpolator::InterpolateT(const Vector3f& baricentricC
     math.MultiplyVec4ByScalar(pTmp + 8, w, out.Data() + 8);
 
     out.m_ScreenPosition.z = tmp.m_ScreenPositionZ;
+}
+
+template< eSimdType Type >
+inline void VertexInterpolator::InterpolateZ(const Vector3f256<Type>& baricentricCoordinates, SimdTransformedVertex<Type>& out)const
+{
+    //__m128 bx = _mm_load_ps(baricentricCoordinates.x);
+    //__m128 by = _mm_load_ps(baricentricCoordinates.y);
+    //__m128 bz = _mm_load_ps(baricentricCoordinates.z);
+
+    //__m128 tmpA = _mm_set1_ps(m_A.m_ScreenPositionZ);
+    //__m128 tmpB = _mm_set1_ps(m_B.m_ScreenPositionZ);
+    //__m128 tmpC = _mm_set1_ps(m_C.m_ScreenPositionZ);
+
+    //__m128 tmpA = _mm_mul_ps(tmpA, bx);
+    //__m128 tmpB = _mm_mul_ps(tmpB, by);
+    //__m128 tmpC = _mm_mul_ps(tmpC, bz);
+
+    //__m128 z = _mm_add_ps(tmpA,tmpB);
+    //       z = _mm_add_ps(z, tmpC);
+
+    //_mm_store_ps(out.m_ScreenPosition.z, z);
+
+    Vector3f256<Type> tmp(m_A.m_ScreenPositionZ,m_B.m_ScreenPositionZ,m_C.m_ScreenPositionZ);
+
+    tmp *= baricentricCoordinates;
+
+    f256<Type> z = tmp.x + tmp.y;
+               z += tmp.z;
+
+    out.m_ScreenPosition.z = z;
+}
+
+
+template< eSimdType Type >
+__forceinline void VertexInterpolator::InterpolateAllButZ(const Vector3f256<Type>& baricentricCoordinates, SimdTransformedVertex<Type>& out)const
+{
+    //const __m128 bx = _mm_load_ps(baricentricCoordinates.x);
+    //const __m128 by = _mm_load_ps(baricentricCoordinates.y);
+    //const __m128 bz = _mm_load_ps(baricentricCoordinates.z);
+
+    //__m128 tmpA = _mm_set1_ps(m_A.m_OneOverW);
+    //__m128 tmpB = _mm_set1_ps(m_B.m_OneOverW);
+    //__m128 tmpC = _mm_set1_ps(m_C.m_OneOverW);
+
+    //tmpA = _mm_mul_ps(tmpA, bx);
+    //tmpB = _mm_mul_ps(tmpB, by);
+    //tmpC = _mm_mul_ps(tmpC, bz);
+
+    //__m128 w = _mm_add_ps(tmpA,tmpB);
+    //       w = _mm_add_ps(w, tmpC);
+
+    //tmpA = _mm_set1_ps(1.0f);
+
+    //w = _mm_div_ps(tmpA, w);
+
+    //auto interpolate = [&]( float BA , float BB , float BC , float* out ) [[msvc::forceinline]]
+    //{
+    //    tmpA = _mm_set1_ps(BA);
+    //    tmpA = _mm_set1_ps(BB);
+    //    tmpA = _mm_set1_ps(BC);
+
+    //    tmpA = _mm_mul_ps(tmpA, bx);
+    //    tmpB = _mm_mul_ps(tmpB, by);
+    //    tmpC = _mm_mul_ps(tmpC, bz);
+
+    //    __m128 r = _mm_add_ps(tmpA, tmpB);
+    //           r = _mm_add_ps(   r, tmpC);
+    //           r = _mm_mul_ps(   r, w   );
+
+    //           _mm_store_ps(out, r);
+    //};
+    //interpolate( m_A.m_NormalOverW.x , m_B.m_NormalOverW.x , m_C.m_NormalOverW.x , out.m_Normal.x );
+    //interpolate( m_A.m_NormalOverW.y , m_B.m_NormalOverW.y , m_C.m_NormalOverW.y , out.m_Normal.y );
+    //interpolate( m_A.m_NormalOverW.z , m_B.m_NormalOverW.z , m_C.m_NormalOverW.z , out.m_Normal.z );
+
+    //interpolate( m_A.m_ColorOverW.x , m_B.m_ColorOverW.x , m_C.m_ColorOverW.x , out.m_Color.x );
+    //interpolate( m_A.m_ColorOverW.y , m_B.m_ColorOverW.y , m_C.m_ColorOverW.y , out.m_Color.y );
+    //interpolate( m_A.m_ColorOverW.z , m_B.m_ColorOverW.z , m_C.m_ColorOverW.z , out.m_Color.z );
+    //interpolate( m_A.m_ColorOverW.w , m_B.m_ColorOverW.w , m_C.m_ColorOverW.w , out.m_Color.w );
+
+    //interpolate( m_A.m_UVOverW.x    , m_B.m_UVOverW.x    , m_C.m_UVOverW.x    , out.m_UV.x    );
+    //interpolate( m_A.m_UVOverW.y    , m_B.m_UVOverW.y    , m_C.m_UVOverW.y    , out.m_UV.y    );
+
+    //interpolate( m_A.m_WorldPositionOverW.x , m_B.m_WorldPositionOverW.x , m_C.m_WorldPositionOverW.x , out.m_WorldPosition.x );
+    //interpolate( m_A.m_WorldPositionOverW.y , m_B.m_WorldPositionOverW.y , m_C.m_WorldPositionOverW.y , out.m_WorldPosition.y );
+    //interpolate( m_A.m_WorldPositionOverW.z , m_B.m_WorldPositionOverW.z , m_C.m_WorldPositionOverW.z , out.m_WorldPosition.z );
+
+
+    Vector3f256<Type> tmp(m_A.m_OneOverW, m_B.m_OneOverW, m_C.m_OneOverW);
+
+    tmp *= baricentricCoordinates;
+
+    simd w = tmp.x + tmp.y;
+         w+= tmp.z;
+
+    w = f256<Type>(1) / w;
+
+    auto interpolate = [&]( float BA , float BB , float BC , f256<Type>& out ) [[msvc::forceinline]]
+    {
+        Vector3f256<Type> tmp(BA,BB,BC);
+
+        tmp *= baricentricCoordinates;
+
+        simd r = tmp.x + tmp.y;
+             r+= tmp.z;
+             r*= w;
+
+        out = r;
+    };
+
+    interpolate( m_A.m_NormalOverW.x , m_B.m_NormalOverW.x , m_C.m_NormalOverW.x , out.m_Normal.x );
+    interpolate( m_A.m_NormalOverW.y , m_B.m_NormalOverW.y , m_C.m_NormalOverW.y , out.m_Normal.y );
+    interpolate( m_A.m_NormalOverW.z , m_B.m_NormalOverW.z , m_C.m_NormalOverW.z , out.m_Normal.z );
+
+    interpolate( m_A.m_ColorOverW.x , m_B.m_ColorOverW.x , m_C.m_ColorOverW.x , out.m_Color.x );
+    interpolate( m_A.m_ColorOverW.y , m_B.m_ColorOverW.y , m_C.m_ColorOverW.y , out.m_Color.y );
+    interpolate( m_A.m_ColorOverW.z , m_B.m_ColorOverW.z , m_C.m_ColorOverW.z , out.m_Color.z );
+    interpolate( m_A.m_ColorOverW.w , m_B.m_ColorOverW.w , m_C.m_ColorOverW.w , out.m_Color.w );
+
+    interpolate( m_A.m_UVOverW.x    , m_B.m_UVOverW.x    , m_C.m_UVOverW.x    , out.m_UV.x    );
+    interpolate( m_A.m_UVOverW.y    , m_B.m_UVOverW.y    , m_C.m_UVOverW.y    , out.m_UV.y    );
+
+    interpolate( m_A.m_WorldPositionOverW.x , m_B.m_WorldPositionOverW.x , m_C.m_WorldPositionOverW.x , out.m_WorldPosition.x );
+    interpolate( m_A.m_WorldPositionOverW.y , m_B.m_WorldPositionOverW.y , m_C.m_WorldPositionOverW.y , out.m_WorldPosition.y );
+    interpolate( m_A.m_WorldPositionOverW.z , m_B.m_WorldPositionOverW.z , m_C.m_WorldPositionOverW.z , out.m_WorldPosition.z );
 }

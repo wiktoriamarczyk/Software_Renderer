@@ -8,50 +8,85 @@
 #include "Common.h"
 #include "Vector2f.h"
 #include "Vector3f.h"
+#include "Simd.h"
 
 class Matrix4f;
-class Vector2f;
-class Vector3f;
 
-class Vector4f
+template< typename T >
+class Vector4
 {
 public:
-    Vector4f() = default;
-    Vector4f(const Vector3f& v,float w);
-    Vector4f(float x, float y, float z, float w);
+    Vector4() = default;
+    Vector4(const Vector2<T>& v,T z, T w);
+    Vector4(const Vector3<T>& v,T w);
+    Vector4(T x, T y, T z, T w);
+    template< typename U , typename ... A >
+        requires HasConstructFromArray<T,U,A...>
+    Vector4( const U* pArray , const A& ... args )
+        : x{ T::construct_from_array( 0 , pArray , args... ) }
+        , y{ T::construct_from_array( 1 , pArray , args... ) }
+        , z{ T::construct_from_array( 2 , pArray , args... ) }
+        , w{ T::construct_from_array( 3 , pArray , args... ) }
+    {}
 
-    Vector4f operator+(Vector4f other)const;
-    Vector4f operator-(Vector4f other)const;
-    Vector4f operator*(Vector4f other)const;
-    Vector4f operator*(float value)const;
-    Vector4f operator/(float value)const;
+    Vector4<T> operator+(Vector4<T> other)const;
+    Vector4<T> operator-(Vector4<T> other)const;
+    Vector4<T> operator*(Vector4<T> other)const;
+    Vector4<T> operator*(T value)const;
+    Vector4<T> operator+(T value)const;
+    Vector4<T> operator/(T value)const;
 
-    friend Vector4f operator*(float value, const Vector4f& v);
+    friend Vector4<T> operator*(T value, const Vector4& v)
+    {
+        return Vector4(v.x * value, v.y * value, v.z * value, v.w * value);
+    }
 
-    float GetLength()const;
-    float Dot(const Vector4f& other)const;
-    Vector4f& Normalize();
-    Vector4f Normalized()const;
-    Vector4f Transformed(const Matrix4f& m) const;
-    Vector4f CWiseMin(const Vector4f& other)const;
-    Vector4f CWiseMax(const Vector4f& other)const;
+    template< typename U , typename ... A >
+        requires HasLoadFromArray<T,U,A...>
+    void load( const U* pArray , const A& ... args )
+    {
+        x.load_from_array( 0 , pArray , args... );
+        y.load_from_array( 1 , pArray , args... );
+        z.load_from_array( 2 , pArray , args... );
+        w.load_from_array( 3 , pArray , args... );
+    }
 
-    Vector2f xy()const;
-    Vector3f xyz()const;
+    template< typename U , typename ... A >
+        requires HasStoreToArray<T,U,A...>
+    void store( U* pArray , const A& ... args )
+    {
+        x.store_to_array( 0 , pArray , args... );
+        y.store_to_array( 1 , pArray , args... );
+        z.store_to_array( 2 , pArray , args... );
+        w.store_to_array( 3 , pArray , args... );
+    }
 
-    float* Data() { return &x; }
-    const float* Data() const { return &x; }
+    T GetLength()const;
+    T Dot(const Vector4& other)const;
+    Vector4& Normalize();
+    Vector4<T> Normalized()const;
+    Vector4<T> Transformed(const Matrix4f& m) const;
+    Vector4<T> CWiseMin(const Vector4& other)const;
+    Vector4<T> CWiseMax(const Vector4& other)const;
 
-    static uint32_t ToARGB(const Vector4f& color);
-    static Vector4f FromARGB(uint32_t color);
+    Vector2<T> xy()const;
+    Vector3<T> xyz()const;
 
-    float x = 0;
-    float y = 0;
-    float z = 0;
-    float w = 0;
+    T* Data() { return &x; }
+    const T* Data() const { return &x; }
+
+    static uint32_t ToARGB(const Vector4& color);
+    inline uint32_t ToARGB()const{ return ToARGB(*this); }
+    static Vector4<T> FromARGB(uint32_t color);
+
+    T x{};
+    T y{};
+    T z{};
+    T w{};
 };
 
-inline Vector4f::Vector4f(float x, float y, float z, float w)
+template< typename T >
+inline Vector4<T>::Vector4(T x, T y, T z, T w)
 {
     this->x = x;
     this->y = y;
@@ -59,47 +94,136 @@ inline Vector4f::Vector4f(float x, float y, float z, float w)
     this->w = w;
 }
 
-inline Vector4f Vector4f::operator+(Vector4f other)const
+template< typename T >
+inline Vector4<T>::Vector4(const Vector2<T>& v, T z, T w)
 {
-    return Vector4f(x + other.x, y + other.y, z + other.z, w + other.w);
+    this->x = v.x;
+    this->y = v.y;
+    this->z = z;
+    this->w = w;
 }
 
-inline Vector4f Vector4f::operator-(Vector4f other)const
+template< typename T >
+inline Vector4<T>::Vector4(const Vector3<T>& v, T w)
 {
-    return Vector4f(x - other.x, y - other.y, z - other.z, w - other.w);
+    this->x = v.x;
+    this->y = v.y;
+    this->z = v.z;
+    this->w = w;
 }
 
-inline Vector4f Vector4f::operator*(Vector4f other) const
+template< typename T >
+inline Vector4<T> Vector4<T>::operator+(Vector4<T> other)const
 {
-    return Vector4f(x * other.x, y * other.y, z * other.z, w * other.w);
+    return Vector4(x + other.x, y + other.y, z + other.z, w + other.w);
 }
 
-inline Vector4f Vector4f::operator*(float value)const
+template< typename T >
+inline Vector4<T> Vector4<T>::operator-(Vector4<T> other)const
 {
-    return Vector4f(x * value, y * value, z * value, w * value);
+    return Vector4(x - other.x, y - other.y, z - other.z, w - other.w);
 }
 
-inline Vector4f Vector4f::operator/(float value)const
+template< typename T >
+inline Vector4<T> Vector4<T>::operator*(Vector4<T> other) const
 {
-    return Vector4f(x / value, y / value, z / value, w / value);
+    return Vector4(x * other.x, y * other.y, z * other.z, w * other.w);
 }
 
-inline Vector4f operator*(float value, const Vector4f& v)
+template< typename T >
+inline Vector4<T> Vector4<T>::operator*(T value)const
 {
-    return Vector4f(v.x * value, v.y * value, v.z * value, v.w * value);
+    return Vector4(x * value, y * value, z * value, w * value);
 }
 
-inline Vector3f Vector4f::xyz() const
+template< typename T >
+inline Vector4<T> Vector4<T>::operator+(T value)const
 {
-    return Vector3f(x, y, z);
+    return Vector4(x + value, y + value, z + value, w + value);
 }
 
-inline Vector2f Vector4f::xy() const
+template< typename T >
+inline Vector4<T> Vector4<T>::operator/(T value)const
 {
-    return Vector2f(x, y);
+    return Vector4(x / value, y / value, z / value, w / value);
 }
 
-inline uint32_t Vector4f::ToARGB(const Vector4f& color)
+template< typename T >
+inline Vector3<T> Vector4<T>::xyz() const
+{
+    return Vector3(x, y, z);
+}
+
+template< typename T >
+inline Vector2<T> Vector4<T>::xy() const
+{
+    return Vector2(x, y);
+}
+
+template< typename T >
+inline uint32_t Vector4<T>::ToARGB(const Vector4& color)
 {
     return (uint32_t)(color.w * 255) << 24 | (uint32_t)(color.z * 255) << 16 | (uint32_t)(color.y * 255) << 8 | (uint32_t)(color.x * 255);
 }
+
+template< typename T >
+T Vector4<T>::GetLength()const
+{
+    return sqrt(x * x + y * y + z * z + w * w);
+}
+
+template< typename T >
+Vector4<T>& Vector4<T>::Normalize()
+{
+    auto length = GetLength();
+    x = x / length;
+    y = y / length;
+    z = z / length;
+    w = w / length;
+
+    return *this;
+}
+
+template< typename T >
+Vector4<T> Vector4<T>::Normalized()const
+{
+    return Vector4<T>(x / GetLength(), y / GetLength(), z / GetLength(), w / GetLength());
+}
+
+template< typename T >
+T Vector4<T>::Dot(const Vector4<T>& other)const
+{
+    return x * other.x + y * other.y + z * other.z + w * other.w;
+}
+
+
+
+template< typename T >
+Vector4<T> Vector4<T>::CWiseMin(const Vector4<T>& other) const
+{
+    return Vector4<T>(std::min(x, other.x), std::min(y, other.y), std::min(z, other.z), std::min(w, other.w));
+}
+
+template< typename T >
+Vector4<T> Vector4<T>::CWiseMax(const Vector4<T>& other) const
+{
+    return Vector4<T>(std::max(x, other.x), std::max(y, other.y), std::max(z, other.z), std::max(w, other.w));
+}
+
+
+template< typename T >
+Vector4<T> Vector4<T>::FromARGB(uint32_t color)
+{
+    return Vector4((T)(color & 0xFF), (T)((color >> 8) & 0xFF), (T)((color >> 16) & 0xFF), (T)((color >> 24))) * 1.0f / 255.0f;
+}
+
+using Vector4f = Vector4<float>;
+
+template< eSimdType Type = eSimdType::SSE >
+using Vector4f128 = Vector4< f128<Type> >;
+
+template< eSimdType Type = eSimdType::SSE >
+using Vector4f256 = Vector4< f256<Type> >;
+
+using Vector4f128A = Vector4f128<eSimdType::AVX>;
+using Vector4f256A = Vector4f256<eSimdType::AVX>;

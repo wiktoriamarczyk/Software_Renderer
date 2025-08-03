@@ -10,36 +10,36 @@
 
 struct ALIGN_FOR_AVX TransformedVertex
 {
-    Vector4f m_Color;           // 0-3
-    Vector3f m_Normal;          // 4-6
+    Vector3f m_Normal;          // 0-2
+    Vector4f m_Color;           // 3-6
     Vector2f m_UV;              // 7-8
     Vector3f m_WorldPosition;   // 9-11
     Vector4f m_ScreenPosition;
 
-    float*       Data()      { return m_Color.Data(); }
-    const float* Data()const { return m_Color.Data(); }
+    float*       Data()      { return m_Normal.data(); }
+    const float* Data()const { return m_Normal.data(); }
 
     TransformedVertex operator*(float value)const
     {
         TransformedVertex result;
-        result.m_ScreenPosition = m_ScreenPosition * value;
        // result.zValue = zValue * value;
         result.m_Normal = m_Normal * value;
-        result.m_WorldPosition = m_WorldPosition * value;
         result.m_Color = m_Color * value;
         result.m_UV = m_UV * value;
+        result.m_WorldPosition = m_WorldPosition * value;
+        result.m_ScreenPosition = m_ScreenPosition * value;
         return result;
     }
 
     TransformedVertex operator+(const TransformedVertex& vertex)const
     {
         TransformedVertex result;
-        result.m_ScreenPosition = m_ScreenPosition + vertex.m_ScreenPosition;
         //result.zValue = zValue + vertex.zValue;
         result.m_Normal = m_Normal + vertex.m_Normal;
-        result.m_WorldPosition = m_WorldPosition + vertex.m_WorldPosition;
         result.m_Color = m_Color + vertex.m_Color;
         result.m_UV = m_UV + vertex.m_UV;
+        result.m_WorldPosition = m_WorldPosition + vertex.m_WorldPosition;
+        result.m_ScreenPosition = m_ScreenPosition + vertex.m_ScreenPosition;
         return result;
     }
 
@@ -64,3 +64,13 @@ inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f& wor
     m_ScreenPosition.x = (m_ScreenPosition.x + 1) * SCREEN_WIDTH / 2;
     m_ScreenPosition.y = (m_ScreenPosition.y + 1) * SCREEN_HEIGHT / 2;
 }
+
+template< eSimdType Type = eSimdType::AVX >
+struct ALIGN_FOR_AVX SimdTransformedVertex
+{
+    Vector3f256<Type> m_Normal;
+    Vector4f256<Type> m_Color;
+    Vector2f256<Type> m_UV;
+    Vector3f256<Type> m_WorldPosition;
+    Vector4f256<Type> m_ScreenPosition;
+};

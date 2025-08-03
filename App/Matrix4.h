@@ -6,7 +6,7 @@
 
 #pragma once
 #include "Common.h"
-#include "Vector3f.h"
+#include "Vector4f.h"
 
 class Plane;
 
@@ -68,7 +68,8 @@ constexpr Matrix4f Matrix4f::Identity()
     return result;
 }
 
-inline Vector3f Vector3f::Multiplied(const Matrix4f& m) const
+template< typename T >
+inline Vector3<T> Vector3<T>::Multiplied(const Matrix4f& m) const
 {
     return Vector3f(
         (m[0] * x + m[4] * y + m[8] * z + m[12])  ,
@@ -76,20 +77,30 @@ inline Vector3f Vector3f::Multiplied(const Matrix4f& m) const
         (m[2] * x + m[6] * y + m[10] * z + m[14]) );
 }
 
-inline Vector3f Vector3f::Transformed(const Matrix4f& m) const
+template< typename T >
+inline Vector3<T> Vector3<T>::Transformed(const Matrix4f& m) const
 {
     float w = 1.f / (m[3] * x + m[7] * y + m[11] * z + m[15]);
-    return Vector3f(
+    return Vector3<T>(
         (m[0] * x + m[4] * y + m[8] * z + m[12]) * w,
         (m[1] * x + m[5] * y + m[9] * z + m[13]) * w,
         (m[2] * x + m[6] * y + m[10] * z + m[14]) * w);
 }
 
-inline Vector3f Vector3f::TransformedVec(const Matrix4f& m) const
+template< typename T >
+inline Vector3<T> Vector3<T>::TransformedVec(const Matrix4f& m) const
 {
-    return Vector3f(
+    return Vector3<T>(
         m[0] * x + m[4] * y + m[ 8] * z,
         m[1] * x + m[5] * y + m[ 9] * z,
         m[2] * x + m[6] * y + m[10] * z);
 }
 
+template< typename T >
+Vector4<T> Vector4<T>::Transformed(const Matrix4f& m) const
+{
+    return Vector4<T>(m[0] * x + m[4] * y + m[8]  * z + m[12] * w,
+                      m[1] * x + m[5] * y + m[9]  * z + m[13] * w,
+                      m[2] * x + m[6] * y + m[10] * z + m[14] * w,
+                      m[3] * x + m[7] * y + m[11] * z + m[15] * w);
+}

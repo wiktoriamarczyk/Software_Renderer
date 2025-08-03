@@ -230,7 +230,7 @@ bool Application::Initialize()
     // create the window
     m_MainWindow.create(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer", sf::Style::Default, GetSFMLOpenGL4_0_WindowSettings());
     m_MainWindow.setActive(true);
-    m_MainWindow.setFramerateLimit(60);
+    m_MainWindow.setFramerateLimit(0);
 
     // create renderers
     m_Contexts[0].pRenderer = RendererFactory::CreateRenderer(eRendererType::Software, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -261,6 +261,14 @@ bool Application::Initialize()
 
     return true;
 }
+
+extern int g_mode;
+extern int g_selected_tri;
+extern int g_mode2;
+
+extern bool g_showTilesBoundry;
+extern bool g_showTilestype;
+extern bool g_showTriangleBoundry;
 
 int Application::Run()
 {
@@ -327,21 +335,24 @@ int Application::Run()
         auto modelTexture = m_Contexts[m_DrawSettings.rendererType].pModelTexture;
 
         // check all the window's events that were triggered since the last iteration of the loop
-        sf::Event event;
-        while (m_MainWindow.pollEvent(event))
         {
-            ImGui::SFML::ProcessEvent(m_MainWindow, event);
-
-            // "close requested" event: we close the window
-            if (event.type == sf::Event::Closed)
-                m_MainWindow.close();
-
-            if (event.type == sf::Event::KeyPressed)
+            ZoneScopedN("pollEvents");
+            sf::Event event;
+            while (m_MainWindow.pollEvent(event))
             {
-                // space pressed
-                if (event.key.code == sf::Keyboard::Space)
-                    m_DrawSettings.rendererType = (m_DrawSettings.rendererType+1)%2;
-            }
+                ImGui::SFML::ProcessEvent(m_MainWindow, event);
+
+                // "close requested" event: we close the window
+                if (event.type == sf::Event::Closed)
+                    m_MainWindow.close();
+
+                if (event.type == sf::Event::KeyPressed)
+                {
+                    // space pressed
+                    if (event.key.code == sf::Keyboard::Space)
+                        m_DrawSettings.rendererType = (m_DrawSettings.rendererType+1)%2;
+                }
+        }
         }
 
         // load model and texture if user selected them
@@ -372,16 +383,28 @@ int Application::Run()
         // render settings window
         ImGui::Begin("Settings");
 
+        ImGui::SliderInt("Mode", &g_mode , 0 , 3 );
+        ImGui::SliderInt("Mode2", &g_mode2 , 0 , 3 );
+
+        //static float drag_speeed = 0.01f;
+        //if( sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) || sf::Keyboard::isKeyPressed(sf::Keyboard::RShift) )
+        //    drag_speeed = 0.001f;
+
+        float drag_speeed = 0.01f;
+
         ImGui::SliderFloat("Ambient Strength", &m_DrawSettings.ambientStrength, 0, 1);
         ImGui::SliderFloat("Diffuse Strength", &m_DrawSettings.diffuseStrength, 0, 1);
         ImGui::SliderFloat("Specular Strength", &m_DrawSettings.specularStrength, 0, 1);
         ImGui::SliderFloat("Shininess Power", &m_DrawSettings.shininessPower, 1.f , 10.0f );
         ImGui::SliderFloat3("Rotation", &m_DrawSettings.modelRotation.x, 0, FULL_ANGLE);
-        ImGui::SliderFloat3("Translation", &m_DrawSettings.modelTranslation.x, -15, 15);
+        ImGui::DragFloat3("Translation", &m_DrawSettings.modelTranslation.x, drag_speeed , -15, 15);
         ImGui::SliderFloat("Scale", &m_DrawSettings.modelScale, 0, 6);
         ImGui::SliderFloat3("Light Position", &m_DrawSettings.lightPosition.x, -20, 20);
         ImGui::SliderInt("Thread Count", &m_DrawSettings.threadsCount, 1, MAX_THREADS_COUNT);
-        ImGui::Combo("Renderer Type", &m_DrawSettings.rendererType, "Software\0Hardware\0");
+        //ImGui::Combo("Renderer Type", &m_DrawSettings.rendererType, "Software\0Hardware\0");
+        ImGui::SliderInt("Renderer Type", &m_DrawSettings.rendererType , 0 , 1 );
+        ImGui::SliderInt("Renderer Type", &g_selected_tri , 0 , 10 );
+
         ImGui::Checkbox("Wireframe", &m_DrawSettings.drawWireframe);
         ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.colorizeThreads);
         ImGui::SameLine(); ImGui::Checkbox("BBoxes", &m_DrawSettings.drawBBoxes);
@@ -422,32 +445,39 @@ int Application::Run()
         renderer->ClearScreen();
         renderer->SetMathType(static_cast<eMathType>(m_DrawSettings.mathType));
 
-        renderer->BeginFrame();
-
-        Frustum frustum = Frustum::FromMatrix(m_ModelMatrix * m_CameraMatrix * m_ProjectionMatrix);
-
-        // render stuff to screen buffer
-        for (auto& model : m_ModelsData)
         {
-            if (frustum.IsInside(model))
-                renderer->Render(model.vertices);
-        }
+            ZoneScopedN("Frame");
+            renderer->BeginFrame();
 
-        renderer->EndFrame();
+            Frustum frustum = Frustum::FromMatrix(m_ModelMatrix * m_CameraMatrix * m_ProjectionMatrix);
+
+            // render stuff to screen buffer
+            for (auto& model : m_ModelsData)
+            {
+                if (frustum.IsInside(model))
+                    renderer->Render(model.vertices);
+            }
+
+            renderer->EndFrame();
+        }
 
         // for software renderer render screen buffer to window (hardware renderer renders directly to window and calling GetScreenBuffer on it returns empty buffer)
         if (auto& buf = renderer->GetScreenBuffer() ; buf.size())
         {
-            ZoneScopedN("Update screen texture");
-            // update texture
+            {
+                ZoneScopedN("Update screen texture");
+                // update texture
 
-            if (m_DrawSettings.renderDepthBuffer)
-                renderer->RenderDepthBuffer();
+                if (m_DrawSettings.renderDepthBuffer)
+                    renderer->RenderDepthBuffer();
 
-            m_ScreenTexture.update((uint8_t*)buf.data());
-
-            // render texture to screen
-            m_MainWindow.draw(m_ScreenSprite);
+                m_ScreenTexture.update((uint8_t*)buf.data());
+            }
+            {
+                ZoneScopedN("Draw screen texture");
+                // render texture to screen
+                m_MainWindow.draw(m_ScreenSprite);
+            }
         }
 
         // display fps counter
@@ -456,6 +486,7 @@ int Application::Run()
         ImGui::SetWindowPos(ImVec2(0, 0));
         ImGui::Text("FPS: %d", fps);
         ImGui::Text("Build: %s" , sizeof(void*) == 8 ? "x64" : "x86");
+        ImGui::Text("Math: %d", m_DrawSettings.mathType );
         ImGui::End();
 
         DrawRenderingStats();
