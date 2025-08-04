@@ -262,13 +262,12 @@ bool Application::Initialize()
     return true;
 }
 
-extern int g_mode;
 extern int g_selected_tri;
-extern int g_mode2;
 
 extern bool g_showTilesBoundry;
 extern bool g_showTilestype;
 extern bool g_showTriangleBoundry;
+extern bool g_useSimd;
 
 int Application::Run()
 {
@@ -383,9 +382,6 @@ int Application::Run()
         // render settings window
         ImGui::Begin("Settings");
 
-        ImGui::SliderInt("Mode", &g_mode , 0 , 3 );
-        ImGui::SliderInt("Mode2", &g_mode2 , 0 , 3 );
-
         //static float drag_speeed = 0.01f;
         //if( sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) || sf::Keyboard::isKeyPressed(sf::Keyboard::RShift) )
         //    drag_speeed = 0.001f;
@@ -398,14 +394,17 @@ int Application::Run()
         ImGui::SliderFloat("Shininess Power", &m_DrawSettings.shininessPower, 1.f , 10.0f );
         ImGui::SliderFloat3("Rotation", &m_DrawSettings.modelRotation.x, 0, FULL_ANGLE);
         ImGui::DragFloat3("Translation", &m_DrawSettings.modelTranslation.x, drag_speeed , -15, 15);
-        ImGui::SliderFloat("Scale", &m_DrawSettings.modelScale, 0, 6);
+        ImGui::SliderFloat("Scale", &m_DrawSettings.modelScale, 0, 9);
         ImGui::SliderFloat3("Light Position", &m_DrawSettings.lightPosition.x, -20, 20);
         ImGui::SliderInt("Thread Count", &m_DrawSettings.threadsCount, 1, MAX_THREADS_COUNT);
         //ImGui::Combo("Renderer Type", &m_DrawSettings.rendererType, "Software\0Hardware\0");
         ImGui::SliderInt("Renderer Type", &m_DrawSettings.rendererType , 0 , 1 );
-        ImGui::SliderInt("Renderer Type", &g_selected_tri , 0 , 10 );
+        //ImGui::SliderInt("Selected Tri", &g_selected_tri , 0 , 10 );
 
         ImGui::Checkbox("Wireframe", &m_DrawSettings.drawWireframe);
+
+        ImGui::Checkbox( "UseSimd" , &g_useSimd ); ImGui::SameLine();
+
         ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.colorizeThreads);
         ImGui::SameLine(); ImGui::Checkbox("BBoxes", &m_DrawSettings.drawBBoxes);
         ImGui::SameLine(); ImGui::Checkbox("Use ZBuffer", &m_DrawSettings.useZBuffer);
@@ -414,7 +413,7 @@ int Application::Run()
         ImGui::ColorEdit3("Background Color", &m_DrawSettings.backgroundColor.x);
         ImGui::Checkbox( "Visualize ZBuffer", &m_DrawSettings.renderDepthBuffer);
         ImGui::SameLine();
-        ImGui::Checkbox( "Vertical Sync", &m_DrawSettings.vSync);
+        ImGui::Checkbox( "Vertical Sync", &m_DrawSettings.vSync); ImGui::SameLine(); if( ImGui::Button( "Close App" ) ) m_MainWindow.close();
         ImGui::Combo("Math Type", &m_DrawSettings.mathType, "CPU\0SSE\0AVX\0");
 
         ImGui::End();

@@ -65,12 +65,12 @@ inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f& wor
     m_ScreenPosition.y = (m_ScreenPosition.y + 1) * SCREEN_HEIGHT / 2;
 }
 
-template< eSimdType Type = eSimdType::AVX >
+template< int Elements = 8 , eSimdType Type = eSimdType::AVX >
 struct ALIGN_FOR_AVX SimdTransformedVertex
 {
-    Vector3f256<Type> m_Normal;
-    Vector4f256<Type> m_Color;
-    Vector2f256<Type> m_UV;
-    Vector3f256<Type> m_WorldPosition;
-    Vector4f256<Type> m_ScreenPosition;
+    Vector3<fsimd<Elements,Type>> m_Normal;
+    Vector4<fsimd<Elements,Type>> m_Color;
+    Vector2<fsimd<Elements,Type>> m_UV;
+    Vector3<fsimd<Elements,Type>> m_WorldPosition;
+    Vector4<fsimd<Elements,Type>> m_ScreenPosition;
 };

@@ -129,7 +129,7 @@ private:
     void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
 
 
-    template< eSimdType Type , bool Partial >
+    template< eSimdType Type , bool Partial , int Elements = 8 >
     void DrawFulllTileImplSimd(const DrawTileData& TD, DrawStats* stats);
 
     template< bool Partial >
@@ -154,14 +154,16 @@ private:
     void UpdateMVPMatrix();
     void DoRender(const vector<Vertex>& vertices, int MinY, int maxY, int threadID);
 
-    ALIGN_FOR_AVX struct AlignedPixel : Vector4f{};
+    struct ALIGN_FOR_AVX AlignedPixel : Vector4f{};
 
     struct TileInfo
     {
+        using at_i16 = std::atomic<uint16_t>;
+
         Vector2si       TileIndex;
-        Vector2i        TileScreenPos;
         Spinlock        Lock;
-        mutable uint16_t DrawCount       = 0;
+        mutable at_i16  DrawCount       = 0;
+        Vector2i        TileScreenPos;
         Vector4f*       TileMem         = nullptr;
         float*          TileZMem        = nullptr;
     };
@@ -174,8 +176,8 @@ private:
     struct Internal;
 
     Vector4f FragmentShader(const TransformedVertex& vertex);
-    template< eSimdType Type >
-    Vector4f256<Type> FragmentShader(const SimdTransformedVertex<Type>& vertex);
+    template< int Elements , eSimdType Type >
+    Vector4<fsimd<Elements,Type>> FragmentShader(const SimdTransformedVertex<Elements,Type>& vertex);
 
     // 8 bit - one channel (8*4=32 - rgba)
     vector<uint32_t>    m_ScreenBuffer;

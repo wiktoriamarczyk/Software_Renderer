@@ -21,10 +21,10 @@ public:
     template< typename MathT >
     void InterpolateT(Vector3f baricentric, TransformedVertex& out)const;
 
-    template< eSimdType Type >
-    void InterpolateZ(const Vector3f256<Type>& baricentric, SimdTransformedVertex<Type>& out)const;
-    template< eSimdType Type >
-    void InterpolateAllButZ(const Vector3f256<Type>& baricentric, SimdTransformedVertex<Type>& out)const;
+    template< int Elements , eSimdType Type >
+    void InterpolateZ(const Vector3<fsimd<Elements,Type>>& baricentric, SimdTransformedVertex<Elements,Type>& out)const;
+    template< int Elements , eSimdType Type >
+    void InterpolateAllButZ(const Vector3<fsimd<Elements,Type>>& baricentric, SimdTransformedVertex<Elements,Type>& out)const;
 //private:
     struct ALIGN_FOR_AVX InterpolatedSource
     {
@@ -44,31 +44,6 @@ public:
     InterpolatedSource m_B;
     InterpolatedSource m_C;
 
-};
-
-template< eSimdType Type >
-struct SimdVertexInterpolator
-{
-    void InterpolateZ(const Vector3f256<Type>& baricentric, SimdTransformedVertex<Type>& out)const;
-    void InterpolateAllButZ(const Vector3f256<Type>& baricentric, SimdTransformedVertex<Type>& out)const;
-
-    using Vec2 = Vector2< f256<Type> >;
-    using Vec3 = Vector3< f256<Type> >;
-    using Vec4 = Vector4< f256<Type> >;
-
-    struct ALIGN_FOR_AVX InterpolatedSource
-    {
-        Vec3        m_NormalOverW;
-        Vec4        m_ColorOverW;
-        Vec2        m_UVOverW;
-        Vec3        m_WorldPositionOverW;
-        f256<Type>  m_OneOverW;
-        f256<Type>  m_ScreenPositionZ;
-    };
-
-    InterpolatedSource m_A;
-    InterpolatedSource m_B;
-    InterpolatedSource m_C;
 };
 
 inline void VertexInterpolator::InterpolateZ(const Vector3f& baricentric, TransformedVertex& out)
@@ -215,8 +190,8 @@ __forceinline void VertexInterpolator::InterpolateT(Vector3f baricentricCoordina
     out.m_ScreenPosition.z = tmp.m_ScreenPositionZ;
 }
 
-template< eSimdType Type >
-inline void VertexInterpolator::InterpolateZ(const Vector3f256<Type>& baricentricCoordinates, SimdTransformedVertex<Type>& out)const
+template< int Elements , eSimdType Type >
+inline void VertexInterpolator::InterpolateZ(const Vector3<fsimd<Elements,Type>>& baricentricCoordinates, SimdTransformedVertex<Elements,Type>& out)const
 {
     //__m128 bx = _mm_load_ps(baricentricCoordinates.x);
     //__m128 by = _mm_load_ps(baricentricCoordinates.y);
@@ -235,19 +210,19 @@ inline void VertexInterpolator::InterpolateZ(const Vector3f256<Type>& baricentri
 
     //_mm_store_ps(out.m_ScreenPosition.z, z);
 
-    Vector3f256<Type> tmp(m_A.m_ScreenPositionZ,m_B.m_ScreenPositionZ,m_C.m_ScreenPositionZ);
+    Vector3<fsimd<Elements,Type>> tmp(m_A.m_ScreenPositionZ,m_B.m_ScreenPositionZ,m_C.m_ScreenPositionZ);
 
     tmp *= baricentricCoordinates;
 
-    f256<Type> z = tmp.x + tmp.y;
-               z += tmp.z;
+    simd z  = tmp.x + tmp.y;
+         z += tmp.z;
 
     out.m_ScreenPosition.z = z;
 }
 
 
-template< eSimdType Type >
-__forceinline void VertexInterpolator::InterpolateAllButZ(const Vector3f256<Type>& baricentricCoordinates, SimdTransformedVertex<Type>& out)const
+template< int Elements , eSimdType Type >
+inline void VertexInterpolator::InterpolateAllButZ(const Vector3<fsimd<Elements,Type>>& baricentricCoordinates, SimdTransformedVertex<Elements,Type>& out)const
 {
     //const __m128 bx = _mm_load_ps(baricentricCoordinates.x);
     //const __m128 by = _mm_load_ps(baricentricCoordinates.y);
@@ -301,18 +276,18 @@ __forceinline void VertexInterpolator::InterpolateAllButZ(const Vector3f256<Type
     //interpolate( m_A.m_WorldPositionOverW.z , m_B.m_WorldPositionOverW.z , m_C.m_WorldPositionOverW.z , out.m_WorldPosition.z );
 
 
-    Vector3f256<Type> tmp(m_A.m_OneOverW, m_B.m_OneOverW, m_C.m_OneOverW);
+    Vector3<fsimd<Elements,Type>> tmp(m_A.m_OneOverW, m_B.m_OneOverW, m_C.m_OneOverW);
 
     tmp *= baricentricCoordinates;
 
     simd w = tmp.x + tmp.y;
          w+= tmp.z;
 
-    w = f256<Type>(1) / w;
+    w = fsimd<Elements,Type>(1) / w;
 
-    auto interpolate = [&]( float BA , float BB , float BC , f256<Type>& out ) [[msvc::forceinline]]
+    auto interpolate = [&]( float BA , float BB , float BC , fsimd<Elements,Type>& out ) [[msvc::forceinline]]
     {
-        Vector3f256<Type> tmp(BA,BB,BC);
+        Vector3<fsimd<Elements,Type>> tmp(BA,BB,BC);
 
         tmp *= baricentricCoordinates;
 

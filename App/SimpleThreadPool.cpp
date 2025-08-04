@@ -115,6 +115,9 @@ void SimpleThreadPool::LaunchTasks(vector<TaskFunc> TaskFuncs)
         if (m_ThreadCount <= 0)
             return;
 
+        m_Tasks.reserve( TaskFuncs.size()*2 );
+        tasksAwaiters.reserve( TaskFuncs.size()*2 );
+
         for (auto& Func : TaskFuncs)
         {
             if (!Func)

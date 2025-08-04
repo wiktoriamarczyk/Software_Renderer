@@ -141,12 +141,12 @@ inline Vector4f256<Type> Texture::Sample(const Vector2f256<Type>& uv) const
 
     if( !m_Pow2 )
     {
-        //if( m_Clamp )
-        //{
-        //    x = std::clamp<int>( int32_t( uv.x * m_fWidthSSE ) , 0 , m_MaxWidth  );
-        //    y = std::clamp<int>( int32_t( uv.y * m_fHeightSSE) , 0 , m_MaxHeight );
-        //}
-        //else
+        if( m_Clamp )
+        {
+            x = i256A( (uv.x * m_fWidthSSE ).clamp( f256<Type>::One , m_fMaxWidthSSE  ) );
+            y = i256A( (uv.y * m_fHeightSSE).clamp( f256<Type>::One , m_fMaxHeightSSE ) );
+        }
+        else
         {
             x = ( i256A( ( m_10_SSE + uv.x ) * m_fWidthSSE ) ) % m_WidthSSE ;
             y = ( i256A( ( m_10_SSE + uv.y ) * m_fHeightSSE) ) % m_HeightSSE;

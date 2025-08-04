@@ -13,10 +13,6 @@
 #include <chrono>
 
 
- int g_mode = 0;
- int g_mode2 = 0;
-
-
 int g_selected_tri = 0;
 thread_local size_t g_tri_index = 0;
 
@@ -172,6 +168,9 @@ void SoftwareRenderer::ClearZBuffer()
 
 inline Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
 {
+    // Normalize the interpolated normal vector
+    auto vertexNormal = vertex.m_Normal.FastNormalized();
+
     Vector4f sampledPixel = m_Texture->Sample(vertex.m_UV);
     //return sampledPixel * vertex.m_Color;
 
@@ -181,13 +180,13 @@ inline Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex
     Vector3f ambient = m_AmbientColor * m_AmbientStrength;
 
     // diffuse - light that is reflected from light source
-    float diffuseFactor = std::max(pointToLightDir.Dot(vertex.m_Normal), 0.0f);
+    float diffuseFactor = std::max(pointToLightDir.Dot(vertexNormal), 0.0f);
     Vector3f diffuse = m_DiffuseColor * diffuseFactor * m_DiffuseStrength;
 
     // specular - light that is reflected from light source and is reflected in one direction
     // specular = specularStrength * specularColor * pow(max(dot(viewDir, reflectDir), 0.0), shininess)
     Vector3f viewDir = (m_CameraPosition - vertex.m_WorldPosition).FastNormalized();
-    Vector3f reflectDir = (pointToLightDir * -1).Reflect(vertex.m_Normal);
+    Vector3f reflectDir = (pointToLightDir * -1).Reflect(vertexNormal);
     float specularFactor = pow(max(viewDir.Dot(reflectDir), 0.0f), m_Shininess);
     Vector3f specular = m_DiffuseColor * m_SpecularStrength * specularFactor;
 
@@ -199,9 +198,12 @@ inline Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex
     return finalColor;
 }
 
-template< eSimdType Type >
-inline Vector4f256<Type> SoftwareRenderer::FragmentShader(const SimdTransformedVertex<Type>& vertex)
+template< int Elements , eSimdType Type >
+inline Vector4<fsimd<Elements,Type>> SoftwareRenderer::FragmentShader(const SimdTransformedVertex<Elements,Type>& vertex)
 {
+    // Normalize the interpolated normal vector
+    auto vertexNormal = vertex.m_Normal.FastNormalized();
+
     Vector4f256<Type> sampledPixel = m_Texture->Sample(vertex.m_UV);
     //return sampledPixel * vertex.m_Color;
 
@@ -211,13 +213,13 @@ inline Vector4f256<Type> SoftwareRenderer::FragmentShader(const SimdTransformedV
     Vector3f256<Type> ambient = m_AmbientColorSimd * m_AmbientStrength;
 
     // diffuse - light that is reflected from light source
-    auto diffuseFactor = Math::Max(pointToLightDir.Dot(vertex.m_Normal), f256<Type>::Zero );
+    auto diffuseFactor = Math::Max(pointToLightDir.Dot(vertexNormal), f256<Type>::Zero );
     Vector3f256<Type> diffuse = m_DiffuseColorSimd * diffuseFactor * m_DiffuseStrength;
 
     // specular - light that is reflected from light source and is reflected in one direction
     // specular = specularStrength * specularColor * pow(max(dot(viewDir, reflectDir), 0.0), shininess)
     Vector3f256<Type> viewDir = (m_CameraPositionSimd - vertex.m_WorldPosition).FastNormalized();
-    Vector3f256<Type> reflectDir = (pointToLightDir * -1).Reflect(vertex.m_Normal);
+    Vector3f256<Type> reflectDir = (pointToLightDir * -1).Reflect(vertexNormal);
     auto specularFactor = Math::Max(viewDir.Dot(reflectDir), f256<Type>::Zero).pow(m_Shininess);
     Vector3f256<Type> specular = m_DiffuseColorSimd * m_SpecularStrength * specularFactor;
 
@@ -267,6 +269,7 @@ struct SoftwareRenderer::ThreadTask
 struct SoftwareRenderer::DrawTileData : ThreadTask
 {
     bool                IsFullTile = false;
+    uint16_t            TileDrawID = 0;
     Vector2i            ScreenPos;
     Vector2i            LogicPos;
     const TriangleData* Triangle;
@@ -281,16 +284,6 @@ void transpose8Vec4f_to_Vec4f256(const Vector4f* in, Vector4f256A& out)
     __m256 row1 = _mm256_loadu_ps( in[2].Data() ); // I J K L  M N O P
     __m256 row2 = _mm256_loadu_ps( in[4].Data() ); // Q R S T  U V W X
     __m256 row3 = _mm256_loadu_ps( in[6].Data() ); // Y Z 1 2  3 4 5 6
-
-
-
-    //__m256 t0   = _mm256_permute2f128_ps( row0 ,row2 , 0x31 ); // E F G H | I J K L
-    //__m256 t1   = _mm256_permute2f128_ps( row0 ,row2 , 0x31 ); // U V W X | Y Z 1 2
-
-    //// A E B F |
-
-
-
 
 
            tmp  = _mm256_permute2f128_ps( row0 ,row2 , 0x31 );
@@ -381,6 +374,8 @@ SoftwareRenderer::SoftwareRenderer(int screenWidth, int screenHeight)
             Tile.TileScreenPos = Vector2i(x*TILE_SIZE, y*TILE_SIZE);
             Tile.TileMem       = m_TilesBuffer.data() + (y * m_TilesGridSize.x + x) * TILE_PIXELS_COUNT;
             Tile.TileZMem      = m_ZBuffer.data() +     (y * m_TilesGridSize.x + x) * TILE_PIXELS_COUNT;
+            assert( Tile.TileZMem + TILE_PIXELS_COUNT <= m_ZBuffer.data() + m_ZBuffer.size() );
+            assert( Tile.TileMem + TILE_PIXELS_COUNT <= m_TilesBuffer.data() + m_TilesBuffer.size() );
         }
     }
 
@@ -426,7 +421,7 @@ SoftwareRenderer::SoftwareRenderer(int screenWidth, int screenHeight)
     //transposeVec4f256_to_8Vec4f(vec256, test2);
 
     m_TrianglesData.resize(100,nullptr);
-    m_TilesData.resize(1024*8);
+    m_TilesData.resize( ((screenWidth+TILE_SIZE-1)/TILE_SIZE) * ((screenHeight+TILE_SIZE-1)/TILE_SIZE) * 2 );
 
     m_TileThreadPool.SetThreadCount(16);
 }
@@ -466,107 +461,100 @@ FORCE_INLINE bool EdgeFunctionTest( const Vector3<T>& EdgeFunctionsValue )
     }
 }
 
-void Vect4ToARGBx4( const __m128& Multiplier , const __m128i& U8Masks , const Vector4f* pPixels , uint32_t* pColBuffer )
+template< bool Col , bool Cov , int Elements , eSimdType Simd >
+void Vec4ToARGB_Simd( const simd<float,Elements,Simd>& Multiplier , const simd<int,Elements,Simd>& U8Masks , const Vector4f* pPixels , uint32_t* pColBuffer , const Vector4f* pCol = nullptr , const simd<int,Elements,Simd>* pCoverageMask = nullptr )
 {
-    const float* pFloats = pPixels->Data();
-    ALIGN_FOR_AVX float Data[16] = { pFloats[0] , pFloats[4] , pFloats[8] , pFloats[12]
-                                   , pFloats[1] , pFloats[5] , pFloats[9] , pFloats[13]
-                                   , pFloats[2] , pFloats[6] , pFloats[10], pFloats[14]
-                                   , pFloats[3] , pFloats[7] , pFloats[11], pFloats[15] };
+    using simdf = simd<float, Elements, Simd>;
+    using simdi = simd<int, Elements, Simd>;
 
-    //Vector4< f128<eSimdType::SSE> > RGBA{ Data , DataAlignmentAVXTag{} };
-    //f128<eSimdType::SSE> MUL{ Multiplier };
-
-    auto R = _mm_load_ps( Data+0  );
-    auto G = _mm_load_ps( Data+4  );
-    auto B = _mm_load_ps( Data+8  );
-    auto A = _mm_load_ps( Data+12 );
-
-    R = _mm_mul_ps(R, Multiplier);
-    G = _mm_mul_ps(G, Multiplier);
-    B = _mm_mul_ps(B, Multiplier);
-    A = _mm_mul_ps(A, Multiplier);
-
-    auto UR = _mm_cvtps_epi32(R);
-    auto UG = _mm_cvtps_epi32(G);
-    auto UB = _mm_cvtps_epi32(B);
-    auto UA = _mm_cvtps_epi32(A);
-
-    UR = _mm_and_si128(UR, U8Masks);
-    UG = _mm_and_si128(UG, U8Masks);
-    UB = _mm_and_si128(UB, U8Masks);
-    UA = _mm_and_si128(UA, U8Masks);
-
-    UG = _mm_slli_epi32(UG, 8 ); // shift green to the left by 8 bits
-    UB = _mm_slli_epi32(UB, 16); // shift blue to the left by 16 bits
-    UA = _mm_slli_epi32(UA, 24); // shift alpha to the left by 24 bits
-
-    auto Pixel = _mm_or_si128(UR   , UG); // combine red and green
-         Pixel = _mm_or_si128(Pixel, UB); // combine with blue
-         Pixel = _mm_or_si128(Pixel, UA); // combine with alpha
-
-    _mm_storeu_si128((__m128i*)(pColBuffer), Pixel); // store the pixel in the screen buffer
-}
-
-                ////ALIGN_FOR_AVX float Data[32] = { pFloats[0] , pFloats[4] , pFloats[8] , pFloats[12] , pFloats[16] , pFloats[20] , pFloats[24] , pFloats[28]
-                ////                               , pFloats[1] , pFloats[5] , pFloats[9] , pFloats[13] , pFloats[17] , pFloats[21] , pFloats[25] , pFloats[29] ,
-                ////                               , pFloats[2] , pFloats[6] , pFloats[10], pFloats[14] , pFloats[18] , pFloats[22] , pFloats[26] , pFloats[30]
-                ////                               , pFloats[3] , pFloats[7] , pFloats[11], pFloats[15] , pFloats[19] , pFloats[23] , pFloats[27] , pFloats[31] };
-
-
-template< bool Col >
-void Vect4ToARGBx8( const __m256& Multiplier , const __m256i& U8Masks , const Vector4f* pPixels , uint32_t* pColBuffer , const Vector4f* pCol )
-{
     const float* pFloats = pPixels->Data();
 
-    auto R = _mm256_load_ps( pFloats+0 );
-    auto G = _mm256_load_ps( pFloats+8 );
-    auto B = _mm256_load_ps( pFloats+16);
-    auto A = _mm256_load_ps( pFloats+24);
+    simdf R{ pFloats+0*Elements , simd_alignment::AVX };
+    simdf G{ pFloats+1*Elements , simd_alignment::AVX };
+    simdf B{ pFloats+2*Elements , simd_alignment::AVX };
+    simdf A{ pFloats+3*Elements , simd_alignment::AVX };
 
-    R = _mm256_mul_ps(R, Multiplier);
-    G = _mm256_mul_ps(G, Multiplier);
-    B = _mm256_mul_ps(B, Multiplier);
-    A = _mm256_mul_ps(A, Multiplier);
+    R *= Multiplier;
+    G *= Multiplier;
+    B *= Multiplier;
+    A *= Multiplier;
 
     if constexpr( Col )
     {
-        R = _mm256_mul_ps(R, _mm256_set1_ps(pCol->x));
-        G = _mm256_mul_ps(G, _mm256_set1_ps(pCol->y));
-        B = _mm256_mul_ps(B, _mm256_set1_ps(pCol->z));
-        A = _mm256_mul_ps(A, _mm256_set1_ps(pCol->w));
+        R *= simdf(pCol->x);
+        G *= simdf(pCol->y);
+        B *= simdf(pCol->z);
+        A *= simdf(pCol->w);
     }
 
-    auto UR = _mm256_cvtps_epi32(R);
-    auto UG = _mm256_cvtps_epi32(G);
-    auto UB = _mm256_cvtps_epi32(B);
-    auto UA = _mm256_cvtps_epi32(A);
+    auto UR = ( R.static_cast_to<int>() & U8Masks );
+    auto UG = ( G.static_cast_to<int>() & U8Masks ) << 8 ; // shift green to the left by 8 bits
+    auto UB = ( B.static_cast_to<int>() & U8Masks ) << 16; // shift blue to the left by 16 bits
+    auto UA = ( A.static_cast_to<int>() & U8Masks ) << 24; // shift alpha to the left by 24 bits
 
-    UR = _mm256_and_si256(UR, U8Masks);
-    UG = _mm256_and_si256(UG, U8Masks);
-    UB = _mm256_and_si256(UB, U8Masks);
-    UA = _mm256_and_si256(UA, U8Masks);
+    simdi Piexl = UR | UG | UB | UA; // combine red, green, blue and alpha
 
-    UG = _mm256_slli_epi32(UG, 8 ); // shift green to the left by 8 bits
-    UB = _mm256_slli_epi32(UB, 16); // shift blue to the left by 16 bits
-    UA = _mm256_slli_epi32(UA, 24); // shift alpha to the left by 24 bits
-
-    auto Pixel = _mm256_or_si256(UR   , UG); // combine red and green
-         Pixel = _mm256_or_si256(Pixel, UB); // combine with blue
-         Pixel = _mm256_or_si256(Pixel, UA); // combine with alpha
-
-    _mm256_storeu_si256((__m256i*)(pColBuffer), Pixel); // store the pixel in the screen buffer
-    //_mm256_maskstore_epi32(
+    if constexpr( Cov )
+        Piexl.store( (int*)pColBuffer , *pCoverageMask ); // store the pixel in the screen buffer using coverage mask
+    else
+        Piexl.store( (int*)pColBuffer ); // store the pixel in the screen buffer
 }
 
 void TileLineFToARGB( const Vector4f* pPixels , uint32_t* pColBuffer )
 {
-    auto Multiplier = _mm_set_ps(255, 255, 255, 255); // set alpha to 255 for all pixels
-    auto U8Masks    = _mm_set_epi32(0xFF, 0xFF, 0xFF, 0xFF); // masks for converting to ARGB
+    f128S Multiplier = 255.0f; // set alpha to 255 for all pixels
+    i128S U8Masks    = 0xFF; // masks for converting to ARGB
 
     for (int x = 0; x < TILE_SIZE; x+=4 , pPixels += 4 , pColBuffer += 4 )
     {
-        Vect4ToARGBx4( Multiplier , U8Masks , pPixels , pColBuffer );
+        Vec4ToARGB_Simd<false,false>( Multiplier , U8Masks , pPixels , pColBuffer );
+    }
+}
+
+template< bool UseCoverage , int Elements , eSimdType Simd >
+void TileLineFToARGB_Simd( const Vector4f* pPixels , uint32_t* pColBuffer , optional<Vector4f> Color , uint32_t Coverage )
+{
+    using simdf = simd<float, Elements, Simd>;
+    using simdi = simd<int  , Elements, Simd>;
+
+    simdf Multiplier =  255.0f; // set alpha to 255 for all pixels
+    simdi U8Masks    =  0xFF;  // masks for converting to ARGB
+    simdi Mask;
+
+    const simdi* pMask = nullptr;
+
+    if constexpr( UseCoverage )
+    {
+        if( !Coverage )
+            return;
+
+        if constexpr( Elements == 8 )
+            Mask = simdi{ int(Coverage) } << simdi{ 7 , 6 , 5 , 4 , 3 , 2 , 1 , 0 } ;
+        else
+            Mask = simdi{ int(Coverage) } << simdi{ 3 , 2 , 1 , 0 } ;
+
+        pMask = &Mask;
+    }
+
+    if( Color )
+    {
+        for (int x = 0; x < TILE_SIZE; x+=Elements , pPixels += Elements , pColBuffer += Elements )
+        {
+            Vec4ToARGB_Simd<true,UseCoverage>( Multiplier , U8Masks , pPixels , pColBuffer , &*Color , pMask );
+
+            if constexpr( UseCoverage )
+                Mask <<= Elements;
+        }
+    }
+    else
+    {
+        for (int x = 0; x < TILE_SIZE; x+=Elements , pPixels += Elements , pColBuffer += Elements )
+        {
+            Vec4ToARGB_Simd<false,UseCoverage>( Multiplier , U8Masks , pPixels , pColBuffer , nullptr , pMask );
+
+            if constexpr( UseCoverage )
+                Mask <<= Elements;
+        }
     }
 }
 
@@ -576,6 +564,10 @@ inline void SoftwareRenderer::DrawTileImpl(const DrawTileData& TD, DrawStats* st
     ZoneScoped;
     const auto pTriangle    = TD.Triangle;
     const auto TilePosition = TD.ScreenPos;
+
+    // lock tile info to prevent concurrent access
+    std::scoped_lock lock( TD.TileInfo->Lock );
+
     const auto EdgeStrideX  = pTriangle->m_EdgeFunctionRails.GetEdgeFunctionsXStride().ToVector3<int>();
     const auto EdgeStrideY  = pTriangle->m_EdgeFunctionRails.GetEdgeFunctionsYStride().ToVector3<int>();
     const auto _EdgeStart   = pTriangle->m_EdgeFunctionRails.GetStartFor( TilePosition.ToVector2<int64_t>() );
@@ -584,6 +576,7 @@ inline void SoftwareRenderer::DrawTileImpl(const DrawTileData& TD, DrawStats* st
     const auto invABC       = pTriangle->m_InvABC;
     const int  StartY       = TilePosition.y;
     const int  EndY         = StartY + TILE_SIZE;
+    float*     pZBuffer     = TD.TileInfo->TileZMem;
 
     auto       pixelsDrawn  = 0;
 
@@ -597,7 +590,6 @@ inline void SoftwareRenderer::DrawTileImpl(const DrawTileData& TD, DrawStats* st
     // loop through all pixels in tile square
     for (int y = StartY ; y < EndY; y++ , EdgeStartY += EdgeStrideY )
     {
-        float*      pZBuffer = m_ZBuffer.data()      + y* SCREEN_WIDTH + TilePosition.x;
         uint32_t* pColBuffer = m_ScreenBuffer.data() + y* SCREEN_WIDTH + TilePosition.x;
 
         auto EdgeFunctions = EdgeStartX + EdgeStartY;
@@ -623,7 +615,6 @@ inline void SoftwareRenderer::DrawTileImpl(const DrawTileData& TD, DrawStats* st
                 continue;
             }
 
-            interpolatedVertex.m_Normal.FastNormalize();
             Vector4f finalColor = FragmentShader(interpolatedVertex);
             //finalColor = Vector4f{ interpolatedVertex.m_UV , 1.0f , 1.0f };
 
@@ -637,6 +628,7 @@ inline void SoftwareRenderer::DrawTileImpl(const DrawTileData& TD, DrawStats* st
                 *pPixels++ = finalColor;
             }
         }
+        pZBuffer += TILE_SIZE; // move to next row in Z-buffer
     }
 
     if constexpr( !Partial )
@@ -652,122 +644,141 @@ inline void SoftwareRenderer::DrawTileImpl(const DrawTileData& TD, DrawStats* st
     if( stats )
         stats->m_FramePixelsDrawn += pixelsDrawn;
 }
-void TileLineFToARGB_AVX( const Vector4f* pPixels , uint32_t* pColBuffer , optional<Vector4f> Color )
-{
-    auto Multiplier = _mm256_set_ps(255.0f, 255.0f, 255.0f, 255.0f, 255.0f, 255.0f, 255.0f, 255.0f ); // set alpha to 255 for all pixels
-    auto U8Masks    = _mm256_set_epi32(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF); // masks for converting to ARGB
 
-    if( Color )
-    {
-        for (int x = 0; x < TILE_SIZE; x+=8 , pPixels += 8 , pColBuffer += 8 )
-        {
-            Vect4ToARGBx8<true>( Multiplier , U8Masks , pPixels , pColBuffer , &*Color );
-        }
-    }
-    else
-    {
-        for (int x = 0; x < TILE_SIZE; x+=8 , pPixels += 8 , pColBuffer += 8 )
-        {
-            Vect4ToARGBx8<false>( Multiplier , U8Masks , pPixels , pColBuffer , nullptr );
-        }
-    }
-
-}
-
-template< eSimdType Type , bool Partial >
+template< eSimdType Type , bool Partial , int Elements  >
 inline void SoftwareRenderer::DrawFulllTileImplSimd(const DrawTileData& TD, DrawStats* stats)
 {
+    using f256t             = fsimd<Elements,Type>;
+    using i256t             = isimd<Elements,Type>;
+    using Vector3i256t      = Vector3<i256t>;
+    using Vector4f256t      = Vector4<f256t>;
+    using TransformedVertexT= SimdTransformedVertex<Elements,Type>;
+
+
     ZoneScoped;
     const auto pTriangle    = TD.Triangle;
     const auto pTileInfo    = TD.TileInfo;
+    constexpr int pack_size = f256t::elements_count;
 
-    //std::scoped_lock lock( pTileInfo->Lock );
+    // lock tile info to prevent concurrent access
+    std::scoped_lock lock( pTileInfo->Lock );
+
+
 
     const auto TilePosition = TD.ScreenPos;
     const auto _EdgeStrideX = pTriangle->m_EdgeFunctionRails.GetEdgeFunctionsXStride().ToVector3<int>().Swizzle<1,2,0>();
     const auto _EdgeStrideY = pTriangle->m_EdgeFunctionRails.GetEdgeFunctionsYStride().ToVector3<int>().Swizzle<1,2,0>();
-          auto EdgeStrideX  = Vector3i256<Type>{ _EdgeStrideX.x , _EdgeStrideX.y , _EdgeStrideX.z };
-    const auto EdgeStrideY  = Vector3i256<Type>{ _EdgeStrideY.x , _EdgeStrideY.y , _EdgeStrideY.z };
+          auto EdgeStrideX  = Vector3i256t{ _EdgeStrideX.x , _EdgeStrideX.y , _EdgeStrideX.z };
+    const auto EdgeStrideY  = Vector3i256t{ _EdgeStrideY.x , _EdgeStrideY.y , _EdgeStrideY.z };
     const auto _EdgeStart   = pTriangle->m_EdgeFunctionRails.GetStartFor( TilePosition.ToVector2<int64_t>() );
-    const auto _EdgeStartX  = _EdgeStart.x.ToVector3<int>().Swizzle<1,2,0>();;
-    const auto _EdgeStartY  = _EdgeStart.y.ToVector3<int>().Swizzle<1,2,0>();;
-    const auto EdgeStartX   = Vector3i256<Type>{ _EdgeStartX.x , _EdgeStartX.y , _EdgeStartX.z }+EdgeStrideX*i256<Type>{ 0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 };
-          auto EdgeStartY   = Vector3i256<Type>{ _EdgeStartY.x , _EdgeStartY.y , _EdgeStartY.z };
-    const auto invABC       = f256<Type>{ pTriangle->m_InvABC };
+    const auto _EdgeStartX  = _EdgeStart.x.ToVector3<int>().Swizzle<1,2,0>();
+    const auto _EdgeStartY  = _EdgeStart.y.ToVector3<int>().Swizzle<1,2,0>();
+          auto EdgeStartX   = Vector3i256t{ _EdgeStartX.x , _EdgeStartX.y , _EdgeStartX.z };
+            if constexpr( Elements == 8 )
+               EdgeStartX  += EdgeStrideX*i256t{ 0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 };
+            else
+                EdgeStartX += EdgeStrideX*i256t{ 0 , 1 , 2 , 3 };
+          auto EdgeStartY   = Vector3i256t{ _EdgeStartY.x , _EdgeStartY.y , _EdgeStartY.z };
+    const auto invABC       = f256t{ pTriangle->m_InvABC };
     const int  StartY       = TilePosition.y;
     const int  EndY         = StartY + TILE_SIZE;
-
-    EdgeStrideX *= 8;
-
     auto       pixelsDrawn  = 0;
+    EdgeStrideX *= pack_size;
 
-    using NumericType = decltype(EdgeStartX.x);
 
-    ALIGN_FOR_AVX Vector4f LocalPixels[TILE_SIZE * TILE_SIZE];
-
-    pTileInfo->DrawCount--;
-
-    if( pTileInfo->DrawCount > 0 )
-        memcpy( LocalPixels , pTileInfo->TileMem , sizeof(LocalPixels) );
-
-    //Vector4f* pPixels = LocalPixels;
-    Vector4f* pPixels = LocalPixels;
-
-    float* pZBuffer = pTileInfo->TileZMem;
-
-    ALIGN_FOR_AVX SimdTransformedVertex<Type> interpolatedVertex;
-
-    i256<Type> write_mask;
+    // local pixels storage - it seems to be faster than using TileMem directly
+    ALIGN_FOR_AVX Vector4f  Pixels       [TILE_SIZE * TILE_SIZE];
+    ALIGN_FOR_AVX uint32_t  TileCoverage [TILE_SIZE] = {};
+    TransformedVertexT      interpolatedVertex;
+    Vector4f*               pCurPixel       = Pixels;
+    uint32_t*               CoverageMask    = TileCoverage;
+    float*                  pZBuffer        = pTileInfo->TileZMem;
+    i256t                   write_mask;
 
     // loop through all pixels in tile square
     for (int y = StartY ; y < EndY; y++ , EdgeStartY += EdgeStrideY )
     {
-        //float*      pZBuffer = m_ZBuffer.data()      + y* SCREEN_WIDTH + TilePosition.x;
-        uint32_t* pColBuffer = m_ScreenBuffer.data() + y* SCREEN_WIDTH + TilePosition.x;
-
+        // Calculate edge functions for the first pixel in the current line
         auto EdgeFunctions = EdgeStartX + EdgeStartY;
 
-        for (int ix = 0; ix < TILE_SIZE; ix+=8 , EdgeFunctions += EdgeStrideX )
+        for (int ix = 0; ix < TILE_SIZE; ix+=pack_size , EdgeFunctions += EdgeStrideX )
         {
-            auto baricentricCoordinates = EdgeFunctions.ToVector3<f256<Type>>() * invABC;
+            auto baricentricCoordinates = EdgeFunctions.ToVector3<f256t>() * invABC;
+
+            // prepare coverage mask for bits from current pixel pack
+            *CoverageMask <<= pack_size;
+            // initialize coverage with 1s - initially we assume that all pixels in current pack will be written
+            uint32_t CurrentPackCoverageMask = 0xFFFFFFFF;
 
             if constexpr( Partial )
             {
-                //write_mask = (EdgeFunctions.x & EdgeFunctions.y | EdgeFunctions.x) >= i256<Type>::Zero;
-                write_mask = i256<Type>::Zero;
+                // compute edge functions for current pixel pack and generate mask with 1s for pixels that are inside triangle
+                write_mask = (EdgeFunctions.x | EdgeFunctions.y | EdgeFunctions.z) >= i256t::Zero;
+
+                // convert write_mask to 32-bit mask (8 least significant bits represent coverage for each pixel in the pack)
+                CurrentPackCoverageMask = write_mask.to_mask_32();
+
+                // perform edge function test for current pixel pack
+                if( !CurrentPackCoverageMask )
+                    // all pixels failed edge function test - all of them are outside triangle - we can skip further processing
+                    continue;
             }
             else
             {
-                write_mask = i256<Type>{ int(0xFFFFFFFF) };
+                // if we are drawing full tile, we assume that initially all pixels are inside triangle
+                write_mask = i256t::AllBitsSet;
             }
 
-            pTriangle->m_Interpolator.InterpolateZ      ( baricentricCoordinates, interpolatedVertex );
+            // interpolate z value
+            pTriangle->m_Interpolator.InterpolateZ( baricentricCoordinates, interpolatedVertex );
+
+            // load z-values for current pixel pack from Z-buffer
+            f256t CurrentZValue( pZBuffer + ix , simd_alignment::AVX );
+
+            if( m_ZTest )
+            {
+                // Perform Z-test on whole pixel pack:
+                //      All pixels with z-value less than current z-value will generate 1 in write_mask, rest will generate 0
+                write_mask &= ( interpolatedVertex.m_ScreenPosition.z < CurrentZValue ).reinterpret_cast_to<int>();
+
+                // Select pixels that passed the Z-test - bit 1 will select second value, 0 will select first value
+                CurrentZValue = CurrentZValue.select( interpolatedVertex.m_ScreenPosition.z , write_mask );
+
+                if( m_ZWrite )
+                    // store the current z-value back to the Z-buffer (we can write all pixels at once because we changed only pixels that passed the Z-test)
+                    CurrentZValue.store( pZBuffer + ix , simd_alignment::AVX );
+
+                // convert write_mask to 8 least significant bits representing coverage for each pixel in the pack
+                CurrentPackCoverageMask &= write_mask.to_mask_32();
+                if( !CurrentPackCoverageMask )
+                    continue; // zest failed for all pixels - no need to interpolate color
+            }
+            else if( m_ZWrite )
+            {
+                // Only z-write is enabled, so we simply store the z-value for all pixels that passed edge function test
+                CurrentZValue = CurrentZValue.select( interpolatedVertex.m_ScreenPosition.z , write_mask );
+
+                CurrentZValue.store( pZBuffer + ix , simd_alignment::AVX );
+            }
+
+            // Add mask for current pixel pack to the coverage mask
+            *CoverageMask |= CurrentPackCoverageMask;
+
+            // Interpolate all other vertex attributes (UV, normal, etc.) for all pixels in the current pack
             pTriangle->m_Interpolator.InterpolateAllButZ( baricentricCoordinates, interpolatedVertex );
 
-            f256<Type> curz;
-            curz.load( pZBuffer , simd_alignment::AVX );
-            pZBuffer += 8;
 
-            write_mask = write_mask & i256<Type>( curz > interpolatedVertex.m_ScreenPosition.z );
-            curz.v = _mm256_blendv_ps( interpolatedVertex.m_ScreenPosition.z.v , curz.v , write_mask.v );
-            curz.store( pZBuffer + ix , simd_alignment::AVX );
+            // Call fragment shader to compute final color for all pixels in the current pack
+            Vector4f256t finalColor = FragmentShader(interpolatedVertex);
+            // store the final color in the local pixel buffer - we will write it to the screen buffer later
+            finalColor.store( pCurPixel[ix].Data() , simd_alignment::AVX );
 
-            //float& z = pZBuffer[ix];
-            //if (interpolatedVertex.m_ScreenPosition.z.v[0] < z){
-            //    //if (m_ZWrite)
-            //    //    z = interpolatedVertex.m_ScreenPosition.z;
-            //}
-            //else if (m_ZTest){
-            //    continue;
-            //}
-
-            interpolatedVertex.m_Normal.FastNormalize();
-            Vector4f256<Type> finalColor = FragmentShader(interpolatedVertex);
-            //Vector4f256<Type> finalColor = Vector4f256<Type>(interpolatedVertex.m_UV * f256A{ 1.0f }, f256A{ 1.0f } , f256A{ 1.0f } );
-            //finalColor.store( pPixels->Data() , i256<Type>{0} );
-
-            pPixels += 8;
+            //Vector4f256t finalColor = Vector4f256t(interpolatedVertex.m_UV * f256A{ 1.0f }, f256A{ 1.0f } , f256A{ 1.0f } );
         }
+
+        pCurPixel += TILE_SIZE;
+        pZBuffer  += TILE_SIZE;
+        CoverageMask++;
     }
 
     optional<Vector4f> White;
@@ -780,26 +791,16 @@ inline void SoftwareRenderer::DrawFulllTileImplSimd(const DrawTileData& TD, Draw
             White = col;
         }
     }
-            //_mm256_maskstore_ps( pPixels[0].Data() , write_mask.v , finalColor.x.v );
-            //_mm256_maskstore_ps( pPixels[2].Data() , write_mask.v , finalColor.y.v );
-            //_mm256_maskstore_ps( pPixels[4].Data() , write_mask.v , finalColor.z.v );
-            //_mm256_maskstore_ps( pPixels[6].Data() , write_mask.v , finalColor.w.v );
 
-
-    //memcpy( pTileInfo->TileMem , LocalPixels , sizeof(LocalPixels) );
-
-    if( --pTileInfo->DrawCount <= 0 )
     {
-        pPixels = LocalPixels;
+        pCurPixel    = Pixels;
+        CoverageMask = TileCoverage;
         for (int y = StartY ; y < EndY; y++)
         {
-            TileLineFToARGB_AVX( pPixels , m_ScreenBuffer.data() + y* SCREEN_WIDTH + TilePosition.x , White );
-            pPixels += TILE_SIZE;
+            TileLineFToARGB_Simd<true,8,eSimdType::AVX>( pCurPixel , m_ScreenBuffer.data() + y* SCREEN_WIDTH + TilePosition.x , White , *CoverageMask );
+            pCurPixel += TILE_SIZE;
+            CoverageMask++;
         }
-    }
-    else
-    {
-        memcpy( pTileInfo->TileMem , LocalPixels , sizeof(LocalPixels) );
     }
 
     if( stats )
@@ -823,16 +824,21 @@ void SoftwareRenderer::PushTile( DrawTileData data )
     //    DrawPartialTile(data,nullptr);
 }
 
+bool g_useSimd = true;
+
 void SoftwareRenderer::DrawPartialTile(const DrawTileData& TD, DrawStats* stats)
 {
-    //return DrawTileImpl<true>(TD, stats);
-
-    return DrawFulllTileImplSimd<eSimdType::AVX,true>( TD, stats );
+    if( g_useSimd )
+        return DrawFulllTileImplSimd<eSimdType::AVX,true,8>( TD, stats );
+    else
+        return DrawTileImpl<true>(TD, stats);
 }
 void SoftwareRenderer::DrawFullTile(const DrawTileData& TD, DrawStats* stats)
 {
-    return DrawFulllTileImplSimd<eSimdType::AVX,false>( TD, stats );
-    //return DrawTileImpl<false>(TD, stats);
+    if( g_useSimd )
+        return DrawFulllTileImplSimd<eSimdType::AVX,false,8>( TD, stats );
+    else
+        return DrawTileImpl<false>(TD, stats);
 }
 void SoftwareRenderer::DrawTile(const DrawTileData& TD, DrawStats* stats)
 {
@@ -1064,7 +1070,7 @@ void SoftwareRenderer::DrawFilledTriangleT(const TransformedVertex& VA, const Tr
 
             if( Classified == eTileCoverage::Inside )
             {
-                pTileInfo->DrawCount++;
+                auto ID = pTileInfo->DrawCount++;
 
                 DrawTileData TD;
                 TD.LogicPos  = TilePos.ToVector2<int>();
@@ -1072,6 +1078,7 @@ void SoftwareRenderer::DrawFilledTriangleT(const TransformedVertex& VA, const Tr
                 TD.Triangle  = &Data;
                 TD.IsFullTile= true;
                 TD.TileInfo  = pTileInfo;
+                TD.TileDrawID= ID;
                 PushTile(TD);
                 //DrawFullTile( TD , stats );
                 if( g_showTilestype )
@@ -1079,7 +1086,7 @@ void SoftwareRenderer::DrawFilledTriangleT(const TransformedVertex& VA, const Tr
             }
             else if( Classified == eTileCoverage::Partial )
             {
-                pTileInfo->DrawCount++;
+                auto ID = pTileInfo->DrawCount++;
 
                 DrawTileData TD;
                 TD.LogicPos  = TilePos.ToVector2<int>();
@@ -1087,6 +1094,7 @@ void SoftwareRenderer::DrawFilledTriangleT(const TransformedVertex& VA, const Tr
                 TD.Triangle  = &Data;
                 TD.IsFullTile= false;
                 TD.TileInfo  = pTileInfo;
+                TD.TileDrawID= ID;
                 PushTile(TD);
                 //DrawPartialTile( TD , stats );
                 if( g_showTilestype )
@@ -1202,21 +1210,8 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
                     continue;
 
                 // process tile
-                if( pTileData->TaskType != eThreadTaskType::ComposeTile )
+                //if( pTileData->TaskType != eThreadTaskType::ComposeTile )
                     DrawTile(*pTileData,nullptr);
-                else
-                {
-                    const auto pInfo    = pTileData->TileInfo;
-                    const int  StartY   = pInfo->TileScreenPos.y;
-                    const int  EndY     = StartY + TILE_SIZE;
-                          auto pPixels  = pInfo->TileMem;
-
-                    for (int y = StartY ; y < EndY; y++)
-                    {
-                        TileLineFToARGB_AVX( pPixels , m_ScreenBuffer.data() + y* SCREEN_WIDTH + pInfo->TileScreenPos.x , {} );
-                        pPixels += TILE_SIZE;
-                    }
-                }
             };
         };
 
@@ -1225,42 +1220,6 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 
         // launch tasks in the thread pool
         m_TileThreadPool.LaunchTasks( std::move(Tasks) );
-
-
-
-        //auto pNew = m_TilesData.data();
-
-        ////ImGui::Text("Tiles: %d" , m_TilesGridSize.x * m_TilesGridSize.y );
-
-        ////printf("S");
-        //for( int i=0; i<m_TilesGridSize.x * m_TilesGridSize.y ; ++i )
-        //{
-        //    pNew->TaskType = eThreadTaskType::ComposeTile;
-        //    pNew->TileInfo = &m_TilesGrid[i];
-
-        //    //if( pNew->TileInfo->TileIndex.x == 0 && pNew->TileInfo->TileIndex.y == 0 )
-        //    //{
-        //    //    printf("00->");
-        //    //}
-        //    //if( pNew->TileInfo->TileIndex == m_LastTile )
-        //    //{
-        //    //    printf("11->");
-        //    //}
-
-        //    pNew++;
-        //}
-        ////printf("E");
-
-        //pTileDataEnd = pNew;
-
-        //// set current tile job pointer to the start of tiles data
-        //m_pCurrentTileJob = m_TilesData.data();
-
-        //// launch tasks in the thread pool
-        //m_TileThreadPool.LaunchTasks( vector<function<void()>>( m_TileThreadPool.GetThreadCount() , function<void()>(Task) ) );
-
-
-
     }
 }
 
@@ -1579,7 +1538,6 @@ void SoftwareRenderer::DrawFilledTriangleBaseline(const TransformedVertex& VA, c
 
 
             interpolator.InterpolateAllButZ(baricentricCoordinates, interpolatedVertex);
-            interpolatedVertex.m_Normal.Normalize();
             interpolatedVertex.m_Color = interpolatedVertex.m_Color * color;
             PutPixelUnsafe(x, y, FragmentShader(interpolatedVertex).ToARGB());
             pixelsDrawn++;
@@ -1669,7 +1627,6 @@ void SoftwareRenderer::DrawFilledTriangle_v2(const TransformedVertex& VA, const 
                 continue;
             }
 
-            interpolatedVertex.m_Normal.Normalize();
             interpolatedVertex.m_Color = interpolatedVertex.m_Color * color;
             PutPixelUnsafe(x, y, FragmentShader(interpolatedVertex).ToARGB());
             pixelsDrawn++;
@@ -1791,7 +1748,6 @@ void SoftwareRenderer::DrawFilledTriangle_v3(const TransformedVertex& VA, const 
                 continue;
             }
 
-            interpolatedVertex.m_Normal.Normalize();
             interpolatedVertex.m_Color = interpolatedVertex.m_Color * color;
             PutPixelUnsafe(x, y, FragmentShader(interpolatedVertex).ToARGB());
             pixelsDrawn++;
@@ -1967,7 +1923,7 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
 
     // clockwise order so we check if point is on the right side of line
     const auto ABC2 = EdgeFunction(A2, B2, C2);
-    const float invABC2 = 1.0f / ABC2;
+    //const float invABC2 = 1.0f / ABC2;
 
     constexpr auto PixelOffset = Vector2<int64_t>{ Multiplier , Multiplier }/2;
 
@@ -2053,38 +2009,9 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
             {
                 EdgeResult_t EdgeResult;
 
-                if( g_mode )
-                {
-                const Vector2 P2 = Vector2(ScrrenX, ScrrenY)+PixelOffset;
-
-                const auto  CAP = (A2.x - C2.x) * (P2.y - C2.y)
-                                - (A2.y - C2.y) * (P2.x - C2.x);
-                const auto  ABP = (B2.x - A2.x) * (P2.y - A2.y)
-                                - (B2.y - A2.y) * (P2.x - A2.x);
-                const auto  BCP = (C2.x - B2.x) * (P2.y - B2.y)
-                                - (C2.y - B2.y) * (P2.x - B2.x);
-
-                EdgeResult.ABP = ABP;
-                EdgeResult.BCP = BCP;
-                EdgeResult.CAP = CAP;
-
-                if (EdgeResult.ABP < 0)
-                    continue;
-                if (EdgeResult.BCP < 0)
-                    continue;
-                if (EdgeResult.CAP < 0)
-                    continue;
-
-                EdgeResult.ABP = ABP;
-                EdgeResult.BCP = BCP;
-                EdgeResult.CAP = CAP;
-
-                }
-                else
-                {
-                    auto ABP = (ABP_X + ABP_Y);
-                    auto BCP = (BCP_X + BCP_Y);
-                    auto CAP = (CAP_X + CAP_Y);
+                auto ABP = (ABP_X + ABP_Y);
+                auto BCP = (BCP_X + BCP_Y);
+                auto CAP = (CAP_X + CAP_Y);
 
                 if (ABP < 0)
                     continue;
@@ -2096,8 +2023,6 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
                 EdgeResult.ABP = ABP;
                 EdgeResult.BCP = BCP;
                 EdgeResult.CAP = CAP;
-
-                }
             }
 
             // if pixel is inside triangle, draw it
@@ -2122,7 +2047,6 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
                 continue;
             }
 
-            //interpolatedVertex.m_Normal.Normalize();
             interpolatedVertex.m_Color = interpolatedVertex.m_Color * color;
             Vector4f finalColor = FragmentShader(interpolatedVertex);
             PutPixelUnsafe(ScrrenX>>PrecisionBits, ScrrenY>>PrecisionBits, Vector4f::ToARGB(finalColor));
@@ -2248,7 +2172,6 @@ void SoftwareRenderer::DrawFilledTriangleWTF(const TransformedVertex& VA, const 
             }
 
             //interpolator.InterpolateAllButZ(baricentricCoordinates, interpolatedVertex);
-            interpolatedVertex.m_Normal.Normalize();
             interpolatedVertex.m_Color = interpolatedVertex.m_Color * color;
             Vector4f finalColor = FragmentShader(interpolatedVertex);
             PutPixelUnsafe(x, y, Vector4f::ToARGB(finalColor));
