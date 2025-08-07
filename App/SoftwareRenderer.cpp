@@ -135,8 +135,8 @@ shared_ptr<ITexture> SoftwareRenderer::LoadTexture(const char* fileName) const
 void SoftwareRenderer::ClearScreen()
 {
     ZoneScoped;
-    std::fill(m_ScreenBuffer.begin(), m_ScreenBuffer.end(), m_ClearColor);
-    return;
+    //std::fill(m_ScreenBuffer.begin(), m_ScreenBuffer.end(), m_ClearColor);
+    //return;
     m_pCommandBuffer->PushCommand<CommandClear>( m_ClearColor );
 
 }
@@ -144,8 +144,8 @@ void SoftwareRenderer::ClearScreen()
 void SoftwareRenderer::ClearZBuffer()
 {
     ZoneScoped;
-    std::fill(m_ZBuffer.begin(), m_ZBuffer.end(), 1.f);
-    return;
+    //std::fill(m_ZBuffer.begin(), m_ZBuffer.end(), 1.f);
+    //return;
     m_pCommandBuffer->PushCommand<CommandClear>( std::nullopt , 1.0F );
 }
 
@@ -1160,10 +1160,7 @@ void SoftwareRenderer::ClearBuffers(const CommandClear& cmd)
     if( !cmd.m_ClearColor && !cmd.m_ZValue )
         return;
 
-
-    return;
-
-    auto BUFFER_SUB_SIZE = m_ScreenBuffer.size()/4;//TILE_SIZE*TILE_SIZE*32;
+    auto BUFFER_SUB_SIZE = m_ScreenBuffer.size()/8;//TILE_SIZE*TILE_SIZE*32;
 
     auto pWorkCmdBuffer = AllocTransientCommandBuffer();
 
@@ -1201,11 +1198,11 @@ void SoftwareRenderer::ClearBuffers(const CommandClear& cmd)
             auto SubSpan = BufferSpan.subspan(0, BUFFER_SUB_SIZE);
             BufferSpan = BufferSpan.subspan(SubSpan.size());
 
-            pWorkCmdBuffer->PushCommand<CommandFill32BitBuffer>( SubSpan, *cmd.m_ZValue);
+            pWorkCmdBuffer->PushCommand<CommandFill32BitBuffer>( SubSpan, 1.0f );//*cmd.m_ZValue);
         }
 
         if( !BufferSpan.empty() )
-            pWorkCmdBuffer->PushCommand<CommandFill32BitBuffer>( BufferSpan, *cmd.m_ZValue);
+            pWorkCmdBuffer->PushCommand<CommandFill32BitBuffer>( BufferSpan,1.0f );// *cmd.m_ZValue);
     }
 
     //pWorkCmdBuffer->AddSyncPoint( *pSync , m_ThreadsCount );

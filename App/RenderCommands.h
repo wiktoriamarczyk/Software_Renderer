@@ -85,13 +85,13 @@ struct CommandFill32BitBuffer : Command
         : Command(COMMAND_ID)
         , m_pBuffer{Buffer.data()}
         , m_ElementsCount{static_cast<uint32_t>(Buffer.size())}
-        , m_Value(Val)
+        , m_Value{ .m_FValue{ Val} }
     {}
     CommandFill32BitBuffer( span<uint32_t> Buffer , uint32_t Val )
         : Command(COMMAND_ID)
         , m_pBuffer{Buffer.data()}
         , m_ElementsCount{static_cast<uint32_t>(Buffer.size())}
-        , m_Value(Val)
+        , m_Value{ .m_UValue{ Val } }
     {}
 
     void*    m_pBuffer = nullptr;
