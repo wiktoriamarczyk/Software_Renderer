@@ -59,7 +59,7 @@ static T LerpT(const T& a, const T& b, float alpha)
     return a * a1 + b * alpha;
 }
 
-const vector<Vertex>& ClipTriangles(const Plane& clipPlane, const float epsilon, const vector<Vertex>& verts)
+span<const Vertex> ClipTriangles(const Plane& clipPlane, const float epsilon, span<const Vertex> verts)
 {
     vector<uint8_t> vertsRelation;
 
@@ -81,10 +81,7 @@ const vector<Vertex>& ClipTriangles(const Plane& clipPlane, const float epsilon,
 
     // all vertices are behind clipping plane - clip all
     if (!frontOnBackCount[(int)eSide::Back])
-    {
-        static const vector<Vertex> EMPTY;
-        return EMPTY;
-    }
+        return {};
 
     // all vertices are in front of clipping plane - no clipping
     if (!frontOnBackCount[(int)eSide::Front])

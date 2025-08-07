@@ -54,9 +54,15 @@ struct Vertex
 };
 
 template< std::integral T >
-inline bool IsPowerOfTwo(T value)
+inline constexpr bool IsPowerOfTwo(T value)
 {
     return value > 0 && (value & (value - 1)) == 0;
+}
+
+template< std::integral T >
+inline constexpr T Granulate(T base, T multiplier)
+{
+    return ( (base + multiplier - 1) / multiplier )* multiplier;
 }
 
 constexpr inline const uint32_t Vertex::Stride          = sizeof(Vertex);
@@ -1815,4 +1821,4 @@ private:
     Plane m_Planes[6];
 };
 
-const vector<Vertex>& ClipTriangles(const Plane& clipPlane, const float epsilon, const vector<Vertex>& verts);
+span<const Vertex> ClipTriangles(const Plane& clipPlane, const float epsilon, span<const Vertex> verts);

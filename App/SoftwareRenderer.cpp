@@ -13,8 +13,25 @@
 #include <chrono>
 
 
+bool g_useSimd               = true;
+bool g_showTilesBoundry      = false;
+bool g_showTilestype         = false;
+bool g_showTriangleBoundry   = false;
+bool g_showCornersClassify   = false;
+bool g_showTilesGrid         = false;
+
 int g_selected_tri = 0;
 thread_local size_t g_tri_index = 0;
+
+struct PipelineSharedData
+{
+    Plane          m_NearFrustumPlane;
+    CommandBuffer* m_pProcessTrianglesCmdBuffer = nullptr;
+    SyncBarrier*   m_pProcessTrianglesCmdBufferSync = nullptr;
+    CommandBuffer* m_pRenderTilesCmdBuffer = nullptr;
+    SyncBarrier*   m_pRenderTilesCmdBufferSync = nullptr;
+    DrawConfig*    m_pDrawConfig = nullptr;
+};
 
 template< typename T >
 struct EdgeFunctionRails
@@ -118,52 +135,18 @@ shared_ptr<ITexture> SoftwareRenderer::LoadTexture(const char* fileName) const
 void SoftwareRenderer::ClearScreen()
 {
     ZoneScoped;
-    //std::fill(m_ScreenBuffer.begin(), m_ScreenBuffer.end(), m_ClearColor);
+    std::fill(m_ScreenBuffer.begin(), m_ScreenBuffer.end(), m_ClearColor);
+    return;
+    m_pCommandBuffer->PushCommand<CommandClear>( m_ClearColor );
 
-
-    {
-        int blozksizee = m_ScreenBuffer.size()/16;
-
-        vector<function<void()>> Tasks;
-        Tasks.reserve(m_TileThreadPool.GetThreadCount());
-
-        for( int i=0 ; i<16 ; ++i )
-        {
-            Tasks.push_back( [this,blozksizee,i]()
-            {
-                ZoneScopedN( "ClearScreenTask");
-                std::fill(m_ScreenBuffer.data()+i*blozksizee, m_ScreenBuffer.data()+(i+1)*blozksizee, m_ClearColor);
-            } );
-        }
-
-        // launch tasks in the thread pool
-        m_TileThreadPool.LaunchTasks( std::move(Tasks) );
-    }
 }
 
 void SoftwareRenderer::ClearZBuffer()
 {
     ZoneScoped;
-    //std::fill(m_ZBuffer.begin(), m_ZBuffer.end(), 1.f);
-
-    {
-        int blozksizee = m_ZBuffer.size()/16;
-
-        vector<function<void()>> Tasks;
-        Tasks.reserve(m_TileThreadPool.GetThreadCount());
-
-        for( int i=0 ; i<16 ; ++i )
-        {
-            Tasks.push_back( [this,blozksizee,i]()
-            {
-                ZoneScopedN( "ClearScreenTask");
-                std::fill(m_ZBuffer.data()+i*blozksizee, m_ZBuffer.data()+(i+1)*blozksizee, 1.0f);
-            } );
-        }
-
-        // launch tasks in the thread pool
-        m_TileThreadPool.LaunchTasks( std::move(Tasks) );
-    }
+    std::fill(m_ZBuffer.begin(), m_ZBuffer.end(), 1.f);
+    return;
+    m_pCommandBuffer->PushCommand<CommandClear>( std::nullopt , 1.0F );
 }
 
 inline Vector4f SoftwareRenderer::FragmentShader(const TransformedVertex& vertex)
@@ -243,7 +226,7 @@ struct IntegrerPrecision
 };
 constexpr IntegrerPrecision Precision{ 0 };
 
-struct ALIGN_FOR_AVX SoftwareRenderer::TriangleData
+struct ALIGN_FOR_AVX TriangleData
 {
     TriangleData( std::nullptr_t )
         : m_Interpolator(nullptr)
@@ -259,21 +242,6 @@ struct ALIGN_FOR_AVX SoftwareRenderer::TriangleData
     VertexInterpolator         m_Interpolator;
     EdgeFunctionRails<int64_t> m_EdgeFunctionRails;
     float                      m_InvABC = 0.f;
-};
-
-struct SoftwareRenderer::ThreadTask
-{
-    eThreadTaskType TaskType = eThreadTaskType::Unknown;
-};
-
-struct SoftwareRenderer::DrawTileData : ThreadTask
-{
-    bool                IsFullTile = false;
-    uint16_t            TileDrawID = 0;
-    Vector2i            ScreenPos;
-    Vector2i            LogicPos;
-    const TriangleData* Triangle;
-    const TileInfo*     TileInfo;
 };
 
 void transpose8Vec4f_to_Vec4f256(const Vector4f* in, Vector4f256A& out)
@@ -353,6 +321,7 @@ void transposeVec4f256_to_8Vec4f(const Vector4f256A& in, Vector4f* out)
 
 SoftwareRenderer::SoftwareRenderer(int screenWidth, int screenHeight)
 {
+    m_TransientMemoryResource.reset();
     m_ScreenBuffer.resize(screenWidth * screenHeight, 0);
     m_ZBuffer.resize(screenWidth * screenHeight, 0);
 
@@ -401,6 +370,7 @@ SoftwareRenderer::SoftwareRenderer(int screenWidth, int screenHeight)
     m_DefaultTexture->CreateWhite4x4Tex();
 
     m_Texture = m_DefaultTexture;
+    m_pCommandBuffer = AllocTransientCommandBuffer();
     //
     //Vector4f test[8] =
     //{
@@ -420,28 +390,14 @@ SoftwareRenderer::SoftwareRenderer(int screenWidth, int screenHeight)
     //transpose8Vec4f_to_Vec4f256(test, vec256);
     //transposeVec4f256_to_8Vec4f(vec256, test2);
 
-    m_TrianglesData.resize(100,nullptr);
-    m_TilesData.resize( ((screenWidth+TILE_SIZE-1)/TILE_SIZE) * ((screenHeight+TILE_SIZE-1)/TILE_SIZE) * 2 );
+    //m_TrianglesData.resize(100,nullptr);
+    //m_TilesData.resize( ((screenWidth+TILE_SIZE-1)/TILE_SIZE) * ((screenHeight+TILE_SIZE-1)/TILE_SIZE) * 2 );
 
     m_TileThreadPool.SetThreadCount(16);
 }
 
 SoftwareRenderer::~SoftwareRenderer()
 {
-}
-
-template< typename ... Args >
-SoftwareRenderer::TriangleData* SoftwareRenderer::PushTriangleData( Args ... args )
-{
-    TriangleData* pCurData = m_pCurrentTriangleData.load( std::memory_order_relaxed );
-    for( ;; )
-    {
-        if( m_pCurrentTriangleData.compare_exchange_strong( pCurData , pCurData + 1 ) )
-            break;
-    }
-
-    new(pCurData) TriangleData( std::forward<Args>(args)...);
-    return pCurData;
 }
 
 template< typename T >
@@ -559,7 +515,7 @@ void TileLineFToARGB_Simd( const Vector4f* pPixels , uint32_t* pColBuffer , opti
 }
 
 template< bool Partial >
-inline void SoftwareRenderer::DrawTileImpl(const DrawTileData& TD, DrawStats* stats)
+inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& TD, DrawStats* stats)
 {
     ZoneScoped;
     const auto pTriangle    = TD.Triangle;
@@ -618,7 +574,7 @@ inline void SoftwareRenderer::DrawTileImpl(const DrawTileData& TD, DrawStats* st
             Vector4f finalColor = FragmentShader(interpolatedVertex);
             //finalColor = Vector4f{ interpolatedVertex.m_UV , 1.0f , 1.0f };
 
-            if constexpr( Partial )
+            if constexpr( Partial || 1 )
             {
                 pColBuffer[ix] = Vector4f::ToARGB(finalColor);
                 pixelsDrawn++;
@@ -631,22 +587,22 @@ inline void SoftwareRenderer::DrawTileImpl(const DrawTileData& TD, DrawStats* st
         pZBuffer += TILE_SIZE; // move to next row in Z-buffer
     }
 
-    if constexpr( !Partial )
-    {
-        pPixels = Pixels;
-        for (int y = StartY ; y < EndY; y++)
-        {
-            TileLineFToARGB( pPixels , m_ScreenBuffer.data() + y* SCREEN_WIDTH + TilePosition.x );
-            pPixels += TILE_SIZE;
-        }
-    }
+    //if constexpr( !Partial )
+    //{
+    //    pPixels = Pixels;
+    //    for (int y = StartY ; y < EndY; y++)
+    //    {
+    //        TileLineFToARGB( pPixels , m_ScreenBuffer.data() + y* SCREEN_WIDTH + TilePosition.x );
+    //        pPixels += TILE_SIZE;
+    //    }
+    //}
 
     if( stats )
         stats->m_FramePixelsDrawn += pixelsDrawn;
 }
 
 template< eSimdType Type , bool Partial , int Elements  >
-inline void SoftwareRenderer::DrawFulllTileImplSimd(const DrawTileData& TD, DrawStats* stats)
+inline void SoftwareRenderer::DrawFulllTileImplSimd(const CommandRenderTile& TD, DrawStats* stats)
 {
     using f256t             = fsimd<Elements,Type>;
     using i256t             = isimd<Elements,Type>;
@@ -807,40 +763,21 @@ inline void SoftwareRenderer::DrawFulllTileImplSimd(const DrawTileData& TD, Draw
         stats->m_FramePixelsDrawn += pixelsDrawn;
 }
 
-void SoftwareRenderer::PushTile( DrawTileData data )
-{
-    DrawTileData* pCurData = m_pCurrentTileData.load( std::memory_order_relaxed );
-    for( ;; )
-    {
-        if( m_pCurrentTileData.compare_exchange_strong( pCurData , pCurData + 1 ) )
-            break;
-    }
-
-    *pCurData = data;
-
-    //if( data.IsFullTile  )
-    //    DrawFullTile(data,nullptr);
-    //else
-    //    DrawPartialTile(data,nullptr);
-}
-
-bool g_useSimd = true;
-
-void SoftwareRenderer::DrawPartialTile(const DrawTileData& TD, DrawStats* stats)
+void SoftwareRenderer::DrawPartialTile(const CommandRenderTile& TD, DrawStats* stats)
 {
     if( g_useSimd )
         return DrawFulllTileImplSimd<eSimdType::AVX,true,8>( TD, stats );
     else
         return DrawTileImpl<true>(TD, stats);
 }
-void SoftwareRenderer::DrawFullTile(const DrawTileData& TD, DrawStats* stats)
+void SoftwareRenderer::DrawFullTile(const CommandRenderTile& TD, DrawStats* stats)
 {
     if( g_useSimd )
         return DrawFulllTileImplSimd<eSimdType::AVX,false,8>( TD, stats );
     else
         return DrawTileImpl<false>(TD, stats);
 }
-void SoftwareRenderer::DrawTile(const DrawTileData& TD, DrawStats* stats)
+void SoftwareRenderer::DrawTile(const CommandRenderTile& TD, DrawStats* stats)
 {
     if( TD.IsFullTile )
         DrawFullTile(TD, stats);
@@ -909,16 +846,19 @@ inline void ImGuiAddX(ImVec2 p_min, ImVec2 p_max, ImU32 col, float thickness = 1
     ImGuiAddLine(P[1], P[2], col, thickness);
 }
 
-bool g_showTilesBoundry      = false;
-bool g_showTilestype         = false;
-bool g_showTriangleBoundry   = false;
-bool g_showCornersClassify   = false;
-
-void SoftwareRenderer::DrawFilledTriangleT(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color, DrawStats& stats)
+void SoftwareRenderer::DrawFilledTriangleT(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color, DrawStats& stats, const PipelineSharedData* pPipelineSharedData )
 {
     ZoneScoped;
     // filling algorithm is working that way that we are going through all pixels in rectangle that is created by min and max points
     // and we are checking if pixel is inside triangle by using three lines and checking if pixel is on the same side of each line
+
+    if( m_DrawBBoxes | m_DrawWireframe )
+    {
+        if (m_DrawWireframe)
+            return DrawTriangle(VA, VB, VC, m_WireFrameColor, 0, SCREEN_HEIGHT);
+        else
+            return DrawTriangleBoundingBox( VA , VB, VC, m_WireFrameColor , 0 , SCREEN_HEIGHT );
+    }
 
     Vector2 A = (VA.m_ScreenPosition.xy()*Precision.Multiplier).ToVector2<int64_t,eRoundMode::Round>();
     Vector2 B = (VB.m_ScreenPosition.xy()*Precision.Multiplier).ToVector2<int64_t,eRoundMode::Round>();
@@ -965,7 +905,7 @@ void SoftwareRenderer::DrawFilledTriangleT(const TransformedVertex& VA, const Tr
 
     constexpr auto PixelOffset = Vector2<int64_t>{ Precision.Multiplier , Precision.Multiplier }/2;
 
-    TriangleData& Data = *PushTriangleData( VA , VB , VC , Vector4f{1,1,1,1} , A , B , C , StartP );
+    TriangleData& Data = *m_TransientAllocator.allocate<TriangleData>( VA , VB , VC , Vector4f{1,1,1,1} , A , B , C , StartP );
     Data.m_InvABC = (1.0f / ABC);
 
     constexpr auto TILE_SIZE_M = TILE_SIZE * Precision.Multiplier;
@@ -1001,6 +941,8 @@ void SoftwareRenderer::DrawFilledTriangleT(const TransformedVertex& VA, const Tr
         { 1 , 1 },
     };
 
+    {
+        ZoneScopedN("Classify Corners");
     for( int i=0 ; auto& Edge : Edges )
     {
         auto A = Edge.A;
@@ -1032,6 +974,7 @@ void SoftwareRenderer::DrawFilledTriangleT(const TransformedVertex& VA, const Tr
         Closest [i  ] = Corners[ ClosestI  ] * TILE_SIZE_M;
         Farthest[i++] = Corners[ FarthestI ] * TILE_SIZE_M;
     }
+    }
 
     if( g_showTriangleBoundry )
     {
@@ -1055,6 +998,10 @@ void SoftwareRenderer::DrawFilledTriangleT(const TransformedVertex& VA, const Tr
         ImGuiAddX(TilePos+Farthest[2], TilePos+Farthest[2] + 8, ImColor(0, 0, 255, 255) , 2 );
     }
 
+    CommandBuffer* pCommandBuffer = pPipelineSharedData ? pPipelineSharedData->m_pRenderTilesCmdBuffer : m_pCommandBuffer;
+
+    {
+        ZoneScopedN("Classify Tiles");
     for( int y = MinTile.y ; y <= MaxTile.y ; ++y )
     {
         for( int x = MinTile.x ; x <= MaxTile.x ; ++x )
@@ -1070,37 +1017,41 @@ void SoftwareRenderer::DrawFilledTriangleT(const TransformedVertex& VA, const Tr
 
             if( Classified == eTileCoverage::Inside )
             {
+                ZoneScopedN("gen command");
                 auto ID = pTileInfo->DrawCount++;
 
-                DrawTileData TD;
-                TD.LogicPos  = TilePos.ToVector2<int>();
-                TD.ScreenPos = (TD.LogicPos / Precision.Multiplier);
+                auto LogicPos  = TilePos.ToVector2<int>();
+                CommandRenderTile TD;
+                TD.ScreenPos = (LogicPos / Precision.Multiplier);
                 TD.Triangle  = &Data;
                 TD.IsFullTile= true;
                 TD.TileInfo  = pTileInfo;
                 TD.TileDrawID= ID;
-                PushTile(TD);
+                pCommandBuffer->PushCommand<CommandRenderTile>( TD );
                 //DrawFullTile( TD , stats );
                 if( g_showTilestype )
                     ImGuiAddRectFilled(TilePos, TilePos + TILE_SIZE, ImColor(64, 255, 0, 64) );
             }
             else if( Classified == eTileCoverage::Partial )
             {
+                ZoneScopedN("gen command");
                 auto ID = pTileInfo->DrawCount++;
 
-                DrawTileData TD;
-                TD.LogicPos  = TilePos.ToVector2<int>();
-                TD.ScreenPos = (TD.LogicPos / Precision.Multiplier);
+                auto LogicPos  = TilePos.ToVector2<int>();
+
+                CommandRenderTile TD;
+                TD.ScreenPos = (LogicPos / Precision.Multiplier);
                 TD.Triangle  = &Data;
                 TD.IsFullTile= false;
                 TD.TileInfo  = pTileInfo;
                 TD.TileDrawID= ID;
-                PushTile(TD);
+                pCommandBuffer->PushCommand<CommandRenderTile>( TD );
                 //DrawPartialTile( TD , stats );
                 if( g_showTilestype )
                     ImGuiAddRectFilled(TilePos, TilePos + TILE_SIZE, ImColor(0, 64, 255, 64) );
             }
         }
+    }
     }
 
 }
@@ -1126,6 +1077,8 @@ void SoftwareRenderer::BeginFrame()
 
 void SoftwareRenderer::EndFrame()
 {
+    m_TransientMemoryResource.reset();
+
     const int ThreadsDivide = ( m_ThreadPool.GetThreadCount() ? m_ThreadPool.GetThreadCount() : 1 );
 
     m_DrawStats.m_FramePixels         = m_FramePixels;
@@ -1139,98 +1092,272 @@ void SoftwareRenderer::EndFrame()
     m_DrawStats.m_RasterTimePerThreadUS=m_FrameRasterTimeUS / ThreadsDivide;
     m_DrawStats.m_TransformTimeUS     = m_FrameTransformTimeUS / ThreadsDivide;
 
-    for( int i=0 ; i<SCREEN_WIDTH; i+=64 )
-        ImGui::GetBackgroundDrawList()->AddLine( ImVec2( i,0 ), ImVec2(i ,SCREEN_HEIGHT) , ImColor(255,128,255,128) );
+    if( g_showTilesGrid )
+    {
+        for( int i=0 ; i<SCREEN_WIDTH; i+=TILE_SIZE )
+            ImGui::GetBackgroundDrawList()->AddLine( ImVec2( i,0 ), ImVec2(i ,SCREEN_HEIGHT) , ImColor(255,128,255,128) );
 
-    for( int i=0 ; i<SCREEN_HEIGHT; i+=64 )
-        ImGui::GetBackgroundDrawList()->AddLine( ImVec2( 0,i ), ImVec2(SCREEN_WIDTH ,i) , ImColor(255,128,255,128) );
+        for( int i=0 ; i<SCREEN_HEIGHT; i+=TILE_SIZE )
+            ImGui::GetBackgroundDrawList()->AddLine( ImVec2( 0,i ), ImVec2(SCREEN_WIDTH ,i) , ImColor(255,128,255,128) );
+    }
+
+    m_TransientMemoryResource.reset();
+    m_pCommandBuffer = AllocTransientCommandBuffer();
 }
 
 void SoftwareRenderer::Render(const vector<Vertex>& vertices)
 {
-    m_pCurrentTriangleData.store( m_TrianglesData.data() );
-    m_pCurrentTileData.store( m_TilesData.data() );
-
     m_pSelectedMath = m_MathArray[std::clamp(m_MathIndex,0,2)];
-    //m_pSelectedMath->log();
 
     ZoneScoped;
     const auto startTime = std::chrono::high_resolution_clock::now();
-    int threadsCount = m_ThreadPool.GetThreadCount();
-    if (threadsCount > 0)
-    {
-        int linesPerThread = SCREEN_HEIGHT / threadsCount;
-        int lineStyartY = 0;
-        int lineEndY = linesPerThread;
 
-        vector<function<void()>> tasks(threadsCount);
-        for (int i = 0; i < threadsCount; ++i)
-        {
-            if (i + 1 == threadsCount)
-                lineEndY = SCREEN_HEIGHT - 1;
-            tasks[i] = [this,&vertices, lineStyartY, lineEndY,i]
-            {
-                ZoneScopedN("Render Task");
-                DoRender(vertices, lineStyartY, lineEndY,i);
-            };
-            lineStyartY = lineEndY+1;
-            lineEndY = lineStyartY+linesPerThread;
-        }
+    auto pConfig = m_TransientAllocator.allocate<DrawConfig>();
+    pConfig->m_Color = Vector4f{1,1,1,1};
 
-        m_ThreadPool.LaunchTasks(std::move(tasks));
-    }
-    else
-    {
-        ZoneScopedN("Preprocess triangles");
-        DoRender(vertices, 0, SCREEN_HEIGHT - 1,0);
-    }
+    m_pCommandBuffer->AddSyncBarrier( "Pre VertexAssemply Sync" , m_ThreadsCount );
+    m_pCommandBuffer->PushCommand<CommandVertexAssemply>( vertices , *pConfig );
+    m_pCommandBuffer->AddSyncBarrier( "Post VertexAssemply Sync" , m_ThreadsCount );
+
+    FrameMarkNamed( "Tasks launched" );
+    m_TileThreadPool.LaunchTasks( { m_ThreadsCount , [this](){ RendererTaskWorker(); } } );
+
     const auto timeUS = std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
     m_FrameDrawTimeMainUS += timeUS;
+}
 
-    auto pTileDataEnd = m_pCurrentTileData.load();
-    m_pCurrentTileData = m_TilesData.data();
+void SoftwareRenderer::RendererTaskWorker()
+{
+    ZoneScoped;
+    const auto pCommandBuffer = m_pCommandBuffer;
+    for(;;)
+    {
+        auto pCommand = pCommandBuffer->GetNextCommand();
+        if (!pCommand)
+            return ExecuteExitCommand();
+
+        switch( pCommand->GetCommandID() )
+        {
+        case eCommandID::ClearBuffers:           ClearBuffers            (*pCommand->static_cast_to<CommandClear>()                  );              continue;
+        case eCommandID::Fill32BitBuffer:        Fill32BitBuffer         (*pCommand->static_cast_to<CommandFill32BitBuffer>()        );              continue;
+        case eCommandID::SyncBarier:             WaitForSync             (*pCommand->static_cast_to<CommandSyncBarier>()             );              continue;
+        case eCommandID::AppendCmdBuf:           AppendCommandBuffer     (*pCommand->static_cast_to<CommandAppendCommmandBufffer>()  );              continue;
+        case eCommandID::VertexAssemply:         VertexAssemply          (*pCommand->static_cast_to<CommandVertexAssemply>()         );              continue;
+        case eCommandID::VertexTransformAndClip: VertexTransformAndClip  (*pCommand->static_cast_to<CommandVertexTransformAndClip>() );              continue;
+        case eCommandID::ProcessTriangles:       ProcessTriangles        (*pCommand->static_cast_to<CommandProcessTriangles>()       );              continue;
+        case eCommandID::RenderTile:             DrawTile                (*pCommand->static_cast_to<CommandRenderTile>()             ,&m_DrawStats); continue;
+            ;
+        default:
+            assert( false && "Unknown command" );
+            return;
+        }
+    }
+}
+
+void SoftwareRenderer::ClearBuffers(const CommandClear& cmd)
+{
+    ZoneScoped;
+    if( !cmd.m_ClearColor && !cmd.m_ZValue )
+        return;
+
+
+    return;
+
+    auto BUFFER_SUB_SIZE = m_ScreenBuffer.size()/4;//TILE_SIZE*TILE_SIZE*32;
+
+    auto pWorkCmdBuffer = AllocTransientCommandBuffer();
+
+    auto pSync = m_TransientAllocator.allocate<SyncBarrier>();
+    pSync->m_Barrier.emplace( m_ThreadsCount );
+
+    if( cmd.m_ClearColor )
+    {
+        span<uint32_t> BufferSpan(m_ScreenBuffer);
+
+        for( int i = BUFFER_SUB_SIZE; i <BufferSpan.size(); i+=BUFFER_SUB_SIZE)
+        {
+            if( BufferSpan.size() < BUFFER_SUB_SIZE )
+                break;
+
+            auto SubSpan = BufferSpan.subspan(0, BUFFER_SUB_SIZE);
+            BufferSpan = BufferSpan.subspan(SubSpan.size());
+
+            pWorkCmdBuffer->PushCommand<CommandFill32BitBuffer>( SubSpan, *cmd.m_ClearColor);
+        }
+
+        if( !BufferSpan.empty() )
+            pWorkCmdBuffer->PushCommand<CommandFill32BitBuffer>( BufferSpan, *cmd.m_ClearColor);
+    }
+
+    if( cmd.m_ZValue )
+    {
+        span<float> BufferSpan(m_ZBuffer);
+
+        for( int i = BUFFER_SUB_SIZE; i <BufferSpan.size(); i+=BUFFER_SUB_SIZE)
+        {
+            if( BufferSpan.size() < BUFFER_SUB_SIZE )
+                break;
+
+            auto SubSpan = BufferSpan.subspan(0, BUFFER_SUB_SIZE);
+            BufferSpan = BufferSpan.subspan(SubSpan.size());
+
+            pWorkCmdBuffer->PushCommand<CommandFill32BitBuffer>( SubSpan, *cmd.m_ZValue);
+        }
+
+        if( !BufferSpan.empty() )
+            pWorkCmdBuffer->PushCommand<CommandFill32BitBuffer>( BufferSpan, *cmd.m_ZValue);
+    }
+
+    //pWorkCmdBuffer->AddSyncPoint( *pSync , m_ThreadsCount );
+
+    m_pCommandBuffer->PushCommandBuffer( *pWorkCmdBuffer );
+}
+
+void SoftwareRenderer::Fill32BitBuffer( const CommandFill32BitBuffer& cmd )
+{
+    ZoneScoped;
+    auto pBuffer = cmd.m_pBuffer;
+    if( !pBuffer )
+        return;
+
+    if( cmd.m_Value.m_U8Array[0] == cmd.m_Value.m_U8Array[1] && cmd.m_Value.m_U8Array[1] == cmd.m_Value.m_U8Array[2] && cmd.m_Value.m_U8Array[2] && cmd.m_Value.m_U8Array[3] )
+        memset( cmd.m_pBuffer , cmd.m_Value.m_U8Array[0] , cmd.m_ElementsCount * sizeof(uint32_t) );
+    else
+        std::fill_n( reinterpret_cast<uint32_t*>( cmd.m_pBuffer ) , cmd.m_ElementsCount , cmd.m_Value.m_UValue );
+}
+
+void SoftwareRenderer::VertexAssemply( const CommandVertexAssemply& cmd )
+{
+    ZoneScoped;
+    auto vertices = cmd.m_Vertices;
+    if( vertices.empty() )
+        return;
+
+    auto VerticesCount  = vertices.size();
+
+    PipelineSharedData* pData = nullptr;
+    CommandBuffer* pWorkCmdBuffer = nullptr;
 
     {
-        ZoneScopedN("Render Tiles");
-        // set current tile job pointer to the start of tiles data
-        m_pCurrentTileJob = m_TilesData.data();
+        ZoneScopedN("Prepare PipelineSharedData");
+        pWorkCmdBuffer = AllocTransientCommandBuffer();
 
-        auto Task = [this,&pTileDataEnd]()
-        {
-            ZoneScopedN("Render task");
-            for(;;)
-            {
-                // get current tile to render
-                auto pTileData = m_pCurrentTileJob.load(std::memory_order_relaxed);
-                if( !pTileData || pTileData >= pTileDataEnd )
-                    return; // all tiles are processed - exit task
-
-                // increment current tile job pointer to signal that we are processing this tile
-                if( !m_pCurrentTileJob.compare_exchange_strong( pTileData , pTileData + 1 ) )
-                    continue;
-
-                // process tile
-                //if( pTileData->TaskType != eThreadTaskType::ComposeTile )
-                    DrawTile(*pTileData,nullptr);
-            };
-        };
-
-        // create a vector of tasks for each thread in the thread pool
-        vector<function<void()>> Tasks( m_TileThreadPool.GetThreadCount() , function<void()>(Task) );
-
-        // launch tasks in the thread pool
-        m_TileThreadPool.LaunchTasks( std::move(Tasks) );
+        pData = m_TransientAllocator.allocate<PipelineSharedData>();
+        pData->m_pProcessTrianglesCmdBuffer = AllocTransientCommandBuffer();
+        pData->m_pProcessTrianglesCmdBufferSync = m_TransientAllocator.allocate<SyncBarrier>();
+        pData->m_pRenderTilesCmdBuffer = AllocTransientCommandBuffer();
+        pData->m_pRenderTilesCmdBufferSync = m_TransientAllocator.allocate<SyncBarrier>();
+        pData->m_pDrawConfig = cmd.m_pConfig;
     }
+
+    m_MVPMatrix.GetFrustumNearPlane(pData->m_NearFrustumPlane);
+
+    auto pVertexTransformAndClipSync = m_TransientAllocator.allocate<SyncBarrier>();
+    {
+        ZoneScopedN("VertexAssemply dispatch");
+        constexpr auto TRIANGLES_PER_COMMAND = 100;
+
+        for( size_t i=0 ; i < VerticesCount ; i+=TRIANGLES_PER_COMMAND*3 )
+        {
+            if( vertices.size() <  + TRIANGLES_PER_COMMAND*3 )
+                break;
+
+            auto SubSpan = vertices.subspan( 0 , TRIANGLES_PER_COMMAND*3 );
+            vertices = vertices.subspan(SubSpan.size());
+
+            pWorkCmdBuffer->PushCommand<CommandVertexTransformAndClip>( SubSpan , *pData );
+        }
+
+        if( !vertices.empty() )
+            pWorkCmdBuffer->PushCommand<CommandVertexTransformAndClip>( vertices , *pData );
+    }
+
+    pVertexTransformAndClipSync->name = "VertexAssemply end";
+    pWorkCmdBuffer->AddSyncPoint( *pVertexTransformAndClipSync , m_ThreadsCount );
+
+    pVertexTransformAndClipSync->m_Barrier.emplace( m_ThreadsCount , triviall_function_ref{}.Assign( m_TransientMemoryResource , [=]
+    {
+        m_pCommandBuffer->PushCommandBuffer( *pData->m_pProcessTrianglesCmdBuffer );
+        pData->m_pProcessTrianglesCmdBufferSync->name = "transform triangles end";
+        m_pCommandBuffer->AddSyncPoint( *pData->m_pProcessTrianglesCmdBufferSync , m_ThreadsCount );
+    }) );
+
+    pData->m_pProcessTrianglesCmdBufferSync->m_Barrier.emplace( m_ThreadsCount , triviall_function_ref{}.Assign( m_TransientMemoryResource , [=]()
+    {
+        m_pCommandBuffer->PushCommandBuffer( *pData->m_pRenderTilesCmdBuffer );
+    }));
+
+    m_pCommandBuffer->PushCommandBuffer( *pWorkCmdBuffer );
+}
+
+void SoftwareRenderer::ExecuteExitCommand()
+{
+    ZoneScoped;
+}
+
+void SoftwareRenderer::VertexTransformAndClip( const CommandVertexTransformAndClip& cmd )
+{
+    ZoneScoped;
+    auto vertices = cmd.m_Input;
+    if( vertices.empty() )
+        return;
+
+    span<TransformedVertex> transformedVertices;
+
+    {
+        ZoneScopedN( "Clip" );
+        vertices = ClipTriangles(cmd.m_pPipelineSharedData->m_NearFrustumPlane, 0.001f, vertices);
+    }
+
+    {
+        ZoneScopedN( "Transform" );
+        transformedVertices = m_TransientAllocator.allocate_array<TransformedVertex>(vertices.size());
+
+        const auto startTime = std::chrono::high_resolution_clock::now();
+
+        for (int i = 0; i < vertices.size(); ++i)
+            transformedVertices[i].ProjToScreen(vertices[i], m_ModelMatrix, m_MVPMatrix);
+
+        m_FrameTransformTimeUS += std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
+    }
+
+    //cmd.m_pPipelineSharedData->m_pProcessTrianglesCmdBuffer->PushCommandSync<CommandProcessTriangles>( cmd.m_pPipelineSharedData->m_pProcessTrianglesCmdBufferSync , transformedVertices , *cmd.m_pPipelineSharedData );
+    cmd.m_pPipelineSharedData->m_pProcessTrianglesCmdBuffer->PushCommand<CommandProcessTriangles>( transformedVertices , *cmd.m_pPipelineSharedData );
+}
+
+void SoftwareRenderer::ProcessTriangles( const CommandProcessTriangles& cmd )
+{
+    ZoneScoped;
+    auto vertices = cmd.m_Vertices;
+    if( vertices.empty() )
+        return;
+
+    for (int i = 2; i < vertices.size(); i+=3)
+        DrawFilledTriangleT(vertices[i - 2], vertices[i - 1], vertices[i], cmd.m_pPipelineSharedData->m_pDrawConfig->m_Color , m_DrawStats,cmd.m_pPipelineSharedData );
 }
 
 void SoftwareRenderer::RenderDepthBuffer()
 {
     ZoneScoped;
     for( int i= 0 ; i < m_ScreenBuffer.size() ; ++i )
+
     {
         uint32_t Col = std::clamp( int(255 * m_ZBuffer[i] ) , 0 , 255 );
         m_ScreenBuffer[i] = 0xFF000000 | (Col<<16) | (Col<<8) | (Col);
     }
+}
+
+void SoftwareRenderer::WaitForSync(const CommandSyncBarier& cmd)
+{
+    ZoneScoped;
+    if( cmd.pAwaitSync )
+        cmd.pAwaitSync->Wait();
+}
+
+void SoftwareRenderer::AppendCommandBuffer(const CommandAppendCommmandBufffer& cmd)
+{
+    ZoneScoped;
+    cmd.pDst->PushCommandBuffer(*cmd.pSrc);
 }
 
 struct SoftwareRenderer::Internal
@@ -1282,7 +1409,7 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int minY, int 
 
     const auto startTime = std::chrono::high_resolution_clock::now();
 
-    const vector<Vertex>& vertices = ClipTriangles(nearFrustumPlane, 0.001f, inVertices);
+    span<const Vertex> vertices = ClipTriangles(nearFrustumPlane, 0.001f, inVertices);
     DrawStats drawStats;
 
     thread_local static vector<TransformedVertex> transformedVertices;
@@ -1813,7 +1940,7 @@ void SoftwareRenderer::DrawFilledTriangle(const TransformedVertex& VA, const Tra
     ZoneScoped;
 
     //if( g_tri_index == size_t(g_selected_tri) )
-        return DrawFilledTriangleT(VA, VB, VC, color, stats);
+        return DrawFilledTriangleT(VA, VB, VC, color, stats,nullptr);
 
     // filling algorithm is working that way that we are going through all pixels in rectangle that is created by min and max points
     // and we are checking if pixel is inside triangle by using three lines and checking if pixel is on the same side of each line
@@ -2383,15 +2510,19 @@ void SoftwareRenderer::SetShininess(float shininess)
 
 void SoftwareRenderer::SetThreadsCount(uint8_t threadsCount)
 {
-    if (threadsCount == 1)
-        // no need to use thread pool for just 1 thread - execute work on main thread
-        threadsCount = 0;
+    //if (threadsCount == 1)
+    //    // no need to use thread pool for just 1 thread - execute work on main thread
+    //    threadsCount = 0;
+
+    if( !threadsCount )
+        threadsCount = 1;
 
     if (m_ThreadsCount == threadsCount)
         return;
 
     m_ThreadsCount = threadsCount;
-    m_ThreadPool.SetThreadCount(m_ThreadsCount);
+    //m_ThreadPool.SetThreadCount(m_ThreadsCount);
+    m_TileThreadPool.SetThreadCount(m_ThreadsCount);
 }
 
 void SoftwareRenderer::SetColorizeThreads(bool colorizeThreads)

@@ -265,9 +265,11 @@ bool Application::Initialize()
 extern int g_selected_tri;
 
 extern bool g_showTilesBoundry;
+extern bool g_showTilesGrid;
 extern bool g_showTilestype;
 extern bool g_showTriangleBoundry;
 extern bool g_useSimd;
+extern std::atomic<size_t> g_memory_resource_mem ;
 
 int Application::Run()
 {
@@ -403,7 +405,7 @@ int Application::Run()
 
         ImGui::Checkbox("Wireframe", &m_DrawSettings.drawWireframe);
 
-        ImGui::Checkbox( "UseSimd" , &g_useSimd ); ImGui::SameLine();
+        ImGui::Checkbox( "UseSimd" , &g_useSimd ); ImGui::SameLine(); ImGui::Checkbox("Show Tiles Grid" , &g_showTilesGrid);
 
         ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.colorizeThreads);
         ImGui::SameLine(); ImGui::Checkbox("BBoxes", &m_DrawSettings.drawBBoxes);
@@ -479,6 +481,7 @@ int Application::Run()
             }
         }
 
+
         // display fps counter
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::Begin("FPS", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize);
@@ -486,6 +489,7 @@ int Application::Run()
         ImGui::Text("FPS: %d", fps);
         ImGui::Text("Build: %s" , sizeof(void*) == 8 ? "x64" : "x86");
         ImGui::Text("Math: %d", m_DrawSettings.mathType );
+        ImGui::Text("Mem : %u KB" , uint32_t(g_memory_resource_mem.load()/1024) );
         ImGui::End();
 
         DrawRenderingStats();

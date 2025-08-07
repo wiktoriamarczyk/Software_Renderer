@@ -18,6 +18,41 @@ bool Texture::CreateWhite4x4Tex()
         m_Data[i] = 0xFFFFFFFF;
     m_Width = 4;
     m_Height = 4;
+
+    m_Pow2 = true;
+
+    m_fData.resize(m_Data.size());
+    for(size_t i = 0; i < m_Data.size(); ++i)
+    {
+        m_fData[i] = Vector4f::FromARGB( m_Data[i] );
+    }
+
+    m_SizeMaskX = m_Width  - 1;
+    m_SizeMaskY = m_Height - 1;
+    m_SizeShiftX = std::countr_zero( uint32_t(m_Width) );
+    m_SizeShiftY = std::countr_zero( uint32_t(m_Height) );
+
+    m_ShiftedWidth   = m_Width  << 16;
+    m_ShiftedHeight  = m_Height << 16;
+
+    m_fWidth  = float(m_Width);
+    m_fHeight = float(m_Height);
+
+    m_fWidthSSE = f256A{ m_fWidth };
+    m_fHeightSSE= f256A{ m_fHeight };
+
+    m_SizeMaskXSSE = i256A{ m_SizeMaskX };
+    m_SizeMaskYSSE = i256A{ m_SizeMaskY };
+
+    m_MaxWidth  = m_Width  - 1;
+    m_MaxHeight = m_Height - 1;
+
+    m_fMaxWidthSSE = f256A{ m_fWidth-1 };
+    m_fMaxHeightSSE= f256A{ m_fHeight-1 };
+
+    m_WidthBias  = 0.001f + m_Width *100;
+    m_HeightBias = 0.001f + m_Height*100;
+
     return true;
 }
 

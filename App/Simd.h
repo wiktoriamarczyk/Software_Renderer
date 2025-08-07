@@ -189,11 +189,11 @@ struct simd_type_maping< T , eSimdType::None , Elements >
     {
         memccpy( R.v, value, 0, sizeof(type));
     }
-    FORCE_INLINE static void store( const type& value , float* R , auto align_tag )
+    FORCE_INLINE static void store( const type& value , T* R , auto align_tag )
     {
         memccpy( R, value.v, 0, sizeof(type));
-    }
 
+    }
     FORCE_INLINE static void rsqrt( const type& Value , type& R )
     {
         Math::Rsqrt( Value , R );

@@ -10,6 +10,7 @@
 #include "../imgui/imgui-SFML.h"
 #include <tracy/Tracy.hpp>
 #include <vector>
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -23,6 +24,8 @@
 #include <semaphore>
 #include <numbers>
 #include <bit>
+#include <span>
+#include <barrier>
 
 using std::vector;
 using std::string;
@@ -42,9 +45,21 @@ using std::atomic_int;
 using std::counting_semaphore;
 using std::max;
 using std::thread;
+using std::array;
+using std::span;
+using std::atomic;
 
-const int SCREEN_WIDTH = 1920*2;
-const int SCREEN_HEIGHT = 1024*2;
+namespace pmr
+{
+    using namespace std::pmr;
+}
+
+//const int SCREEN_WIDTH  = 1920*2;
+//const int SCREEN_HEIGHT = 1024*2;
+const int SCREEN_WIDTH  = 1920;
+const int SCREEN_HEIGHT = 1024;
+//const int SCREEN_WIDTH  = 640;
+//const int SCREEN_HEIGHT = 480;
 const int MAX_MODEL_TRIANGLES = 200'000;
 const int MAX_TEXTURE_SIZE = 4096;
 const int FULL_ANGLE = 360;

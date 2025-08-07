@@ -68,6 +68,7 @@ void SimpleThreadPool::SetThreadCount(uint8_t count)
 
 void SimpleThreadPool::Worker()
 {
+    ZoneScoped;
     unique_ptr<int> m_ID;
     {
         std::unique_lock lock(m_IDsCS);
@@ -87,6 +88,7 @@ void SimpleThreadPool::Worker()
     m_ThreadCount++;
     while (true)
     {
+        ZoneScopedN("Worker loop");
         m_NewTaskSemaphore.acquire();
         if (m_Finlizing)
             break;
@@ -95,11 +97,20 @@ void SimpleThreadPool::Worker()
         if (!Task || !Task->m_Func)
             break;
 
-        Task->m_Func();
+        try
+        {
+            Task->m_Func();
+        }
+        catch(...)
+        {
+            ZoneScopedN("Task exception");
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
         Task->m_FinishPromise.set_value();
     }
 
     {
+        ZoneScopedN("Worker cleanup");
         g_ThreadID = -1;
         std::unique_lock lock(m_IDsCS);
         m_FreeThreadIds.push_back(std::move(m_ID));
@@ -109,6 +120,7 @@ void SimpleThreadPool::Worker()
 
 void SimpleThreadPool::LaunchTasks(vector<TaskFunc> TaskFuncs)
 {
+    ZoneScoped;
     vector<future<void>> tasksAwaiters;
     {
         std::unique_lock lock(m_TasksCS);

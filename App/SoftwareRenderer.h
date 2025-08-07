@@ -10,6 +10,28 @@
 #include "Texture.h"
 #include "SimpleThreadPool.h"
 
+#include <memory_resource>
+#include "assimp/Compiler/pstdint.h"
+
+#include "TransientAllocator.h"
+#include "function_ref.h"
+#include "RenderCommands.h"
+#include "RenderCommandsBuffer.h"
+
+struct TileInfo
+{
+    using at_i16 = std::atomic<uint16_t>;
+
+    Vector2si       TileIndex;
+    Spinlock        Lock;
+    mutable at_i16  DrawCount       = 0;
+    Vector2i        TileScreenPos;
+    Vector4f*       TileMem         = nullptr;
+    float*          TileZMem        = nullptr;
+};
+
+struct TileData;
+
 struct DrawFunctionConfig
 {
     static constexpr inline uint8_t Bits = 2;
@@ -64,18 +86,6 @@ struct DrawFunctionConfigArray
 class SoftwareRenderer : public IRenderer
 {
 public:
-    enum class eThreadTaskType : uint8_t
-    {
-        Unknown,
-        Clear,
-        RenderTile,
-        ComposeTile,
-    };
-
-    struct TriangleData;
-    struct ThreadTask;
-    struct DrawTileData;
-
     SoftwareRenderer(int screenWidth, int screenHeight);
     ~SoftwareRenderer();
 
@@ -130,15 +140,15 @@ private:
 
 
     template< eSimdType Type , bool Partial , int Elements = 8 >
-    void DrawFulllTileImplSimd(const DrawTileData& TD, DrawStats* stats);
+    void DrawFulllTileImplSimd(const CommandRenderTile& TD, DrawStats* stats);
 
     template< bool Partial >
-    void DrawTileImpl   (const DrawTileData& TD, DrawStats* stats);
-    void DrawFullTile   (const DrawTileData& TD, DrawStats* stats);
-    void DrawPartialTile(const DrawTileData& TD, DrawStats* stats);
-    void DrawTile       (const DrawTileData& TD, DrawStats* stats);
+    void DrawTileImpl   (const CommandRenderTile& TD, DrawStats* stats);
+    void DrawFullTile   (const CommandRenderTile& TD, DrawStats* stats);
+    void DrawPartialTile(const CommandRenderTile& TD, DrawStats* stats);
+    void DrawTile       (const CommandRenderTile& TD, DrawStats* stats);
 
-    void DrawFilledTriangleT(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, DrawStats& stats);
+    void DrawFilledTriangleT(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, DrawStats& stats, const PipelineSharedData* pPipelineSharedData );
 
 
     template< typename MathT , DrawFunctionConfig Config >
@@ -156,22 +166,21 @@ private:
 
     struct ALIGN_FOR_AVX AlignedPixel : Vector4f{};
 
-    struct TileInfo
-    {
-        using at_i16 = std::atomic<uint16_t>;
-
-        Vector2si       TileIndex;
-        Spinlock        Lock;
-        mutable at_i16  DrawCount       = 0;
-        Vector2i        TileScreenPos;
-        Vector4f*       TileMem         = nullptr;
-        float*          TileZMem        = nullptr;
-    };
-
     inline TileInfo* GetTileInfo(const Vector2si& tileIndex)
     {
         return &m_TilesGrid[tileIndex.y * m_TilesGridSize.x + tileIndex.x];
     }
+
+    void                RendererTaskWorker();
+    void                VertexAssemply( const CommandVertexAssemply& cmd );
+    void                ExecuteExitCommand();
+    void                ClearBuffers(const CommandClear& cmd);
+    void                Fill32BitBuffer( const CommandFill32BitBuffer& cmd );
+    void                VertexTransformAndClip( const CommandVertexTransformAndClip& cmd );
+    void                ProcessTriangles( const CommandProcessTriangles& cmd );
+    void                WaitForSync(const CommandSyncBarier& cmd);
+    void                AppendCommandBuffer(const CommandAppendCommmandBufffer& cmd);
+    CommandBuffer*      AllocTransientCommandBuffer(){ return CommandBuffer::CreateCommandBuffer( m_TransientMemoryResource); }
 
     struct Internal;
 
@@ -217,6 +226,7 @@ private:
     float               m_SpecularStrength = 0.9f;
     float               m_Shininess = 32.0f;
     uint8_t             m_ThreadsCount = 0;
+    CommandBuffer*      m_pCommandBuffer = nullptr;
 
     atomic_int          m_FrameTriangles = 0;
     atomic_int          m_FrameTrianglesDrawn = 0;
@@ -230,21 +240,13 @@ private:
 
     DrawStats           m_DrawStats;
 
-    template< typename ... Args >
-    TriangleData*       PushTriangleData( Args ... args );
-    void                PushTile( DrawTileData data );
-
-    vector<TriangleData> m_TrianglesData;
-    vector<DrawTileData>    m_TilesData;
-
-    std::atomic<TriangleData*>      m_pCurrentTriangleData = nullptr;
-    std::atomic<DrawTileData*>      m_pCurrentTileData = nullptr;
-    std::atomic<DrawTileData*>      m_pCurrentTileJob = nullptr;
-
     shared_ptr<Texture> m_Texture;
     shared_ptr<Texture> m_DefaultTexture;
     SimpleThreadPool    m_ThreadPool;
     SimpleThreadPool    m_TileThreadPool;
+
+    transient_memory_resource m_TransientMemoryResource;
+    transient_allocator m_TransientAllocator{ m_TransientMemoryResource };
 
     int                 m_MathIndex = 0;
     MathCPU             m_MathCPU;

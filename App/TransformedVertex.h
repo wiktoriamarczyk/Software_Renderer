@@ -46,7 +46,8 @@ struct ALIGN_FOR_AVX TransformedVertex
     void ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix);
 };
 
-inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix)
+inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f
+    & worldMatrix, const Matrix4f& mvpMatrix)
 {
     m_WorldPosition = v.position.Multiplied(worldMatrix);
     m_Normal        = v.normal.TransformedVec(worldMatrix).Normalized();
