@@ -9,36 +9,56 @@
 
 atomic<size_t> g_memory_resource_mem;
 
-struct alignas(64) TransientMemoryAllocator::Page
+struct TransientMemoryAllocator::Page
 {
-    constexpr static inline auto SIZE = 256*1024;
-
-    Page();
-    ~Page();
     void* allocate( size_t bytes, size_t alignment , std::pmr::synchronized_pool_resource& upstream );
+
+    constexpr Page()=default;
+    virtual ~Page();
     void reset();
 
-    array<uint8_t, SIZE>    m_Buffer;
-    uint8_t*                m_pCurPos   = m_Buffer.data();
-    uint32_t                m_FreeLeft  = SIZE;
-    const uint8_t*const     m_pEnd      = m_Buffer.data() + m_Buffer.size();
+    struct PageImpl;
+protected:
+    Page( uint8_t* pMem , uint32_t size );
+private:
+    uint8_t*                m_pCurPos   = nullptr;
+    uint32_t                m_FreeLeft  = 0;
+    uint8_t*const           m_pStartPos = nullptr;
+    const uint32_t          m_MaxSize   = 0xFFFFFF;
+    const uint8_t*const     m_pEnd      = nullptr;
 };
 
-
-TransientMemoryAllocator::Page::Page()
+TransientMemoryAllocator::Page::Page( uint8_t* pMem , uint32_t size )
+    : m_pCurPos( pMem )
+    , m_FreeLeft( size )
+    , m_pStartPos( pMem )
+    , m_MaxSize( size )
+    , m_pEnd( pMem + size )
 {
-    g_memory_resource_mem.fetch_add( sizeof(Page) , std::memory_order_relaxed );
+    g_memory_resource_mem.fetch_add( m_MaxSize , std::memory_order_relaxed );
 }
+
+struct TransientMemoryAllocator::Page::PageImpl : Page
+{
+    constexpr static inline auto SIZE = 512*1024;
+
+    PageImpl()
+        : Page( m_Buffer , SIZE )
+    {}
+private:
+    alignas(64) uint8_t m_Buffer[SIZE];
+};
 
 TransientMemoryAllocator::Page::~Page()
 {
-    g_memory_resource_mem.fetch_sub( sizeof(Page) , std::memory_order_relaxed );
+    if( m_pStartPos )
+        g_memory_resource_mem.fetch_sub( m_MaxSize , std::memory_order_relaxed );
 }
 
 void TransientMemoryAllocator::Page::reset()
 {
-    m_pCurPos = m_Buffer.data();
-    m_FreeLeft = SIZE;
+    m_pCurPos = m_pStartPos;
+    m_FreeLeft = m_MaxSize;
 }
 
 void* TransientMemoryAllocator::Page::allocate( size_t bytes, size_t alignment , std::pmr::synchronized_pool_resource& upstream )
@@ -47,7 +67,7 @@ void* TransientMemoryAllocator::Page::allocate( size_t bytes, size_t alignment ,
 
     alignment = Granulate<size_t>(alignment, AVX_ALIGN);
     bytes = Granulate<size_t>(bytes, alignment);
-    if( alignment > 64 || bytes > SIZE/4 )
+    if( alignment > 64 || bytes > m_MaxSize/4 )
         return upstream.allocate(bytes, alignment);
 
     if( m_pCurPos + bytes > m_pEnd )
@@ -58,45 +78,149 @@ void* TransientMemoryAllocator::Page::allocate( size_t bytes, size_t alignment ,
     return pMem;
 }
 
-TransientMemoryAllocator::TransientMemoryAllocator()
+struct TransientMemoryAllocator::Storage
+{
+    Storage();
+    ~Storage();
+    void FreeSlot( TLSlot& slot );
+    static Storage* RegisterSlot( TLSlot& slot );
+    Page* GetNextFreePage();
+    void reset();
+    static Storage& Get()
+    {
+        static Storage storage;
+        return storage;
+    }
+private:
+    vector<unique_ptr<Page>>    m_Pages;
+    vector<unique_ptr<Page>>    m_EmptyPages;
+    vector<TLSlot*>             m_Slots;
+    std::recursive_mutex        m_Mutex;
+};
+
+struct TransientMemoryAllocator::TLSlot
+{
+    friend class Storage;
+
+    constexpr TLSlot()
+    {
+        m_pPage = &s_EmptyPage;
+    }
+
+    void* allocate( size_t bytes, size_t alignment , std::pmr::synchronized_pool_resource& upstream )
+    {
+        auto pMem = m_pPage->allocate( bytes, alignment, upstream );
+        if( pMem )
+            return pMem;
+
+        if( !m_pStorage )
+            m_pStorage = Storage::RegisterSlot(*this);
+
+        if( m_pStorage )
+        {
+            if( auto pNewPage = m_pStorage->GetNextFreePage() )
+                m_pPage = pNewPage;
+        }
+
+        pMem = m_pPage->allocate( bytes, alignment, upstream );
+        return pMem;
+    }
+
+    void reset()
+    {
+        m_pPage = &s_EmptyPage;
+    }
+
+    ~TLSlot()
+    {
+        if( m_pPage && m_pStorage )
+            m_pStorage->FreeSlot(*this);
+    }
+
+private:
+    Page*       m_pPage     = nullptr;
+    Storage*    m_pStorage  = nullptr;
+    static inline Page s_EmptyPage ;
+};
+
+constinit thread_local TransientMemoryAllocator::TLSlot TransientMemoryAllocator::s_TLSlot;
+
+TransientMemoryAllocator::Storage::Storage()
 {
     m_Pages.reserve(64);
-    m_Pages.reserve(64);
-
-    m_Pages.push_back(make_unique<Page>());
-    m_pPage = m_Pages.back().get();
+    m_EmptyPages.reserve(64);
 }
 
-TransientMemoryAllocator::~TransientMemoryAllocator()
+TransientMemoryAllocator::Storage::~Storage()
 {
+    std::scoped_lock lock(m_Mutex);
+
+    for( auto& TLSlot : m_Slots )
+    {
+        if( TLSlot->m_pStorage == this )
+        {
+            TLSlot->m_pStorage = nullptr;
+            TLSlot->reset();
+        }
+    }
 }
 
-void* TransientMemoryAllocator::do_allocate(std::size_t bytes, std::size_t alignment, std::pmr::synchronized_pool_resource& upstream )
+void TransientMemoryAllocator::Storage::FreeSlot( TLSlot& slot )
+{
+    if( !slot.m_pStorage )
+        return;
+
+    ZoneScoped;
+
+    std::scoped_lock lock(m_Mutex);
+
+    m_Slots.erase(std::remove(m_Slots.begin(), m_Slots.end(), &slot), m_Slots.end());
+    slot.m_pStorage = nullptr;
+}
+TransientMemoryAllocator::Storage* TransientMemoryAllocator::Storage::RegisterSlot( TLSlot& slot )
+{
+    if( slot.m_pStorage )
+        return slot.m_pStorage;
+
+    ZoneScoped;
+
+    auto& Storage = Get();
+    std::scoped_lock lock(Storage.m_Mutex);
+
+    Storage.m_Slots.push_back(&slot);
+    slot.m_pStorage = &Storage;
+    return slot.m_pStorage;
+}
+
+TransientMemoryAllocator::Page* TransientMemoryAllocator::Storage::GetNextFreePage()
 {
     ZoneScoped;
-    auto pMem = m_pPage->allocate(bytes, alignment, upstream);
-    if( pMem )
-        return pMem;
+    std::scoped_lock lock(m_Mutex);
+
+    Page* pPage = nullptr;
 
     if( m_EmptyPages.empty() )
     {
         ZoneScopedN("Allocate new page");
-        m_Pages.push_back(make_unique<Page>());
-        m_pPage = m_Pages.back().get();
+        m_Pages.push_back(make_unique<Page::PageImpl>());
+        pPage = m_Pages.back().get();
     }
     else
     {
         m_Pages.push_back(std::move(m_EmptyPages.back()));
         m_EmptyPages.pop_back();
-        m_pPage = m_Pages.back().get();
+        pPage = m_Pages.back().get();
     }
+    return pPage;
+};
 
-    return m_pPage->allocate(bytes, alignment,upstream);
-}
-
-void TransientMemoryAllocator::reset()
+void TransientMemoryAllocator::Storage::reset()
 {
-    m_pPage = nullptr;
+    ZoneScoped;
+    std::scoped_lock lock(m_Mutex);
+
+    for( auto& pSlot : m_Slots )
+        pSlot->reset();
 
     for( auto& pPage : m_Pages )
     {
@@ -105,69 +229,30 @@ void TransientMemoryAllocator::reset()
     }
 
     m_Pages.clear();
+}
 
-    if( m_EmptyPages.empty() )
-        return;
-
-    m_Pages.push_back( std::move( m_EmptyPages.back() ) );
-    m_EmptyPages.pop_back();
-
-    m_pPage = m_Pages.back().get();
-};
-
-
-struct transient_memory_resource::Context
+void* TransientMemoryAllocator::do_allocate(std::size_t bytes, std::size_t alignment, std::pmr::synchronized_pool_resource& upstream )
 {
-    vector<AllocSlot*> m_AllocSlots;
-    std::recursive_mutex m_AllocSlotsMutex;
-};
+    ZoneScoped;
+    return s_TLSlot.allocate(bytes, alignment, upstream);
+}
 
-struct transient_memory_resource::AllocSlot
+void TransientMemoryAllocator::reset()
 {
-    AllocSlot()
-    {
-        auto& ctx = GetContext();
-        std::scoped_lock lock(ctx.m_AllocSlotsMutex);
-        ctx.m_AllocSlots.push_back(this);
-    }
-    ~AllocSlot()
-    {
-        auto& ctx = GetContext();
-        std::scoped_lock lock(ctx.m_AllocSlotsMutex);
-        auto it = std::find(ctx.m_AllocSlots.begin(), ctx.m_AllocSlots.end(), this);
-        if (it != ctx.m_AllocSlots.end())
-            ctx.m_AllocSlots.erase(it);
-    }
-
-    TransientMemoryAllocator m_pAlloc;
-
-    static thread_local optional<AllocSlot> s_Allocator;
+    ZoneScoped;
+    auto& Storage = Storage::Get();
+    Storage.reset();
 };
-
-thread_local constinit optional<transient_memory_resource::AllocSlot> transient_memory_resource::AllocSlot::s_Allocator;
 
 void* transient_memory_resource::do_allocate(std::size_t bytes, std::size_t alignment)
 {
     ZoneScoped;
-    if( !AllocSlot::s_Allocator )
-        AllocSlot::s_Allocator.emplace();
-
-    return AllocSlot::s_Allocator->m_pAlloc.do_allocate(bytes, alignment, m_Fallback);
+    return TransientMemoryAllocator::do_allocate(bytes, alignment, m_Fallback);
 }
 
 void transient_memory_resource::reset()
 {
     ZoneScoped;
-    auto& ctx = GetContext();
-
-    std::scoped_lock lock(ctx.m_AllocSlotsMutex);
-
-    for( auto& pSlot : ctx.m_AllocSlots )
-        pSlot->m_pAlloc.reset();
-};
-
-transient_memory_resource::Context& transient_memory_resource::GetContext()
-{
-    static Context ctx;
-    return ctx;
+    TransientMemoryAllocator::reset();
+    m_Fallback.release();
 };

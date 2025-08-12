@@ -25,8 +25,8 @@ void CommandBuffer::GrowCommandBuffer( Context*& pContext , size_t ExtraSize ) n
     ZoneScoped;
     std::scoped_lock lock( m_CmdBufSpinLock );
 
-    const auto WriteOffset = (pContext->m_pCurWriteCommand.load()-m_Commands.data());
-    const auto ReadOffset  = (pContext->m_pCurReadCommand.load() -m_Commands.data());
+    const auto WriteOffset = (pContext->m_pCurWriteCommand.load()-pContext->m_pFirstCommand);
+    const auto ReadOffset  = (pContext->m_pCurReadCommand.load() -pContext->m_pFirstCommand);
 
     auto pNewContext = m_Allocator.allocate<Context>();
 
@@ -34,7 +34,12 @@ void CommandBuffer::GrowCommandBuffer( Context*& pContext , size_t ExtraSize ) n
     if( ExtraSize < m_Commands.size()*2 )
         ExtraSize = m_Commands.size()*2;
 
-    m_Commands.resize(ExtraSize);
+    if( ExtraSize > 100'000 )
+    {
+        int i=0;
+    }
+
+    m_Commands.resize(ExtraSize,0);
 
     pNewContext->m_pFirstCommand     = m_Commands.data();
     pNewContext->m_pEndCommand       = pNewContext->m_pFirstCommand + m_Commands.size() - 1;

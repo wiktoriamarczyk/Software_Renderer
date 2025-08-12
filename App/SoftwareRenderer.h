@@ -63,26 +63,6 @@ enum class eDrawTriVersion : uint8_t
     DrawTri     ,
 };
 
-template< typename T >
-struct DrawFunctionConfigArray
-{
-    static constexpr inline auto SIZE = 1 << DrawFunctionConfig::Bits;
-
-    constexpr DrawFunctionConfigArray()
-    {
-        uint8_t i = 0;
-        for ( auto& El : m_Array )
-            El.Config = DrawFunctionConfig{ i++ };
-    }
-
-    struct Element
-    {
-        DrawFunctionConfig Config;
-        T                  Function = {};
-    };
-    Element m_Array[SIZE];
-};
-
 class SoftwareRenderer : public IRenderer
 {
 public:
@@ -140,21 +120,20 @@ private:
 
 
     template< eSimdType Type , bool Partial , int Elements = 8 >
-    void DrawFulllTileImplSimd(const CommandRenderTile& TD, DrawStats* stats);
-
+    void DrawTileImplSimd(const CommandRenderTile& TD, DrawStats* stats);
     template< bool Partial >
     void DrawTileImpl   (const CommandRenderTile& TD, DrawStats* stats);
+
     void DrawFullTile   (const CommandRenderTile& TD, DrawStats* stats);
     void DrawPartialTile(const CommandRenderTile& TD, DrawStats* stats);
     void DrawTile       (const CommandRenderTile& TD, DrawStats* stats);
 
-    void DrawFilledTriangleT(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, DrawStats& stats, const PipelineSharedData* pPipelineSharedData );
+    void GenerateTileJobs(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, DrawStats& stats, const PipelineSharedData* pPipelineSharedData );
 
 
     template< typename MathT , DrawFunctionConfig Config >
     void DrawFilledTriangles(const TransformedVertex* pVerts, size_t Count, const Vector4f& color, int minY, int maxY, DrawStats& stats);
 
-    void DrawFilledTriangleWTF(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
     void DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int maxY);
     void DrawTriangleBoundingBox(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int maxY);
     void DrawLine(const TransformedVertex& A, const TransformedVertex& B, const Vector4f& color, int MinY, int maxY);
@@ -181,8 +160,6 @@ private:
     void                WaitForSync(const CommandSyncBarier& cmd);
     void                AppendCommandBuffer(const CommandAppendCommmandBufffer& cmd);
     CommandBuffer*      AllocTransientCommandBuffer(){ return CommandBuffer::CreateCommandBuffer( m_TransientMemoryResource); }
-
-    struct Internal;
 
     Vector4f FragmentShader(const TransformedVertex& vertex);
     template< int Elements , eSimdType Type >

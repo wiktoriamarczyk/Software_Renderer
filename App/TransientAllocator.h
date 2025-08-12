@@ -13,16 +13,16 @@ extern atomic<size_t> g_memory_resource_mem;
 
 struct TransientMemoryAllocator
 {
-    TransientMemoryAllocator();
-    ~TransientMemoryAllocator();
-    void* do_allocate(std::size_t bytes, std::size_t alignment, std::pmr::synchronized_pool_resource& upstream );
-    void reset();
+    TransientMemoryAllocator()=default;
+    ~TransientMemoryAllocator()=default;
+    static void* do_allocate(std::size_t bytes, std::size_t alignment, std::pmr::synchronized_pool_resource& upstream );
+    static void reset();
 private:
     struct Page;
+    struct Storage;
+    struct TLSlot;
 
-    vector<unique_ptr<Page>>    m_Pages;
-    vector<unique_ptr<Page>>    m_EmptyPages;
-    Page*                       m_pPage = nullptr;
+    static thread_local TLSlot  s_TLSlot;
 };
 
 struct transient_memory_resource : public std::pmr::memory_resource
@@ -33,11 +33,6 @@ struct transient_memory_resource : public std::pmr::memory_resource
 
     void reset();
 private:
-    struct AllocSlot;
-    struct AllocSlot;
-    struct Context;
-    static Context& GetContext();
-
     std::pmr::synchronized_pool_resource m_Fallback;
 };
 

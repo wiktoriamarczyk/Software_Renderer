@@ -262,8 +262,6 @@ bool Application::Initialize()
     return true;
 }
 
-extern int g_selected_tri;
-
 extern bool g_showTilesBoundry;
 extern bool g_showTilesGrid;
 extern bool g_showTilestype;
@@ -401,7 +399,6 @@ int Application::Run()
         ImGui::SliderInt("Thread Count", &m_DrawSettings.threadsCount, 1, MAX_THREADS_COUNT);
         //ImGui::Combo("Renderer Type", &m_DrawSettings.rendererType, "Software\0Hardware\0");
         ImGui::SliderInt("Renderer Type", &m_DrawSettings.rendererType , 0 , 1 );
-        //ImGui::SliderInt("Selected Tri", &g_selected_tri , 0 , 10 );
 
         ImGui::Checkbox("Wireframe", &m_DrawSettings.drawWireframe);
 
