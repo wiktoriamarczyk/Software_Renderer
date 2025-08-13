@@ -12,6 +12,22 @@
 #include <assimp/postprocess.h>
 #include "../ImGuiFileDialog/ImGuiFileDialog.h"
 
+struct PredefinedModel
+{
+    const char* modelPath   = "";
+    const char* texturePath = "";
+    optional<float> RotationX;
+    optional<float> RotationY;
+    optional<float> RotationZ;
+};
+
+const PredefinedModel s_PredefinedModels[] =
+{
+    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , },
+    { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330 , .RotationY = 25 },
+    { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280 , .RotationY = 140 },
+    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120 }
+};
 
 vector<Model> Application::LoadFromScene(const aiScene* pScene)
 {
@@ -167,6 +183,26 @@ vector<Model> Application::LoadModelVertices(const char* path)
     }
 
     return result;
+}
+
+void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
+{
+    span<const PredefinedModel> PredefinedArray{ s_PredefinedModels };
+    if( PredefinedArray.size() <= index )
+    {
+        paths = {};
+        return;
+    }
+
+    const PredefinedModel& model = PredefinedArray[index];
+
+    DrawSettings Def;
+
+    paths.modelPath                 = model.modelPath;
+    paths.texturePath               = model.texturePath;
+    Settings.modelRotation.x        = model.RotationX.value_or(Def.modelRotation.x);
+    Settings.modelRotation.y        = model.RotationY.value_or(Def.modelRotation.y);
+    Settings.modelRotation.z        = model.RotationZ.value_or(Def.modelRotation.z);
 }
 
 void Application::OpenDialog(const char* title, const char* filters, function<void()> callback)
@@ -358,15 +394,16 @@ int Application::Run()
         if (m_LastModelPaths.modelPath != m_ModelPaths.modelPath)
         {
             m_ModelsData = LoadModelVertices(m_ModelPaths.modelPath.c_str());
-            m_LastModelPaths = m_ModelPaths;
-            m_ModelPaths.texturePath = "";
+            m_LastModelPaths.modelPath = m_ModelPaths.modelPath;
+            if( m_LastModelPaths.texturePath == m_ModelPaths.texturePath)
+                m_ModelPaths.texturePath = "";
         }
 
         if (m_LastModelPaths.texturePath != m_ModelPaths.texturePath)
         {
             m_Contexts[0].pModelTexture = m_Contexts[0].pRenderer->LoadTexture(m_ModelPaths.texturePath.c_str());
             m_Contexts[1].pModelTexture = m_Contexts[1].pRenderer->LoadTexture(m_ModelPaths.texturePath.c_str());
-            m_LastModelPaths = m_ModelPaths;
+            m_LastModelPaths.texturePath = m_ModelPaths.texturePath;
         }
 
         m_ModelMatrix = Matrix4f::Rotation(m_DrawSettings.modelRotation / 180.f * PI ) * Matrix4f::Scale(Vector3f(m_DrawSettings.modelScale, m_DrawSettings.modelScale, m_DrawSettings.modelScale)) * Matrix4f::Translation(m_DrawSettings.modelTranslation);
@@ -403,6 +440,12 @@ int Application::Run()
         ImGui::Checkbox("Wireframe", &m_DrawSettings.drawWireframe);
 
         ImGui::Checkbox( "UseSimd" , &g_useSimd ); ImGui::SameLine(); ImGui::Checkbox("Show Tiles Grid" , &g_showTilesGrid);
+
+        if( ImGui::Button("0") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 0); ImGui::SameLine();
+        if( ImGui::Button("1") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 1); ImGui::SameLine();
+        if( ImGui::Button("2") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 2); ImGui::SameLine();
+        if( ImGui::Button("3") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 3);
+
 
         ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.colorizeThreads);
         ImGui::SameLine(); ImGui::Checkbox("BBoxes", &m_DrawSettings.drawBBoxes);

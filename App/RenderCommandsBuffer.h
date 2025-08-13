@@ -63,7 +63,7 @@ inline void CommandBuffer::PushCommandImpl( Command* pCmd ) noexcept
     auto pCur = pContext->m_pCurWriteCommand.load( std::memory_order_relaxed );
     for(;;)
     {
-        if( pContext->m_pCurWriteCommand == pContext->m_pEndCommand )
+        if( pContext->m_pCurWriteCommand >= pContext->m_pEndCommand )
         {
             GrowCommandBuffer( pContext );
             continue;
@@ -83,7 +83,7 @@ inline bool CommandBuffer::PushCommands( span<const Command*> CommandsToAdd ) no
     for(;;)
     {
         const Command** pCur = pContext->m_pCurWriteCommand.load( std::memory_order_relaxed );
-        if( pCur+CommandsToAdd.size() == pContext->m_pEndCommand )
+        if( pCur+CommandsToAdd.size() >= pContext->m_pEndCommand )
         {
             GrowCommandBuffer( pContext , CommandsToAdd.size() );
             continue;
@@ -104,7 +104,7 @@ inline const Command* CommandBuffer::GetNextCommand() noexcept
     {
         auto pRead = pContext->m_pCurReadCommand.load( std::memory_order_relaxed );
 
-        if( pRead == pContext->m_pEndCommand )
+        if( pRead >= pContext->m_pEndCommand )
         {
             if( CheckGrow( pContext ) )
                 continue;

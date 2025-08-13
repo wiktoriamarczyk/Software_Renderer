@@ -1253,7 +1253,12 @@ void SoftwareRenderer::VertexAssemply( const CommandVertexAssemply& cmd )
     pData->m_pProcessTrianglesCmdBufferSync->m_Barrier.emplace( m_ThreadsCount , triviall_function_ref{}.Assign( m_TransientMemoryResource , [=]()
     {
         m_pCommandBuffer->PushCommandBuffer( *pData->m_pRenderTilesCmdBuffer );
+
+        pData->m_pRenderTilesCmdBufferSync->name = "render triles end";
+        m_pCommandBuffer->AddSyncPoint( *pData->m_pRenderTilesCmdBufferSync , m_ThreadsCount );
     }));
+
+    pData->m_pRenderTilesCmdBufferSync->m_Barrier.emplace( m_ThreadsCount );
 
     m_pCommandBuffer->PushCommandBuffer( *pWorkCmdBuffer );
 }
