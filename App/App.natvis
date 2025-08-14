@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+    <Type Name="EncodedCommandPtr">
+
+        <Intrinsic Name="is_empty" Expression="( m_Separated.m_Ptr == 0 )" />
+        <Intrinsic Name="get_cmd" Expression="( (Command*)(m_Separated.m_Ptr &lt;&lt; 2) )" />
+        <Intrinsic Name="get_cmd_id" Expression="( (get_cmd()-&gt;m_CommandID) )" />
+        <Intrinsic Name="get_kind" Expression="( (eCommandPtrKind)m_Separated.m_Data )" />
+
+        <DisplayString Condition="get_cmd()==0"        >null, kind={(eCommandPtrKind)m_Separated.m_Data}</DisplayString>
+
+
+        <DisplayString Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::NoCommand"             >{get_kind()} : {*get_cmd()}</DisplayString>
+        <DisplayString Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::RenderTile"            >{get_kind()} | jump: {*(CommandRenderTile*)get_cmd()}</DisplayString>
+        <DisplayString Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::VertexAssemply"        >{get_kind()} | assembly: {*(CommandVertexAssemply*)get_cmd()}</DisplayString>
+        <DisplayString Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::VertexTransformAndClip">{get_kind()} | t-clip: {*(CommandVertexTransformAndClip*)get_cmd()}</DisplayString>
+        <DisplayString Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::ProcessTriangles"      >{get_kind()} | gentile: {*(CommandProcessTriangles*)get_cmd()}</DisplayString>
+        <DisplayString Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::ClearBuffers"          >{get_kind()} | clear: {*(CommandClear*)get_cmd()}</DisplayString>
+        <DisplayString Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::Fill32BitBuffer"       >{get_kind()} | fill: {*(CommandFill32BitBuffer*)get_cmd()}</DisplayString>
+        <DisplayString Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::SyncBarier"            >{get_kind()} | sync: {*(CommandSyncBarier*)get_cmd()}</DisplayString>
+        <DisplayString Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::CmdReadJump"           >{get_kind()} | jump: {*(CommandReadJump*)get_cmd()}</DisplayString>
+
+        <Expand>
+            <Item Name="[Command]"                  Condition="is_empty()      ||      get_cmd_id() ==eCommandID::NoCommand"             >get_cmd()</Item>
+            <Item Name="[Commmand Render]"          Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::RenderTile"            >*(CommandRenderTile*)get_cmd()</Item>
+            <Item Name="[Commmand Assembly]"        Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::VertexAssemply"        >*(CommandVertexAssemply*)get_cmd()</Item>
+            <Item Name="[Commmand Transf&gt;clip]"  Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::VertexTransformAndClip">*(CommandVertexTransformAndClip*)get_cmd()</Item>
+            <Item Name="[Commmand Process Tris]"    Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::ProcessTriangles"      >*(CommandProcessTriangles*)get_cmd()</Item>
+            <Item Name="[Commmand Clear]"           Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::ClearBuffers"          >*(CommandClear*)get_cmd()</Item>
+            <Item Name="[Commmand Fill]"            Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::Fill32BitBuffer"       >*(CommandFill32BitBuffer*)get_cmd()</Item>
+            <Item Name="[Commmand Sync]"            Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::SyncBarier"            >*(CommandSyncBarier*)get_cmd()</Item>
+            <Item Name="[Commmand Jump]"            Condition="get_cmd()!=0 &amp;&amp; get_cmd_id() ==eCommandID::CmdReadJump"           >*(CommandReadJump*)get_cmd()</Item>
+
+            <Item Name="[Offset]">m_Separated.m_Ptr</Item>
+            <Item Name="[Kind]">(eCommandPtrKind)m_Separated.m_Data</Item>
+        </Expand>
+    </Type>
+
+    <Type Name="eEncodedCommandPtr">
+        <DisplayString>{*(EncodedCommandPtr*)this,nd}</DisplayString>
+        <Expand>
+            <Item Name="[Enc]">*(EncodedCommandPtr*)this</Item>
+        </Expand>
+    </Type>
+
+</AutoVisualizer>

@@ -19,6 +19,8 @@ bool g_showTilestype         = false;
 bool g_showTriangleBoundry   = false;
 bool g_showCornersClassify   = false;
 bool g_showTilesGrid         = false;
+bool g_ThreadPerTile         = true;
+auto g_max_overdraw          = std::atomic<int>{0};
 
 struct PipelineSharedData
 {
@@ -239,6 +241,9 @@ struct ALIGN_FOR_AVX TriangleData
     VertexInterpolator         m_Interpolator;
     EdgeFunctionRails<int64_t> m_EdgeFunctionRails;
     float                      m_InvABC = 0.f;
+    float                      m_MinZ = 0.f;
+    float                      m_MaxZ = 0.f;
+    uint32_t                   m_TriIndex = 0;
 };
 
 void transpose8Vec4f_to_Vec4f256(const Vector4f* in, Vector4f256A& out)
@@ -491,26 +496,46 @@ void TileLineFToARGB_Simd( const Vector4f* pPixels , uint32_t* pColBuffer , opti
 }
 
 template< bool Partial >
-inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& TD, DrawStats* stats)
+inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& _InitTD, DrawStats* stats)
 {
-    ZoneScoped;
-    const auto pTriangle    = TD.Triangle;
-    const auto TilePosition = TD.ScreenPos;
+    ZoneScopedN( Partial ? "DrawTileImpl" : "DrawTileImplFull" );
+    ZoneColor( 0xE0E000 );
+    const auto pTileInfo    = _InitTD.TileInfo;
+
+    // local storage for pixels and zbuffer - it seems to be faster than using TileMem directly
+    ALIGN_FOR_AVX Vector4f  Pixels       [TILE_SIZE * TILE_SIZE];
+    ALIGN_FOR_AVX float     ZBuffer      [TILE_SIZE * TILE_SIZE];
+    ALIGN_FOR_AVX uint32_t  TileCoverage [TILE_SIZE] = {};
 
     // lock tile info to prevent concurrent access
-    std::scoped_lock lock( TD.TileInfo->Lock );
+    std::scoped_lock lock( pTileInfo->Lock );
 
+    // copy tile memory to local storage
+    memcpy( Pixels  , pTileInfo->TileMem  , sizeof(Pixels) );
+    memcpy( ZBuffer , pTileInfo->TileZMem , sizeof(ZBuffer) );
+
+    auto       pDrawCommand = g_ThreadPerTile ? pTileInfo->pRenderTileCmd.load( std::memory_order_relaxed ) : &_InitTD;
+    auto       pixelsDrawn  = 0;
+    int32_t    CommandIndex = 0;
+    const auto TilePosition = pTileInfo->TileScreenPos;
+    const int  StartY       = TilePosition.y;
+    const int  EndY         = StartY + TILE_SIZE;
+
+    for( ; pDrawCommand ; ++CommandIndex , pDrawCommand = pDrawCommand->pNext.load( std::memory_order_relaxed ) )
+    {
+    ZoneScopedN("Iteration");
+    ZoneColor( CommandIndex>0 ? 0x00E000 : 0x0000E0 );
+
+    const auto pTriangle    = pDrawCommand->Triangle;
     const auto EdgeStrideX  = pTriangle->m_EdgeFunctionRails.GetEdgeFunctionsXStride().ToVector3<int>();
     const auto EdgeStrideY  = pTriangle->m_EdgeFunctionRails.GetEdgeFunctionsYStride().ToVector3<int>();
     const auto _EdgeStart   = pTriangle->m_EdgeFunctionRails.GetStartFor( TilePosition.ToVector2<int64_t>() );
     const auto EdgeStartX   = _EdgeStart.x.ToVector3<int>();
     auto       EdgeStartY   = _EdgeStart.y.ToVector3<int>();
     const auto invABC       = pTriangle->m_InvABC;
-    const int  StartY       = TilePosition.y;
-    const int  EndY         = StartY + TILE_SIZE;
-    float*     pZBuffer     = TD.TileInfo->TileZMem;
-
-    auto       pixelsDrawn  = 0;
+    float*     pZBuffer     = ZBuffer;
+    Vector4f*  pCurPixel    = Pixels;
+    uint32_t*  pTileCoverage= TileCoverage;
 
     using NumericType = decltype(EdgeStartX.x);
 
@@ -522,13 +547,12 @@ inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& TD, DrawStat
     // loop through all pixels in tile square
     for (int y = StartY ; y < EndY; y++ , EdgeStartY += EdgeStrideY )
     {
-        uint32_t* pColBuffer = m_ScreenBuffer.data() + y* SCREEN_WIDTH + TilePosition.x;
-
         auto EdgeFunctions = EdgeStartX + EdgeStartY;
 
         for (int ix = 0; ix < TILE_SIZE; ix++ , EdgeFunctions += EdgeStrideX )
         {
-            if constexpr( Partial )
+            //if constexpr( Partial )
+            if( !pDrawCommand->IsFullTile )
             {
                 if( EdgeFunctionTest( EdgeFunctions ) )
                     continue; // outside triangle
@@ -537,6 +561,8 @@ inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& TD, DrawStat
             Vector3f baricentricCoordinates = EdgeFunctions.ToVector3<float>() * invABC;
 
             pTriangle->m_Interpolator.InterpolateT<MathCPU>( Vector3f( baricentricCoordinates.y , baricentricCoordinates.z , baricentricCoordinates.x ) , interpolatedVertex);
+
+            Vector4f col = Vector4f{ 1,1,1,1 };
 
             float& z = pZBuffer[ix];
             if (interpolatedVertex.m_ScreenPosition.z < z){
@@ -548,37 +574,48 @@ inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& TD, DrawStat
             }
 
             Vector4f finalColor = FragmentShader(interpolatedVertex);
-            //finalColor = Vector4f{ interpolatedVertex.m_UV , 1.0f , 1.0f };
 
-            if constexpr( Partial || 1 )
-            {
-                pColBuffer[ix] = Vector4f::ToARGB(finalColor);
-                pixelsDrawn++;
-            }
-            else
-            {
-                *pPixels++ = finalColor;
-            }
+            pCurPixel[ix] = finalColor*col;
+            pixelsDrawn++;
+
+            pTileCoverage[0] |= 1 << ix;
         }
-        pZBuffer += TILE_SIZE; // move to next row in Z-buffer
+
+        pCurPixel += TILE_SIZE;
+        pZBuffer  += TILE_SIZE; // move to next row in Z-buffer
+        pTileCoverage++;
     }
 
-    //if constexpr( !Partial )
-    //{
-    //    pPixels = Pixels;
-    //    for (int y = StartY ; y < EndY; y++)
-    //    {
-    //        TileLineFToARGB( pPixels , m_ScreenBuffer.data() + y* SCREEN_WIDTH + TilePosition.x );
-    //        pPixels += TILE_SIZE;
-    //    }
-    //}
+    if( !g_ThreadPerTile )
+        break;
+    }
+
+    memcpy( pTileInfo->TileMem  , Pixels  , sizeof(Pixels)  );
+    memcpy( pTileInfo->TileZMem , ZBuffer , sizeof(ZBuffer) );
+
+    uint32_t* pTileCoverage = TileCoverage;
+    Vector4f* pPixels       = Pixels;
+
+    for (int y = StartY ; y < EndY; y++ )
+    {
+        auto pCurScreenPixel = m_ScreenBuffer.data() + (y * SCREEN_WIDTH + TilePosition.x);
+        for( uint32_t x = 0 , cov = 1 ; x < TILE_SIZE ; ++x , cov <<= 1 )
+        {
+            if( pTileCoverage[0] & cov )
+                pCurScreenPixel[x] = Vector4f::ToARGB( pPixels[x] );
+        }
+        pTileCoverage++;
+        pPixels += TILE_SIZE; // move to next row in Pixels
+    }
+
+
 
     if( stats )
         stats->m_FramePixelsDrawn += pixelsDrawn;
 }
 
 template< eSimdType Type , bool Partial , int Elements  >
-inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& TD, DrawStats* stats)
+inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD, DrawStats* stats)
 {
     using f256t             = fsimd<Elements,Type>;
     using i256t             = isimd<Elements,Type>;
@@ -586,18 +623,36 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& TD, Draw
     using Vector4f256t      = Vector4<f256t>;
     using TransformedVertexT= SimdTransformedVertex<Elements,Type>;
 
+    ZoneScopedN( Partial ? "DrawTileImplSimd" : "DrawTileImplSimdFull" );
+    ZoneColor( 0xE0E000 );
+    const auto pTileInfo    = _InitTD.TileInfo;
 
-    ZoneScoped;
-    const auto pTriangle    = TD.Triangle;
-    const auto pTileInfo    = TD.TileInfo;
-    constexpr int pack_size = f256t::elements_count;
+    // local storage for pixels and zbuffer - it seems to be faster than using TileMem directly
+    ALIGN_FOR_AVX Vector4f  Pixels       [TILE_SIZE * TILE_SIZE];
+    ALIGN_FOR_AVX float     ZBuffer      [TILE_SIZE * TILE_SIZE];
+    ALIGN_FOR_AVX uint32_t  TileCoverage [TILE_SIZE] = {};
 
     // lock tile info to prevent concurrent access
     std::scoped_lock lock( pTileInfo->Lock );
 
+    // copy tile memory to local storage
+    memcpy( Pixels  , pTileInfo->TileMem  , sizeof(Pixels) );
+    memcpy( ZBuffer , pTileInfo->TileZMem , sizeof(ZBuffer) );
 
+    auto       pDrawCommand = g_ThreadPerTile ? pTileInfo->pRenderTileCmd.load( std::memory_order_relaxed ) : &_InitTD;
+    auto       pixelsDrawn  = 0;
+    int32_t    CommandIndex = 0;
+    const auto TilePosition = pTileInfo->TileScreenPos;
+    const int  StartY       = TilePosition.y;
+    const int  EndY         = StartY + TILE_SIZE;
 
-    const auto TilePosition = TD.ScreenPos;
+    for( ; pDrawCommand ; ++CommandIndex , pDrawCommand = pDrawCommand->pNext.load( std::memory_order_relaxed ) )
+    {
+    ZoneScopedN("Iteration");
+    ZoneColor( CommandIndex>0 ? 0x00E000 : 0x0000E0 );
+
+    constexpr int pack_size = f256t::elements_count;
+    const auto pTriangle    = pDrawCommand->Triangle;
     const auto _EdgeStrideX = pTriangle->m_EdgeFunctionRails.GetEdgeFunctionsXStride().ToVector3<int>().Swizzle<1,2,0>();
     const auto _EdgeStrideY = pTriangle->m_EdgeFunctionRails.GetEdgeFunctionsYStride().ToVector3<int>().Swizzle<1,2,0>();
           auto EdgeStrideX  = Vector3i256t{ _EdgeStrideX.x , _EdgeStrideX.y , _EdgeStrideX.z };
@@ -612,37 +667,38 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& TD, Draw
                 EdgeStartX += EdgeStrideX*i256t{ 0 , 1 , 2 , 3 };
           auto EdgeStartY   = Vector3i256t{ _EdgeStartY.x , _EdgeStartY.y , _EdgeStartY.z };
     const auto invABC       = f256t{ pTriangle->m_InvABC };
-    const int  StartY       = TilePosition.y;
-    const int  EndY         = StartY + TILE_SIZE;
-    auto       pixelsDrawn  = 0;
     EdgeStrideX *= pack_size;
 
-
-    // local pixels storage - it seems to be faster than using TileMem directly
-    ALIGN_FOR_AVX Vector4f  Pixels       [TILE_SIZE * TILE_SIZE];
-    ALIGN_FOR_AVX uint32_t  TileCoverage [TILE_SIZE] = {};
     TransformedVertexT      interpolatedVertex;
     Vector4f*               pCurPixel       = Pixels;
     uint32_t*               CoverageMask    = TileCoverage;
-    float*                  pZBuffer        = pTileInfo->TileZMem;
+    float*                  pZBuffer        = ZBuffer;
     i256t                   write_mask;
+    constexpr auto          pack_coverage_mask = (uint32_t(1)<<pack_size)-1;
 
     // loop through all pixels in tile square
-    for (int y = StartY ; y < EndY; y++ , EdgeStartY += EdgeStrideY )
+    for (int y = StartY ; y < EndY; y++ , EdgeStartY += EdgeStrideY , CoverageMask++ )
     {
         // Calculate edge functions for the first pixel in the current line
         auto EdgeFunctions = EdgeStartX + EdgeStartY;
 
-        for (int ix = 0; ix < TILE_SIZE; ix+=pack_size , EdgeFunctions += EdgeStrideX )
+        uint32_t LineCoverageMask = 0;
+
+        for (int ix = 0; ix < TILE_SIZE
+            ; ix+=pack_size
+            , EdgeFunctions += EdgeStrideX
+            )
         {
+            LineCoverageMask <<= pack_size;
+
             auto baricentricCoordinates = EdgeFunctions.ToVector3<f256t>() * invABC;
 
             // prepare coverage mask for bits from current pixel pack
-            *CoverageMask <<= pack_size;
+
             // initialize coverage with 1s - initially we assume that all pixels in current pack will be written
             uint32_t CurrentPackCoverageMask = 0xFFFFFFFF;
 
-            if constexpr( Partial )
+            if constexpr( Partial || 1 )
             {
                 // compute edge functions for current pixel pack and generate mask with 1s for pixels that are inside triangle
                 write_mask = (EdgeFunctions.x | EdgeFunctions.y | EdgeFunctions.z) >= i256t::Zero;
@@ -694,23 +750,27 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& TD, Draw
             }
 
             // Add mask for current pixel pack to the coverage mask
-            *CoverageMask |= CurrentPackCoverageMask;
+            LineCoverageMask |= (CurrentPackCoverageMask & pack_coverage_mask);
 
             // Interpolate all other vertex attributes (UV, normal, etc.) for all pixels in the current pack
             pTriangle->m_Interpolator.InterpolateAllButZ( baricentricCoordinates, interpolatedVertex );
 
-
             // Call fragment shader to compute final color for all pixels in the current pack
             Vector4f256t finalColor = FragmentShader(interpolatedVertex);
             // store the final color in the local pixel buffer - we will write it to the screen buffer later
-            finalColor.store( pCurPixel[ix].Data() , simd_alignment::AVX );
+            finalColor.store( pCurPixel[ix].Data() , write_mask );
 
             //Vector4f256t finalColor = Vector4f256t(interpolatedVertex.m_UV * f256A{ 1.0f }, f256A{ 1.0f } , f256A{ 1.0f } );
         }
 
         pCurPixel += TILE_SIZE;
         pZBuffer  += TILE_SIZE;
-        CoverageMask++;
+
+        *CoverageMask |= LineCoverageMask; // accumulate coverage mask for the whole tile
+    }
+
+        if( !g_ThreadPerTile )
+            break;
     }
 
     optional<Vector4f> White;
@@ -725,16 +785,29 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& TD, Draw
     }
 
     {
-        pCurPixel    = Pixels;
-        CoverageMask = TileCoverage;
+        Vector4f* pCurPixel       = Pixels;
+        uint32_t* CoverageMask    = TileCoverage;
         for (int y = StartY ; y < EndY; y++)
         {
             TileLineFToARGB_Simd<true,8,eSimdType::AVX>( pCurPixel , m_ScreenBuffer.data() + y* SCREEN_WIDTH + TilePosition.x , White , *CoverageMask );
             pCurPixel += TILE_SIZE;
             CoverageMask++;
         }
+        memcpy( pTileInfo->TileMem  , Pixels  , sizeof(Pixels)  );
+        memcpy( pTileInfo->TileZMem , ZBuffer , sizeof(ZBuffer) );
     }
 
+
+    // update max overdraw count
+    auto old_max_overdraw = g_max_overdraw.load(std::memory_order_relaxed);
+    for(;;)
+    {
+        CommandIndex = std::max( old_max_overdraw , CommandIndex );
+        if( g_max_overdraw.compare_exchange_strong( old_max_overdraw , CommandIndex, std::memory_order_relaxed) )
+            break;
+    }
+
+    // update pixels draw stats
     if( stats )
         stats->m_FramePixelsDrawn += pixelsDrawn;
 }
@@ -822,9 +895,10 @@ inline void ImGuiAddX(ImVec2 p_min, ImVec2 p_max, ImU32 col, float thickness = 1
     ImGuiAddLine(P[1], P[2], col, thickness);
 }
 
-void SoftwareRenderer::GenerateTileJobs(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color, DrawStats& stats, const PipelineSharedData* pPipelineSharedData )
+void SoftwareRenderer::GenerateTileJobs(const TransformedVertex& VA, const TransformedVertex& VB, const TransformedVertex& VC, const Vector4f& color, DrawStats& stats, const PipelineSharedData* pPipelineSharedData, uint32_t tri_index ,  pmr::vector<const Command*>& outCommmands )
 {
     ZoneScoped;
+    ZoneColor( 0x00E0E0 );
     // filling algorithm is working that way that we are going through all pixels in rectangle that is created by min and max points
     // and we are checking if pixel is inside triangle by using three lines and checking if pixel is on the same side of each line
 
@@ -878,6 +952,14 @@ void SoftwareRenderer::GenerateTileJobs(const TransformedVertex& VA, const Trans
 
     TriangleData& Data = *m_TransientAllocator.allocate<TriangleData>( VA , VB , VC , Vector4f{1,1,1,1} , A , B , C , StartP );
     Data.m_InvABC = (1.0f / ABC);
+    Data.m_TriIndex = tri_index;
+    Data.m_MaxZ = Data.m_MinZ = VA.m_ScreenPosition.z;
+    Data.m_MinZ = std::min( Data.m_MinZ , VB.m_ScreenPosition.z );
+    Data.m_MaxZ = std::max( Data.m_MaxZ , VB.m_ScreenPosition.z );
+
+    Data.m_MinZ = std::min( Data.m_MinZ , VC.m_ScreenPosition.z );
+    Data.m_MaxZ = std::max( Data.m_MaxZ , VC.m_ScreenPosition.z );
+
 
     constexpr auto TILE_SIZE_M = TILE_SIZE * Precision.Multiplier;
 
@@ -971,60 +1053,85 @@ void SoftwareRenderer::GenerateTileJobs(const TransformedVertex& VA, const Trans
 
     CommandBuffer* pCommandBuffer = pPipelineSharedData ? pPipelineSharedData->m_pRenderTilesCmdBuffer : m_pCommandBuffer;
 
+    transient_allocator alloc{ m_TransientMemoryResource };
+
+    auto AddCommand = [&Data,&alloc,&outCommmands,tri_index]( const Vector2<int64_t>& TilePos , const TileInfo* pTileInfo , auto FullTile )
+    {
+        constexpr bool IsFullTile = FullTile();
+
+        ZoneScopedN( IsFullTile ? "gen command full" : "gen command partial" );
+        auto ID = pTileInfo->DrawCount++;
+
+        CommandRenderTile& TD = *alloc.allocate<CommandRenderTile>();
+        auto LogicPos  = TilePos.ToVector2<int>();
+        TD.IsFullTile= IsFullTile;
+        TD.TileDrawID= ID;
+        TD.Triangle  = &Data;
+        TD.TileInfo  = pTileInfo;
+
+        CommandRenderTile* pCurTop = nullptr;
+
+        if( g_ThreadPerTile )
+        {
+            pCurTop = pTileInfo->pRenderTileCmd.load( std::memory_order_relaxed );
+
+            for(;;)
+            {
+                TD.pNext.store( pCurTop , std::memory_order_relaxed );
+                if( !pTileInfo->pRenderTileCmd.compare_exchange_weak( pCurTop , &TD , std::memory_order_acq_rel ) )
+                    continue;
+
+                break;
+            }
+        }
+
+        if( !pCurTop )
+        {
+            ZoneColor( 0x0000FF );
+            outCommmands.push_back( &TD );
+        }
+        else
+        {
+            ZoneColor( 0x00FF00 );
+        }
+
+        //pCommandBuffer->PushCommand<CommandRenderTile>( TD );
+
+        if( g_showTilestype )
+        {
+            if constexpr( IsFullTile )
+                ImGuiAddRectFilled(TilePos, TilePos + TILE_SIZE, ImColor(64, 255, 0, 64) );
+            else
+                ImGuiAddRectFilled(TilePos, TilePos + TILE_SIZE, ImColor(0, 64, 255, 64) );
+        }
+    };
+
     {
         ZoneScopedN("Classify Tiles");
-    for( int y = MinTile.y ; y <= MaxTile.y ; ++y )
-    {
-        for( int x = MinTile.x ; x <= MaxTile.x ; ++x )
+        for( int y = MinTile.y ; y <= MaxTile.y ; ++y )
         {
-            const auto TileIndex = Vector2si( x , y );
-            auto* pTileInfo = GetTileInfo( TileIndex );
-            Vector2 TilePos = (TileIndex*TILE_SIZE_M).ToVector2<int64_t>();
-
-            auto Classified = ClassifyX( A , B , C , TilePos , Closest , Farthest );
-
-            if( g_showTilesBoundry )
-                ImGuiAddRect( TilePos , TilePos + TILE_SIZE, ImColor(32, 32, 32, 255) );
-
-            if( Classified == eTileCoverage::Inside )
+            for( int x = MinTile.x ; x <= MaxTile.x ; ++x )
             {
-                ZoneScopedN("gen command");
-                auto ID = pTileInfo->DrawCount++;
+                const auto TileIndex = Vector2si( x , y );
+                auto* pTileInfo = GetTileInfo( TileIndex );
+                Vector2 TilePos = (TileIndex*TILE_SIZE_M).ToVector2<int64_t>();
 
-                auto LogicPos  = TilePos.ToVector2<int>();
-                CommandRenderTile TD;
-                TD.ScreenPos = (LogicPos / Precision.Multiplier);
-                TD.Triangle  = &Data;
-                TD.IsFullTile= true;
-                TD.TileInfo  = pTileInfo;
-                TD.TileDrawID= ID;
-                pCommandBuffer->PushCommand<CommandRenderTile>( TD );
-                //DrawFullTile( TD , stats );
-                if( g_showTilestype )
-                    ImGuiAddRectFilled(TilePos, TilePos + TILE_SIZE, ImColor(64, 255, 0, 64) );
-            }
-            else if( Classified == eTileCoverage::Partial )
-            {
-                ZoneScopedN("gen command");
-                auto ID = pTileInfo->DrawCount++;
+                auto Classified = ClassifyX( A , B , C , TilePos , Closest , Farthest );
 
-                auto LogicPos  = TilePos.ToVector2<int>();
+                if( g_showTilesBoundry )
+                    ImGuiAddRect( TilePos , TilePos + TILE_SIZE, ImColor(32, 32, 32, 255) );
 
-                CommandRenderTile TD;
-                TD.ScreenPos = (LogicPos / Precision.Multiplier);
-                TD.Triangle  = &Data;
-                TD.IsFullTile= false;
-                TD.TileInfo  = pTileInfo;
-                TD.TileDrawID= ID;
-                pCommandBuffer->PushCommand<CommandRenderTile>( TD );
-                //DrawPartialTile( TD , stats );
-                if( g_showTilestype )
-                    ImGuiAddRectFilled(TilePos, TilePos + TILE_SIZE, ImColor(0, 64, 255, 64) );
+                if( Classified == eTileCoverage::Inside )
+                {
+                    AddCommand( TilePos , pTileInfo , std::true_type{} );
+                }
+                else if( Classified == eTileCoverage::Partial )
+                {
+                    AddCommand( TilePos , pTileInfo , std::false_type{} );
+                }
             }
         }
     }
-    }
-
 }
 
 void SoftwareRenderer::BeginFrame()
@@ -1039,10 +1146,12 @@ void SoftwareRenderer::BeginFrame()
 
     m_FrameRasterTimeUS = 0;
     m_FrameTransformTimeUS = 0;
+    g_max_overdraw = 0;
 
     for( int i=0 ; m_TilesGridSize.x * m_TilesGridSize.y > i ; ++i )
     {
         m_TilesGrid[i].DrawCount = 0;
+        m_TilesGrid[i].pRenderTileCmd = nullptr;
     }
 }
 
@@ -1093,14 +1202,24 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
     FrameMarkNamed( "Tasks launched" );
     m_TileThreadPool.LaunchTasks( { m_ThreadsCount , [this](){ RendererTaskWorker(); } } );
 
+    for( int i=0 ; m_TilesGridSize.x * m_TilesGridSize.y > i ; ++i )
+    {
+        m_TilesGrid[i].DrawCount = 0;
+        m_TilesGrid[i].pRenderTileCmd = nullptr;
+    }
+
     const auto timeUS = std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
     m_FrameDrawTimeMainUS += timeUS;
+
+    m_pCommandBuffer = AllocTransientCommandBuffer();
 }
 
 void SoftwareRenderer::RendererTaskWorker()
 {
     ZoneScoped;
     const auto pCommandBuffer = m_pCommandBuffer;
+    pmr::vector<uint64_t> TmpBuffer{ &m_TransientMemoryResource };
+    TmpBuffer.reserve( 2048 );
     for(;;)
     {
         auto pCommand = pCommandBuffer->GetNextCommand();
@@ -1112,7 +1231,6 @@ void SoftwareRenderer::RendererTaskWorker()
         case eCommandID::ClearBuffers:           ClearBuffers            (*pCommand->static_cast_to<CommandClear>()                  );              continue;
         case eCommandID::Fill32BitBuffer:        Fill32BitBuffer         (*pCommand->static_cast_to<CommandFill32BitBuffer>()        );              continue;
         case eCommandID::SyncBarier:             WaitForSync             (*pCommand->static_cast_to<CommandSyncBarier>()             );              continue;
-        case eCommandID::AppendCmdBuf:           AppendCommandBuffer     (*pCommand->static_cast_to<CommandAppendCommmandBufffer>()  );              continue;
         case eCommandID::VertexAssemply:         VertexAssemply          (*pCommand->static_cast_to<CommandVertexAssemply>()         );              continue;
         case eCommandID::VertexTransformAndClip: VertexTransformAndClip  (*pCommand->static_cast_to<CommandVertexTransformAndClip>() );              continue;
         case eCommandID::ProcessTriangles:       ProcessTriangles        (*pCommand->static_cast_to<CommandProcessTriangles>()       );              continue;
@@ -1225,7 +1343,8 @@ void SoftwareRenderer::VertexAssemply( const CommandVertexAssemply& cmd )
         ZoneScopedN("VertexAssemply dispatch");
         constexpr auto TRIANGLES_PER_COMMAND = 100;
 
-        for( size_t i=0 ; i < VerticesCount ; i+=TRIANGLES_PER_COMMAND*3 )
+        size_t i=0;
+        for(  ; i < VerticesCount ; i+=TRIANGLES_PER_COMMAND*3 )
         {
             if( vertices.size() <  + TRIANGLES_PER_COMMAND*3 )
                 break;
@@ -1233,11 +1352,11 @@ void SoftwareRenderer::VertexAssemply( const CommandVertexAssemply& cmd )
             auto SubSpan = vertices.subspan( 0 , TRIANGLES_PER_COMMAND*3 );
             vertices = vertices.subspan(SubSpan.size());
 
-            pWorkCmdBuffer->PushCommand<CommandVertexTransformAndClip>( SubSpan , *pData );
+            pWorkCmdBuffer->PushCommand<CommandVertexTransformAndClip>( SubSpan , *pData , i/3 );
         }
 
         if( !vertices.empty() )
-            pWorkCmdBuffer->PushCommand<CommandVertexTransformAndClip>( vertices , *pData );
+            pWorkCmdBuffer->PushCommand<CommandVertexTransformAndClip>( vertices , *pData , i/3 );
     }
 
     pVertexTransformAndClipSync->name = "VertexAssemply end";
@@ -1272,6 +1391,7 @@ void SoftwareRenderer::ExecuteExitCommand()
 void SoftwareRenderer::VertexTransformAndClip( const CommandVertexTransformAndClip& cmd )
 {
     ZoneScoped;
+    ZoneColor( 0xE000E0 );
     auto vertices = cmd.m_Input;
     if( vertices.empty() )
         return;
@@ -1280,11 +1400,13 @@ void SoftwareRenderer::VertexTransformAndClip( const CommandVertexTransformAndCl
 
     {
         ZoneScopedN( "Clip" );
+        ZoneColor( 0xE000E0 );
         vertices = ClipTriangles(cmd.m_pPipelineSharedData->m_NearFrustumPlane, 0.001f, vertices);
     }
 
     {
         ZoneScopedN( "Transform" );
+        ZoneColor( 0xE000E0 );
         transformedVertices = m_TransientAllocator.allocate_array<TransformedVertex>(vertices.size());
 
         const auto startTime = std::chrono::high_resolution_clock::now();
@@ -1296,18 +1418,30 @@ void SoftwareRenderer::VertexTransformAndClip( const CommandVertexTransformAndCl
     }
 
     //cmd.m_pPipelineSharedData->m_pProcessTrianglesCmdBuffer->PushCommandSync<CommandProcessTriangles>( cmd.m_pPipelineSharedData->m_pProcessTrianglesCmdBufferSync , transformedVertices , *cmd.m_pPipelineSharedData );
-    cmd.m_pPipelineSharedData->m_pProcessTrianglesCmdBuffer->PushCommand<CommandProcessTriangles>( transformedVertices , *cmd.m_pPipelineSharedData );
+    cmd.m_pPipelineSharedData->m_pProcessTrianglesCmdBuffer->PushCommand<CommandProcessTriangles>( transformedVertices , *cmd.m_pPipelineSharedData , cmd.m_StartTriIndex );
 }
 
 void SoftwareRenderer::ProcessTriangles( const CommandProcessTriangles& cmd )
 {
     ZoneScoped;
+    ZoneColor( 0x00E0E0 );
     auto vertices = cmd.m_Vertices;
     if( vertices.empty() )
         return;
 
-    for (int i = 2; i < vertices.size(); i+=3)
-        GenerateTileJobs(vertices[i - 2], vertices[i - 1], vertices[i], cmd.m_pPipelineSharedData->m_pDrawConfig->m_Color , m_DrawStats,cmd.m_pPipelineSharedData );
+    std::array<uint8_t,(1024+16)*sizeof(void*)> Buffer;
+    transient_memory_resource transient;
+    pmr::monotonic_buffer_resource BufferedRes{ Buffer.data() , Buffer.size() , &transient };
+    pmr::vector<const Command*> Commands{ &BufferedRes };
+    Commands.reserve( 1024 );
+
+    int tri = cmd.m_StartTriIndex;
+    for (int i = 2; i < vertices.size(); i+=3, ++tri)
+        GenerateTileJobs(vertices[i - 2], vertices[i - 1], vertices[i], cmd.m_pPipelineSharedData->m_pDrawConfig->m_Color , m_DrawStats,cmd.m_pPipelineSharedData , tri , Commands );
+
+    auto pCmdBuf = CommandBuffer::CreateCommandBuffer( m_TransientMemoryResource , Commands , true );
+
+    cmd.m_pPipelineSharedData->m_pRenderTilesCmdBuffer->PushCommandBuffer( *pCmdBuf );
 }
 
 void SoftwareRenderer::RenderDepthBuffer()
@@ -1324,14 +1458,9 @@ void SoftwareRenderer::RenderDepthBuffer()
 void SoftwareRenderer::WaitForSync(const CommandSyncBarier& cmd)
 {
     ZoneScoped;
+    ZoneColor( 0xFF0000 );
     if( cmd.pAwaitSync )
         cmd.pAwaitSync->Wait();
-}
-
-void SoftwareRenderer::AppendCommandBuffer(const CommandAppendCommmandBufffer& cmd)
-{
-    ZoneScoped;
-    cmd.pDst->PushCommandBuffer(*cmd.pSrc);
 }
 
 void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int minY, int maxY, int threadID)

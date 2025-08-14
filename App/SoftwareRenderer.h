@@ -20,14 +20,16 @@
 
 struct TileInfo
 {
-    using at_i16 = std::atomic<uint16_t>;
+    using at_i16            = atomic<uint16_t>;
+    using at_CmdDrawTile    = atomic<CommandRenderTile*>;
 
-    Vector2si       TileIndex;
-    Spinlock        Lock;
-    mutable at_i16  DrawCount       = 0;
-    Vector2i        TileScreenPos;
-    Vector4f*       TileMem         = nullptr;
-    float*          TileZMem        = nullptr;
+    Vector2si               TileIndex;
+    Spinlock                Lock;
+    mutable at_i16          DrawCount       = 0;
+    Vector2i                TileScreenPos;
+    Vector4f*               TileMem         = nullptr;
+    float*                  TileZMem        = nullptr;
+    mutable at_CmdDrawTile  pRenderTileCmd  = nullptr;
 };
 
 struct TileData;
@@ -128,7 +130,7 @@ private:
     void DrawPartialTile(const CommandRenderTile& TD, DrawStats* stats);
     void DrawTile       (const CommandRenderTile& TD, DrawStats* stats);
 
-    void GenerateTileJobs(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, DrawStats& stats, const PipelineSharedData* pPipelineSharedData );
+    void GenerateTileJobs(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, DrawStats& stats, const PipelineSharedData* pPipelineSharedData, uint32_t tri_index , pmr::vector<const Command*>& outCommmands );
 
 
     template< typename MathT , DrawFunctionConfig Config >
@@ -158,7 +160,6 @@ private:
     void                VertexTransformAndClip( const CommandVertexTransformAndClip& cmd );
     void                ProcessTriangles( const CommandProcessTriangles& cmd );
     void                WaitForSync(const CommandSyncBarier& cmd);
-    void                AppendCommandBuffer(const CommandAppendCommmandBufffer& cmd);
     CommandBuffer*      AllocTransientCommandBuffer(){ return CommandBuffer::CreateCommandBuffer( m_TransientMemoryResource); }
 
     Vector4f FragmentShader(const TransformedVertex& vertex);

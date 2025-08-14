@@ -100,6 +100,8 @@ span<const Vertex> ClipTriangles(const Plane& clipPlane, const float epsilon, sp
         { 2,0 }
     };
 
+    ZoneScopedN("Execute Clip");
+
     vector<Vertex> splitedVertices;
     vector<int> edgeSplitVertex(oldEdgesCount);
 

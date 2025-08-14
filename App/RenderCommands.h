@@ -23,9 +23,7 @@ enum class eCommandID : uint8_t
     ClearBuffers,
     Fill32BitBuffer,
     SyncBarier,
-    AppendCmdBuf,
-
-    SwitchCmdBuf,
+    CmdReadJump,
 };
 
 struct DrawConfig
@@ -62,12 +60,25 @@ enum class eCommandPtrKind : uint8_t
     End        = 3,
 };
 
-enum class eEncodedCommandPtr : size_t
+enum class _eEncodedCommandPtr : size_t
 {
     Invalid = 0,
 };
 
-struct alignas(4) Command
+struct eEncodedCommandPtr
+{
+    static const eEncodedCommandPtr Invalid;
+
+    constexpr auto operator<=>( const eEncodedCommandPtr& other )const noexcept = default;
+
+    _eEncodedCommandPtr val = _eEncodedCommandPtr::Invalid;
+};
+
+inline constexpr const eEncodedCommandPtr eEncodedCommandPtr::Invalid = eEncodedCommandPtr{ _eEncodedCommandPtr::Invalid };
+
+#define COMMAND_ALIGN alignas(8)
+
+struct Command
 {
     eCommandID m_CommandID = eCommandID::NoCommand;
 
@@ -152,12 +163,12 @@ struct EncodedCommandPtr
 
     union
     {
-        eEncodedCommandPtr  m_Enoded = eEncodedCommandPtr::Invalid;
+        eEncodedCommandPtr  m_Enoded = eEncodedCommandPtr{};
         SeparatedCommand    m_Separated;
     };
 };
 
-struct CommandFill32BitBuffer : Command
+struct COMMAND_ALIGN CommandFill32BitBuffer : Command
 {
     static constexpr auto COMMAND_ID = eCommandID::Fill32BitBuffer;
 
@@ -184,7 +195,7 @@ struct CommandFill32BitBuffer : Command
     } m_Value;
 };
 
-struct CommandClear : Command
+struct COMMAND_ALIGN CommandClear : Command
 {
     static constexpr auto COMMAND_ID = eCommandID::ClearBuffers;
 
@@ -197,7 +208,7 @@ struct CommandClear : Command
     optional<float>     m_ZValue    ;
 };
 
-struct CommandVertexAssemply : Command
+struct COMMAND_ALIGN  CommandVertexAssemply : Command
 {
     static constexpr auto COMMAND_ID = eCommandID::VertexAssemply;
 
@@ -210,33 +221,37 @@ struct CommandVertexAssemply : Command
     DrawConfig* m_pConfig = nullptr;
 };
 
-struct CommandVertexTransformAndClip : Command
+struct COMMAND_ALIGN  CommandVertexTransformAndClip : Command
 {
     static constexpr auto COMMAND_ID = eCommandID::VertexTransformAndClip;
 
-    CommandVertexTransformAndClip( span<const Vertex> Input , const  PipelineSharedData& Data )
+    CommandVertexTransformAndClip( span<const Vertex> Input , const PipelineSharedData& Data , uint32_t StartTriIndex )
         : Command(COMMAND_ID)
+        , m_StartTriIndex(StartTriIndex)
         , m_Input(Input)
         , m_pPipelineSharedData(&Data)
     {}
+    uint32_t m_StartTriIndex = 0;
     span<const Vertex> m_Input;
     const  PipelineSharedData* m_pPipelineSharedData = nullptr;
 };
 
-struct CommandProcessTriangles : Command
+struct COMMAND_ALIGN  CommandProcessTriangles : Command
 {
     static constexpr auto COMMAND_ID = eCommandID::ProcessTriangles;
 
-    CommandProcessTriangles( span<const TransformedVertex> Input , const PipelineSharedData& Data )
+    CommandProcessTriangles( span<const TransformedVertex> Input , const PipelineSharedData& Data , uint32_t StartTriIndex )
         : Command(COMMAND_ID)
+        , m_StartTriIndex(StartTriIndex)
         , m_Vertices(Input)
         , m_pPipelineSharedData(&Data)
     {}
+    uint32_t m_StartTriIndex = 0;
     span<const TransformedVertex> m_Vertices;
     const  PipelineSharedData* m_pPipelineSharedData = nullptr;
 };
 
-struct CommandSyncBarier : Command
+struct COMMAND_ALIGN  CommandSyncBarier : Command
 {
     static constexpr auto COMMAND_ID = eCommandID::SyncBarier;
 
@@ -248,27 +263,11 @@ struct CommandSyncBarier : Command
     ISyncBarier* pAwaitSync = nullptr;
 };
 
-struct CommandAppendCommmandBufffer : Command
+struct COMMAND_ALIGN  CommandReadJump : Command
 {
-    static constexpr auto COMMAND_ID = eCommandID::AppendCmdBuf;
+    static constexpr auto COMMAND_ID = eCommandID::CmdReadJump;
 
-    CommandAppendCommmandBufffer( CommandBuffer& Src , CommandBuffer& Dst , bool AtEnd = true )
-        : Command(COMMAND_ID)
-        , pSrc(&Src)
-        , pDst(&Dst)
-        , m_AtEnd(AtEnd)
-    {}
-
-    bool m_AtEnd = true;
-    CommandBuffer* pSrc = nullptr;
-    CommandBuffer* pDst = nullptr;
-};
-
-struct CommmandReadJump : Command
-{
-    static constexpr auto COMMAND_ID = eCommandID::SwitchCmdBuf;
-
-    CommmandReadJump( eEncodedCommandPtr& Cmd )
+    CommandReadJump( eEncodedCommandPtr& Cmd )
         : Command(COMMAND_ID)
         , pCmd{ &Cmd }
     {}
@@ -276,7 +275,7 @@ struct CommmandReadJump : Command
     eEncodedCommandPtr* pCmd = nullptr;
 };
 
-struct CommandRenderTile : Command
+struct COMMAND_ALIGN CommandRenderTile : Command
 {
     static constexpr auto COMMAND_ID = eCommandID::RenderTile;
 
@@ -284,8 +283,8 @@ struct CommandRenderTile : Command
         : Command(COMMAND_ID)
     {}
     bool                IsFullTile = false;
-    uint16_t            TileDrawID = 0;
-    Vector2i            ScreenPos;
+    uint32_t            TileDrawID = 0;
     const TriangleData* Triangle;
     const TileInfo*     TileInfo;
+    atomic<CommandRenderTile*> pNext = nullptr;
 };

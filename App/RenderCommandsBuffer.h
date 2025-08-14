@@ -23,6 +23,7 @@ struct CommandBuffer
     void AddSyncBarrier( const char* Name , triviall_function_ref Callabck , uint8_t Count = 1 );
     void AddSyncPoint( ISyncBarier& Sync , uint8_t Count = 1 );
     static CommandBuffer* CreateCommandBuffer( transient_memory_resource& Res ) noexcept;
+    static CommandBuffer* CreateCommandBuffer( transient_memory_resource& Res , span<const Command*const> Commands , bool ExactSize ) noexcept;
     void Finish()
     {
         PushCommandImpl( EncodedCommandPtr{ nullptr , eCommandPtrKind::End } );
@@ -32,6 +33,7 @@ protected:
     struct Context;
 
     CommandBuffer( transient_memory_resource& Res );
+    CommandBuffer( transient_memory_resource& Res ,span<const Command*const> Commands, bool ExactSize);
 
     void PushCommandImpl( eEncodedCommandPtr pCmd ) noexcept;
 
@@ -138,8 +140,8 @@ inline void CommandBuffer::PushCommandBuffer( CommandBuffer& Cmd )
     }
 
 
-    auto pJumpCmd = m_Allocator.allocate<CommmandReadJump>( *Cmd.m_pFirstCommand );
-    auto pReturnCmd = m_Allocator.allocate<CommmandReadJump>( pCur[1] );
+    auto pJumpCmd = m_Allocator.allocate<CommandReadJump>( *Cmd.m_pFirstCommand );
+    auto pReturnCmd = m_Allocator.allocate<CommandReadJump>( pCur[1] );
 
     pCur[0] = EncodedCommandPtr{ pJumpCmd , eCommandPtrKind::Special };
     Cmd.m_pCurWriteCommand.load()[0] = EncodedCommandPtr{ pReturnCmd , eCommandPtrKind::Special };

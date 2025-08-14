@@ -38,7 +38,7 @@ private:
 
 struct transient_allocator
 {
-    transient_allocator( transient_memory_resource& res ) noexcept
+    transient_allocator( std::pmr::memory_resource& res ) noexcept
         : m_pResource( &res )
     {}
 
@@ -58,5 +58,5 @@ struct transient_allocator
         return { pMem , Count };
     }
 private:
-    transient_memory_resource* m_pResource = nullptr;
+    std::pmr::memory_resource* m_pResource = nullptr;
 };

@@ -1,7 +1,7 @@
 #pragma once
 #include "Math.h"
 
-constexpr int FALLBACK_MODEL_VERT_COUNT = 36+6;
+constexpr int FALLBACK_MODEL_VERT_COUNT = (6+1)*6;
 
 const Vertex fallbackVertices[FALLBACK_MODEL_VERT_COUNT] =
 {

@@ -61,8 +61,9 @@ void TransientMemoryAllocator::Page::reset()
     m_FreeLeft = m_MaxSize;
 }
 
-void* TransientMemoryAllocator::Page::allocate( size_t bytes, size_t alignment , std::pmr::synchronized_pool_resource& upstream )
+FORCE_INLINE void* TransientMemoryAllocator::Page::allocate( size_t bytes, size_t alignment , std::pmr::synchronized_pool_resource& upstream )
 {
+    ZoneScoped;
     static_assert( IsPowerOfTwo( AVX_ALIGN ) );
 
     alignment = Granulate<size_t>(alignment, AVX_ALIGN);
@@ -107,7 +108,7 @@ struct TransientMemoryAllocator::TLSlot
         m_pPage = &s_EmptyPage;
     }
 
-    void* allocate( size_t bytes, size_t alignment , std::pmr::synchronized_pool_resource& upstream )
+    FORCE_INLINE void* allocate( size_t bytes, size_t alignment , std::pmr::synchronized_pool_resource& upstream )
     {
         auto pMem = m_pPage->allocate( bytes, alignment, upstream );
         if( pMem )
@@ -177,6 +178,7 @@ void TransientMemoryAllocator::Storage::FreeSlot( TLSlot& slot )
     m_Slots.erase(std::remove(m_Slots.begin(), m_Slots.end(), &slot), m_Slots.end());
     slot.m_pStorage = nullptr;
 }
+
 TransientMemoryAllocator::Storage* TransientMemoryAllocator::Storage::RegisterSlot( TLSlot& slot )
 {
     if( slot.m_pStorage )
@@ -231,9 +233,8 @@ void TransientMemoryAllocator::Storage::reset()
     m_Pages.clear();
 }
 
-void* TransientMemoryAllocator::do_allocate(std::size_t bytes, std::size_t alignment, std::pmr::synchronized_pool_resource& upstream )
+FORCE_INLINE void* TransientMemoryAllocator::do_allocate(std::size_t bytes, std::size_t alignment, std::pmr::synchronized_pool_resource& upstream )
 {
-    ZoneScoped;
     return s_TLSlot.allocate(bytes, alignment, upstream);
 }
 
@@ -246,7 +247,6 @@ void TransientMemoryAllocator::reset()
 
 void* transient_memory_resource::do_allocate(std::size_t bytes, std::size_t alignment)
 {
-    ZoneScoped;
     return TransientMemoryAllocator::do_allocate(bytes, alignment, m_Fallback);
 }
 

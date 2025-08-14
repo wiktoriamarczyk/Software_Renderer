@@ -27,7 +27,7 @@ const PredefinedModel s_PredefinedModels[] =
     { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , },
     { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330 , .RotationY = 25 },
     { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280 , .RotationY = 140 },
-    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120 }
+    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120 , .Scale = 6.5 }
 };
 
 void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
@@ -305,7 +305,9 @@ extern bool g_showTilesGrid;
 extern bool g_showTilestype;
 extern bool g_showTriangleBoundry;
 extern bool g_useSimd;
+extern bool g_ThreadPerTile;
 extern std::atomic<size_t> g_memory_resource_mem ;
+extern std::atomic<int> g_max_overdraw;
 
 int Application::Run()
 {
@@ -441,7 +443,10 @@ int Application::Run()
 
         ImGui::Checkbox("Wireframe", &m_DrawSettings.drawWireframe);
 
-        ImGui::Checkbox( "UseSimd" , &g_useSimd ); ImGui::SameLine(); ImGui::Checkbox("Show Tiles Grid" , &g_showTilesGrid);
+        ImGui::Checkbox( "UseSimd" , &g_useSimd ); 
+        ImGui::SameLine(); ImGui::Checkbox("Show Tiles Grid" , &g_showTilesGrid);
+        ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.colorizeThreads);
+        ImGui::SameLine(); ImGui::Checkbox("BBoxes", &m_DrawSettings.drawBBoxes);
 
         if( ImGui::Button("0") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 0); ImGui::SameLine();
         if( ImGui::Button("1") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 1); ImGui::SameLine();
@@ -449,9 +454,9 @@ int Application::Run()
         if( ImGui::Button("3") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 3);
 
 
-        ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.colorizeThreads);
-        ImGui::SameLine(); ImGui::Checkbox("BBoxes", &m_DrawSettings.drawBBoxes);
         ImGui::SameLine(); ImGui::Checkbox("Use ZBuffer", &m_DrawSettings.useZBuffer);
+        ImGui::SameLine(); ImGui::Checkbox("One Thread Per Tile", &g_ThreadPerTile);
+
         ImGui::ColorEdit3("Ambient Color", &m_DrawSettings.ambientColor.x);
         ImGui::ColorEdit3("Diffuse Color", &m_DrawSettings.diffuseColor.x);
         ImGui::ColorEdit3("Background Color", &m_DrawSettings.backgroundColor.x);
@@ -532,6 +537,7 @@ int Application::Run()
         ImGui::Text("Build: %s" , sizeof(void*) == 8 ? "x64" : "x86");
         ImGui::Text("Math: %d", m_DrawSettings.mathType );
         ImGui::Text("Mem : %u KB" , uint32_t(g_memory_resource_mem.load()/1024) );
+        ImGui::Text("Max Overdraw: %d" , g_max_overdraw.load() );
         ImGui::End();
 
         DrawRenderingStats();
