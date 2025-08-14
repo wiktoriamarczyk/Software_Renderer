@@ -6,65 +6,122 @@
 
 #pragma once
 #include "RenderCommandsBuffer.h"
-
-bool CommandBuffer::CheckGrow( Context*& pContext )
-{
-    ZoneScoped;
-    std::scoped_lock lock( m_CmdBufSpinLock );
-
-    auto pCurContext = m_pContext.load();
-    if( pContext == pCurContext )
-        return false;
-
-    pContext = pCurContext;
-    return true;
-}
-
-void CommandBuffer::GrowCommandBuffer( Context*& pContext , size_t ExtraSize ) noexcept
-{
-    ZoneScoped;
-    std::scoped_lock lock( m_CmdBufSpinLock );
-
-    const auto WriteOffset = (pContext->m_pCurWriteCommand.load()-pContext->m_pFirstCommand);
-    const auto ReadOffset  = (pContext->m_pCurReadCommand.load() -pContext->m_pFirstCommand);
-
-    auto pNewContext = m_Allocator.allocate<Context>();
-
-    ExtraSize += m_Commands.size();
-    if( ExtraSize < m_Commands.size()*2 )
-        ExtraSize = m_Commands.size()*2;
-
-    if( ExtraSize > 100'000 )
-    {
-        int i=0;
-    }
-
-    m_Commands.resize(ExtraSize,0);
-
-    pNewContext->m_pFirstCommand     = m_Commands.data();
-    pNewContext->m_pEndCommand       = pNewContext->m_pFirstCommand + m_Commands.size() - 1;
-    pNewContext->m_pCurWriteCommand  = pNewContext->m_pFirstCommand + WriteOffset;
-    pNewContext->m_pCurReadCommand   = pNewContext->m_pFirstCommand + ReadOffset;
-
-    pContext = pNewContext;
-    m_pContext = pNewContext;
-}
+#include "RenderCommands.h"
 
 CommandBuffer::CommandBuffer( transient_memory_resource& Res )
     : m_MemoryResource  (Res)
-    , m_Commands        (m_CmdAllocator)
 {
     ZoneScoped;
-    m_Commands.resize(1024*8);
-    memset( m_Commands.data(), 0, sizeof(m_Commands[0]) * m_Commands.size() );
-    m_BaseContext.m_pFirstCommand    = m_Commands.data();
-    m_BaseContext.m_pCurReadCommand  = m_BaseContext.m_pFirstCommand;
-    m_BaseContext.m_pCurWriteCommand = m_BaseContext.m_pFirstCommand;
-    m_BaseContext.m_pEndCommand      = m_BaseContext.m_pFirstCommand + m_Commands.size() - 1;
+    m_Commands = m_Allocator.allocate_array<eEncodedCommandPtr>( 1024 * 8, eEncodedCommandPtr::Invalid );
+
+    m_pFirstCommand = m_Commands.data();
+    m_Commands.back() = EncodedCommandPtr{ nullptr , eCommandPtrKind::End };
+    m_pCurReadCommand = m_pFirstCommand;
+    m_pCurWriteCommand = m_pFirstCommand;
 }
 
 CommandBuffer* CommandBuffer::CreateCommandBuffer( transient_memory_resource& Res ) noexcept
 {
     transient_allocator Allocator{ Res };
     return Allocator.allocate<CommandBuffer>( Res );
+}
+
+
+bool CommandBuffer::HandleReadNonStandardCommnad()
+{
+    ZoneScoped;
+    std::scoped_lock lock( m_CmdBufSpinLock );
+
+    EncodedCommandPtr Commmand{ *m_pCurReadCommand.load() };
+
+    switch( Commmand.GetKind() )
+    {
+    case eCommandPtrKind::Null:
+        std::this_thread::sleep_for(std::chrono::milliseconds(1)); // no command, wait
+        return true; // no command
+
+    case eCommandPtrKind::Standard:
+        return true; // standard command, no special handling
+
+    case eCommandPtrKind::Special:
+        {
+            auto pCommand = Commmand.GetCommand();
+            assert( pCommand );
+            if( !pCommand )
+                return false;
+
+            switch( pCommand->m_CommandID )
+            {
+
+            case eCommandID::SwitchCmdBuf:
+                {
+                    auto pCmd = pCommand->static_cast_to<CommmandReadJump>();
+                    assert( pCmd );
+
+                    m_pCurReadCommand = pCmd->pCmd;
+                    return true;
+                }
+
+            default:
+                return false;
+            }
+
+            return false;
+        }
+
+    case eCommandPtrKind::End:
+        return false; // end of commands
+    default:
+        return false;
+    }
+
+}
+
+void CommandBuffer::HandleNoWriteSpace( const eEncodedCommandPtr* pLastCmd )
+{
+    ZoneScoped;
+    std::scoped_lock lock( m_CmdBufSpinLock );
+
+    auto pCur = m_pCurWriteCommand.load();
+    if( pCur != pLastCmd )
+        return; // value has changed since we checked, we need to check again
+
+    EncodedCommandPtr Commmand{ *pCur };
+
+    switch( Commmand.GetKind() )
+    {
+    case eCommandPtrKind::Null:
+        return; // there is space - return
+
+    case eCommandPtrKind::Standard:
+    {
+        auto pwtf = Commmand.GetCommand();
+        throw 1;
+    }
+
+    case eCommandPtrKind::Special:
+    {
+        auto pCommand = Commmand.GetCommand();
+        assert( pCommand );
+        if( !pCommand )
+            throw 1;
+
+        switch( pCommand->m_CommandID )
+        {
+        case eCommandID::SwitchCmdBuf:  return; // switch command, no special handling
+        default:                        throw 1; // unknown command
+        }
+    }
+
+    case eCommandPtrKind::End:
+        {
+            auto pNewCmdBuf = CreateCommandBuffer( m_MemoryResource );
+            auto pSwitchCmd = m_Allocator.allocate<CommmandReadJump>( *pNewCmdBuf->m_pFirstCommand );
+
+            m_pCurWriteCommand = pNewCmdBuf->m_pFirstCommand;
+
+            pCur[0] = EncodedCommandPtr{ pSwitchCmd , eCommandPtrKind::Special };
+            return;
+        }
+    }
 }

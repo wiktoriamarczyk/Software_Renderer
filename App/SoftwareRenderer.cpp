@@ -1256,6 +1256,7 @@ void SoftwareRenderer::VertexAssemply( const CommandVertexAssemply& cmd )
 
         pData->m_pRenderTilesCmdBufferSync->name = "render triles end";
         m_pCommandBuffer->AddSyncPoint( *pData->m_pRenderTilesCmdBufferSync , m_ThreadsCount );
+        m_pCommandBuffer->Finish();
     }));
 
     pData->m_pRenderTilesCmdBufferSync->m_Barrier.emplace( m_ThreadsCount );

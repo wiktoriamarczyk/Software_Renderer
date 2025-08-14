@@ -19,6 +19,7 @@ struct PredefinedModel
     optional<float> RotationX;
     optional<float> RotationY;
     optional<float> RotationZ;
+    optional<float> Scale;
 };
 
 const PredefinedModel s_PredefinedModels[] =
@@ -28,6 +29,27 @@ const PredefinedModel s_PredefinedModels[] =
     { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280 , .RotationY = 140 },
     { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120 }
 };
+
+void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
+{
+    span<const PredefinedModel> PredefinedArray{ s_PredefinedModels };
+    if( PredefinedArray.size() <= index )
+    {
+        paths = {};
+        return;
+    }
+
+    const PredefinedModel& model = PredefinedArray[index];
+
+    DrawSettings Def;
+
+    paths.modelPath                 = model.modelPath;
+    paths.texturePath               = model.texturePath;
+    Settings.modelRotation.x        = model.RotationX.value_or(Def.modelRotation.x);
+    Settings.modelRotation.y        = model.RotationY.value_or(Def.modelRotation.y);
+    Settings.modelRotation.z        = model.RotationZ.value_or(Def.modelRotation.z);
+    Settings.modelScale             = model.Scale.value_or(Def.modelScale);
+}
 
 vector<Model> Application::LoadFromScene(const aiScene* pScene)
 {
@@ -183,26 +205,6 @@ vector<Model> Application::LoadModelVertices(const char* path)
     }
 
     return result;
-}
-
-void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
-{
-    span<const PredefinedModel> PredefinedArray{ s_PredefinedModels };
-    if( PredefinedArray.size() <= index )
-    {
-        paths = {};
-        return;
-    }
-
-    const PredefinedModel& model = PredefinedArray[index];
-
-    DrawSettings Def;
-
-    paths.modelPath                 = model.modelPath;
-    paths.texturePath               = model.texturePath;
-    Settings.modelRotation.x        = model.RotationX.value_or(Def.modelRotation.x);
-    Settings.modelRotation.y        = model.RotationY.value_or(Def.modelRotation.y);
-    Settings.modelRotation.z        = model.RotationZ.value_or(Def.modelRotation.z);
 }
 
 void Application::OpenDialog(const char* title, const char* filters, function<void()> callback)

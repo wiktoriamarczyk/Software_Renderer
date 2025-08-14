@@ -24,6 +24,8 @@ enum class eCommandID : uint8_t
     Fill32BitBuffer,
     SyncBarier,
     AppendCmdBuf,
+
+    SwitchCmdBuf,
 };
 
 struct DrawConfig
@@ -52,7 +54,20 @@ struct SyncBarrier : ISyncBarier
 
 struct PipelineSharedData;
 
-struct Command
+enum class eCommandPtrKind : uint8_t
+{
+    Null       = 0,
+    Standard   = 1,
+    Special    = 2,
+    End        = 3,
+};
+
+enum class eEncodedCommandPtr : size_t
+{
+    Invalid = 0,
+};
+
+struct alignas(4) Command
 {
     eCommandID m_CommandID = eCommandID::NoCommand;
 
@@ -75,6 +90,71 @@ protected:
     Command( eCommandID ID )
         : m_CommandID( ID )
     {}
+};
+
+struct EncodedCommandPtr
+{
+    static constexpr inline auto Bits = sizeof(size_t)*8;
+    static constexpr inline auto DataBits = 2;
+    static constexpr inline auto DataMask = (1 << DataBits) - 1;
+    static constexpr inline auto RequiredCmdAlign = 1 << DataBits;
+
+    EncodedCommandPtr( const Command* pCmd , eCommandPtrKind Kind )
+    {
+        size_t Ptr = reinterpret_cast<size_t>(pCmd);
+        assert( Ptr % RequiredCmdAlign == 0 && "Command pointer must be aligned to 8 bytes" );
+
+        m_Separated.m_Ptr  = Ptr >> DataBits;
+        m_Separated.m_Data = size_t(Kind) & DataMask;
+    };
+    EncodedCommandPtr( eEncodedCommandPtr Encoded )
+        : m_Enoded(Encoded)
+    {}
+    EncodedCommandPtr( const EncodedCommandPtr& Encoded )
+        : m_Enoded(Encoded.m_Enoded)
+    {}
+
+    const Command* GetCommand()const noexcept
+    {
+        return reinterpret_cast<const Command*>(m_Separated.m_Ptr << DataBits);
+    }
+
+    eCommandPtrKind GetKind()const noexcept
+    {
+        return static_cast<eCommandPtrKind>( m_Separated.m_Data );
+    }
+    eEncodedCommandPtr GetEncoded()const noexcept
+    {
+        return m_Enoded;
+    }
+    operator eEncodedCommandPtr()const noexcept
+    {
+        return GetEncoded();
+    }
+
+    eEncodedCommandPtr Next()const noexcept
+    {
+        EncodedCommandPtr next = *this;
+        next.m_Separated.m_Data += sizeof(const Command*);
+        return next.m_Enoded;
+    }
+
+    eEncodedCommandPtr GetEncodedCommand()const noexcept
+    {
+        return m_Enoded;
+    }
+
+    struct SeparatedCommand
+    {
+    size_t m_Ptr    : Bits - DataBits   = 0;
+    size_t m_Data   : DataBits          = 0;
+    };
+
+    union
+    {
+        eEncodedCommandPtr  m_Enoded = eEncodedCommandPtr::Invalid;
+        SeparatedCommand    m_Separated;
+    };
 };
 
 struct CommandFill32BitBuffer : Command
@@ -179,9 +259,21 @@ struct CommandAppendCommmandBufffer : Command
         , m_AtEnd(AtEnd)
     {}
 
+    bool m_AtEnd = true;
     CommandBuffer* pSrc = nullptr;
     CommandBuffer* pDst = nullptr;
-    bool m_AtEnd = true;
+};
+
+struct CommmandReadJump : Command
+{
+    static constexpr auto COMMAND_ID = eCommandID::SwitchCmdBuf;
+
+    CommmandReadJump( eEncodedCommandPtr& Cmd )
+        : Command(COMMAND_ID)
+        , pCmd{ &Cmd }
+    {}
+
+    eEncodedCommandPtr* pCmd = nullptr;
 };
 
 struct CommandRenderTile : Command

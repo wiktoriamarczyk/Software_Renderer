@@ -71,7 +71,7 @@ private:
     void OpenSceneDataDialog(MyModelPaths& selectedPaths);
     void DrawRenderingStats();
 
-    const uint8_t MAX_THREADS_COUNT = uint8_t(std::min<int>(12, std::thread::hardware_concurrency()));
+    const uint8_t MAX_THREADS_COUNT = uint8_t(std::min<int>(16, std::thread::hardware_concurrency()));
 
     DrawSettings m_DrawSettings;
     RendererContext m_Contexts[2];

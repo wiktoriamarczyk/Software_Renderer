@@ -14,128 +14,167 @@ struct CommandBuffer
 
     template< std::derived_from<Command> T , typename ... ARGS >
     void PushCommand( ARGS&& ... args ) noexcept;
-    bool PushCommandBuffer( CommandBuffer& Cmd )noexcept;
+
+    void PushCommand( span<const Command*const> ) noexcept;
+
+    void PushCommandBuffer( CommandBuffer& Buf );
+
     void AddSyncBarrier( const char* Name , uint8_t Count = 1 );
     void AddSyncBarrier( const char* Name , triviall_function_ref Callabck , uint8_t Count = 1 );
     void AddSyncPoint( ISyncBarier& Sync , uint8_t Count = 1 );
     static CommandBuffer* CreateCommandBuffer( transient_memory_resource& Res ) noexcept;
+    void Finish()
+    {
+        PushCommandImpl( EncodedCommandPtr{ nullptr , eCommandPtrKind::End } );
+    }
 protected:
     friend class transient_allocator;
     struct Context;
 
     CommandBuffer( transient_memory_resource& Res );
 
-    span<const Command*> GetCommands() const noexcept;
-    void PushCommandImpl( Command* pCmd ) noexcept;
-    bool PushCommands( span<const Command*> CommandsToAdd ) noexcept;
-    bool CheckGrow( Context*& pContext );
-    void GrowCommandBuffer( Context*& pContext , size_t ExtraSize = 0 ) noexcept;
+    void PushCommandImpl( eEncodedCommandPtr pCmd ) noexcept;
+
+    void ReserveComands( span<eEncodedCommandPtr*> Res ) noexcept;
 
     using CommandAllocator      = pmr::polymorphic_allocator<const Command*>;
 
-    struct Context
-    {
-    atomic<const Command**>     m_pCurReadCommand  = nullptr;
-    atomic<const Command**>     m_pCurWriteCommand = nullptr;
-    const Command**             m_pFirstCommand    = nullptr;
-    const Command**             m_pEndCommand      = nullptr;
-    };
-
-    atomic<Context*>            m_pContext          = &m_BaseContext;
     transient_memory_resource&  m_MemoryResource;
     CommandAllocator            m_CmdAllocator{ &m_MemoryResource };
-    pmr::vector<const Command*> m_Commands;
     Spinlock                    m_CmdBufSpinLock;
     transient_allocator         m_Allocator        { m_MemoryResource };
-    Context                     m_BaseContext;
 
+    bool HandleReadNonStandardCommnad();
+    void HandleNoWriteSpace( const eEncodedCommandPtr* );
+
+    atomic<eEncodedCommandPtr*> m_pCurReadCommand  = nullptr;
+    atomic<eEncodedCommandPtr*> m_pCurWriteCommand = nullptr;
+    eEncodedCommandPtr*         m_pFirstCommand    = nullptr;
+    span<eEncodedCommandPtr>    m_Commands;
 };
 
-inline span<const Command*> CommandBuffer::GetCommands() const noexcept
-{
-    auto pContext = m_pContext.load(std::memory_order_acquire);
-    return { pContext->m_pFirstCommand , pContext->m_pCurWriteCommand.load() };
-}
 
-inline void CommandBuffer::PushCommandImpl( Command* pCmd ) noexcept
+inline void CommandBuffer::PushCommandImpl( eEncodedCommandPtr pCmd )noexcept//  Command* pCmd ) noexcept
 {
-    auto pContext = m_pContext.load( std::memory_order_acquire );
-    auto pCur = pContext->m_pCurWriteCommand.load( std::memory_order_relaxed );
+    eEncodedCommandPtr* pCur = nullptr;
     for(;;)
     {
-        if( pContext->m_pCurWriteCommand >= pContext->m_pEndCommand )
+        pCur = m_pCurWriteCommand.load( std::memory_order_relaxed );
+
+        if( *pCur != eEncodedCommandPtr::Invalid )
         {
-            GrowCommandBuffer( pContext );
+            HandleNoWriteSpace( pCur );
             continue;
         }
 
-        if( pContext->m_pCurWriteCommand.compare_exchange_weak( pCur , pCur+1 , std::memory_order_acq_rel ) )
+        if( m_pCurWriteCommand.compare_exchange_weak( pCur , pCur+1 , std::memory_order_acq_rel ) )
             break;
     }
 
     *pCur = pCmd;
 }
 
-inline bool CommandBuffer::PushCommands( span<const Command*> CommandsToAdd ) noexcept
+inline void CommandBuffer::ReserveComands( span<eEncodedCommandPtr*> Res ) noexcept
 {
-    auto pContext = m_pContext.load( std::memory_order_acquire );
+    eEncodedCommandPtr** pBegin = Res.data();
+    eEncodedCommandPtr** pEnd = pBegin + Res.size();
 
-    for(;;)
+    for(;pBegin<pEnd;)
     {
-        const Command** pCur = pContext->m_pCurWriteCommand.load( std::memory_order_relaxed );
-        if( pCur+CommandsToAdd.size() >= pContext->m_pEndCommand )
+        auto pCur = m_pCurWriteCommand.load( std::memory_order_relaxed );
+
+        if( *pCur != eEncodedCommandPtr::Invalid )
         {
-            GrowCommandBuffer( pContext , CommandsToAdd.size() );
+            HandleNoWriteSpace( pCur );
             continue;
         }
 
-        if( !pContext->m_pCurWriteCommand.compare_exchange_weak( pCur , pCur+CommandsToAdd.size() , std::memory_order_acq_rel ) )
+        if( !m_pCurWriteCommand.compare_exchange_weak( pCur , pCur+1 , std::memory_order_acq_rel ) )
             continue;
 
-        memcpy( pCur , CommandsToAdd.data() , CommandsToAdd.size_bytes() );
-        return true;
+        pBegin[0] = pCur;
+        pBegin++;
     }
-};
+}
+
+inline void CommandBuffer::PushCommand( span<const Command*const> Commands ) noexcept
+{
+    if( Commands.empty() )
+        return;
+
+    eEncodedCommandPtr* TmpBuffer[100];
+    for( ; Commands.size() ; )
+    {
+        size_t Count = std::min( Commands.size() , size_t(100) );
+        auto pBuffer = span{ TmpBuffer , Count };
+
+        ReserveComands( pBuffer );
+
+        for( size_t i = 0 ; i < Count ; ++i )
+            *TmpBuffer[i] = EncodedCommandPtr{ Commands[i] , eCommandPtrKind::Standard };
+
+        Commands = Commands.subspan(Count);
+    }
+}
+
+inline void CommandBuffer::PushCommandBuffer( CommandBuffer& Cmd )
+{
+    if( &Cmd == this )
+        return; // cannot push self
+
+    eEncodedCommandPtr* pCur = nullptr;
+    for(;;)
+    {
+        pCur = m_pCurWriteCommand.load( std::memory_order_relaxed );
+
+        if( pCur[0] != eEncodedCommandPtr::Invalid )
+        {
+            HandleNoWriteSpace( pCur );
+            continue;
+        }
+
+        if( m_pCurWriteCommand.compare_exchange_weak( pCur , pCur+1 , std::memory_order_acq_rel ) )
+            break;
+    }
+
+
+    auto pJumpCmd = m_Allocator.allocate<CommmandReadJump>( *Cmd.m_pFirstCommand );
+    auto pReturnCmd = m_Allocator.allocate<CommmandReadJump>( pCur[1] );
+
+    pCur[0] = EncodedCommandPtr{ pJumpCmd , eCommandPtrKind::Special };
+    Cmd.m_pCurWriteCommand.load()[0] = EncodedCommandPtr{ pReturnCmd , eCommandPtrKind::Special };
+}
 
 inline const Command* CommandBuffer::GetNextCommand() noexcept
 {
-    auto pContext = m_pContext.load( std::memory_order_acquire );
     for( ;; )
     {
-        auto pRead = pContext->m_pCurReadCommand.load( std::memory_order_relaxed );
+        eEncodedCommandPtr* pRead = m_pCurReadCommand.load( std::memory_order_relaxed );
+        EncodedCommandPtr Ins{ *pRead };
 
-        if( pRead >= pContext->m_pEndCommand )
+        if( Ins.GetKind() != eCommandPtrKind::Standard )
         {
-            if( CheckGrow( pContext ) )
+            if( HandleReadNonStandardCommnad() )
                 continue;
 
             return nullptr;
         }
 
         // try to acquire the next command
-        if( !pContext->m_pCurReadCommand.compare_exchange_weak( pRead , pRead+1 , std::memory_order_acq_rel ) )
+        if( !m_pCurReadCommand.compare_exchange_weak( pRead , pRead+1 , std::memory_order_acq_rel ) )
             // failed to acquire, try again
             continue;
 
-        return *pRead;
+        return Ins.GetCommand();
     }
 }
 
-inline bool CommandBuffer::PushCommandBuffer( CommandBuffer& Cmd ) noexcept
-{
-    if( &Cmd == this )
-        return false; // cannot push self
-
-    span<const Command*> CommandsToAdd = Cmd.GetCommands();
-
-    return PushCommands( CommandsToAdd );
-};
 
 template< std::derived_from<Command> T , typename ... ARGS >
 inline void CommandBuffer::PushCommand( ARGS&& ... args ) noexcept
 {
     auto pCommand = m_Allocator.allocate<T>( std::forward<ARGS>(args)... );
-    return PushCommandImpl( pCommand );
+    return PushCommandImpl( EncodedCommandPtr{ pCommand , eCommandPtrKind::Standard } );
 }
 
 inline void CommandBuffer::AddSyncBarrier( const char* Name , uint8_t Count )
@@ -158,19 +197,8 @@ inline void CommandBuffer::AddSyncBarrier( const char* Name , triviall_function_
 
 inline void CommandBuffer::AddSyncPoint( ISyncBarier& Sync , uint8_t Count )
 {
-    if( Count == 1 )
+    for( uint8_t i = 0 ; i < Count ; ++i )
     {
         PushCommand<CommandSyncBarier>(Sync);
-    }
-    else if( Count > 1 )
-    {
-        auto Commands = m_Allocator.allocate_array<CommandSyncBarier>( Count , Sync );
-        auto CommandPtrs = m_Allocator.allocate_array<const Command*>( Count , nullptr );
-
-        for(  size_t i = 0 ; i < Count ; ++i )
-            CommandPtrs[i] = &Commands[i];
-
-
-        PushCommands( CommandPtrs );
     }
 }
