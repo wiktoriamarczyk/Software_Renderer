@@ -36,6 +36,26 @@ private:
     std::pmr::synchronized_pool_resource m_Fallback;
 };
 
+struct monotonic_stack_unsynchronized_memory_resource : public std::pmr::memory_resource
+{
+    monotonic_stack_unsynchronized_memory_resource( uint32_t Size , uint32_t BaseAlign , std::pmr::memory_resource& Upstream );
+    ~monotonic_stack_unsynchronized_memory_resource();
+    void* do_allocate(std::size_t bytes, std::size_t alignment) override;
+    void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) override;
+    bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override;
+
+    void reset();
+private:
+    uint8_t* m_pStart   = nullptr;
+    uint8_t* m_pEnd     = nullptr;
+    void*    m_pCurPos  = nullptr;
+    size_t   m_MemLeft  = 0;
+    uint32_t m_Size     = 0;
+    uint8_t  m_Alignment= 0;
+
+    std::pmr::memory_resource& m_Upstream;
+};
+
 struct transient_allocator
 {
     transient_allocator( std::pmr::memory_resource& res ) noexcept

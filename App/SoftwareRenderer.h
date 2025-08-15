@@ -108,6 +108,7 @@ public:
     template< typename T >
     static T EdgeFunction(const Vector2<T>& A, const Vector2<T>& B, const Vector2<T>& C);
 private:
+    struct RenderThreadData;
     template< typename , DrawFunctionConfig >
     void DrawFilledTriangleBaseline(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
 
@@ -122,13 +123,13 @@ private:
 
 
     template< eSimdType Type , bool Partial , int Elements = 8 >
-    void DrawTileImplSimd(const CommandRenderTile& TD, DrawStats* stats);
+    void DrawTileImplSimd(const CommandRenderTile& TD, RenderThreadData& data);
     template< bool Partial >
-    void DrawTileImpl   (const CommandRenderTile& TD, DrawStats* stats);
+    void DrawTileImpl   (const CommandRenderTile& TD, RenderThreadData& data);
 
-    void DrawFullTile   (const CommandRenderTile& TD, DrawStats* stats);
-    void DrawPartialTile(const CommandRenderTile& TD, DrawStats* stats);
-    void DrawTile       (const CommandRenderTile& TD, DrawStats* stats);
+    void DrawFullTile   (const CommandRenderTile& TD, RenderThreadData& data);
+    void DrawPartialTile(const CommandRenderTile& TD, RenderThreadData& data);
+    void DrawTile       (const CommandRenderTile& TD, RenderThreadData& data);
 
     void GenerateTileJobs(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, DrawStats& stats, const PipelineSharedData* pPipelineSharedData, uint32_t tri_index , pmr::vector<const Command*>& outCommmands );
 

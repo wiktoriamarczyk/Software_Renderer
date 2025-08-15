@@ -24,10 +24,10 @@ struct PredefinedModel
 
 const PredefinedModel s_PredefinedModels[] =
 {
-    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , },
-    { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330 , .RotationY = 25 },
-    { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280 , .RotationY = 140 },
-    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120 , .Scale = 6.5 }
+    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , .RotationX = 214.468 },
+    { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330 , .RotationY = 25    , .Scale = 6.0f },
+    { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280 , .RotationY = 140   , .Scale = 4.0f },
+    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120                      , .Scale = 6.5f },
 };
 
 void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )

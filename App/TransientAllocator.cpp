@@ -256,3 +256,48 @@ void transient_memory_resource::reset()
     TransientMemoryAllocator::reset();
     m_Fallback.release();
 };
+
+monotonic_stack_unsynchronized_memory_resource::monotonic_stack_unsynchronized_memory_resource( uint32_t Size , uint32_t BaseAlign , std::pmr::memory_resource& Upstream )
+    : m_Upstream(Upstream)
+{
+    m_pStart = static_cast<uint8_t*>( Upstream.allocate(Size, BaseAlign) );
+    m_pEnd = m_pStart + Size;
+    m_pCurPos = m_pStart;
+
+    m_Size     = static_cast<size_t>(Size);
+    m_Alignment = static_cast<uint8_t>(BaseAlign);
+}
+
+monotonic_stack_unsynchronized_memory_resource::~monotonic_stack_unsynchronized_memory_resource()
+{
+    ZoneScoped;
+    if( m_pStart )
+        m_Upstream.deallocate(m_pStart, m_Size, m_Alignment);
+}
+
+void* monotonic_stack_unsynchronized_memory_resource::do_allocate(std::size_t bytes, std::size_t alignment)
+{
+    ZoneScoped;
+
+    auto pMem = std::align( alignment , bytes , m_pCurPos, m_MemLeft );
+    if( !pMem )
+        return m_Upstream.allocate(bytes, alignment);
+
+    return pMem;
+}
+
+void monotonic_stack_unsynchronized_memory_resource::do_deallocate(void* p, std::size_t bytes, std::size_t alignment)
+{
+    ZoneScoped;
+    if( p < m_pStart || p >= m_pEnd )
+        // If the pointer is outside the allocated range, delegate to upstream
+        return m_Upstream.deallocate(p, bytes, alignment);
+
+    m_pCurPos = static_cast<uint8_t*>(p);
+    m_MemLeft = m_pEnd - static_cast<uint8_t*>( m_pCurPos );
+}
+
+bool monotonic_stack_unsynchronized_memory_resource::do_is_equal(const std::pmr::memory_resource& other) const noexcept
+{
+    return &other == this;
+}

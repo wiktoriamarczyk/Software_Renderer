@@ -32,6 +32,12 @@ struct PipelineSharedData
     DrawConfig*    m_pDrawConfig = nullptr;
 };
 
+struct SoftwareRenderer::RenderThreadData
+{
+    monotonic_stack_unsynchronized_memory_resource m_ThreadfastMemResource;
+    DrawStats* m_pDrawStats = nullptr;
+};
+
 template< typename T >
 struct EdgeFunctionRails
 {
@@ -496,7 +502,7 @@ void TileLineFToARGB_Simd( const Vector4f* pPixels , uint32_t* pColBuffer , opti
 }
 
 template< bool Partial >
-inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& _InitTD, DrawStats* stats)
+inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& _InitTD, RenderThreadData& data)
 {
     ZoneScopedN( Partial ? "DrawTileImpl" : "DrawTileImplFull" );
     ZoneColor( 0xE0E000 );
@@ -610,12 +616,12 @@ inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& _InitTD, Dra
 
 
 
-    if( stats )
-        stats->m_FramePixelsDrawn += pixelsDrawn;
+    if( data.m_pDrawStats )
+        data.m_pDrawStats->m_FramePixelsDrawn += pixelsDrawn;
 }
 
 template< eSimdType Type , bool Partial , int Elements  >
-inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD, DrawStats* stats)
+inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD, RenderThreadData& data)
 {
     using f256t             = fsimd<Elements,Type>;
     using i256t             = isimd<Elements,Type>;
@@ -631,13 +637,17 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
     ALIGN_FOR_AVX Vector4f  Pixels       [TILE_SIZE * TILE_SIZE];
     ALIGN_FOR_AVX float     ZBuffer      [TILE_SIZE * TILE_SIZE];
     ALIGN_FOR_AVX uint32_t  TileCoverage [TILE_SIZE] = {};
+    float*const             ZBufferStart = g_ThreadPerTile ? ZBuffer : pTileInfo->TileZMem;
 
     // lock tile info to prevent concurrent access
     std::scoped_lock lock( pTileInfo->Lock );
 
     // copy tile memory to local storage
+    if( g_ThreadPerTile )
+    {
     memcpy( Pixels  , pTileInfo->TileMem  , sizeof(Pixels) );
     memcpy( ZBuffer , pTileInfo->TileZMem , sizeof(ZBuffer) );
+    }
 
     auto       pDrawCommand = g_ThreadPerTile ? pTileInfo->pRenderTileCmd.load( std::memory_order_relaxed ) : &_InitTD;
     auto       pixelsDrawn  = 0;
@@ -660,11 +670,7 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
     const auto _EdgeStart   = pTriangle->m_EdgeFunctionRails.GetStartFor( TilePosition.ToVector2<int64_t>() );
     const auto _EdgeStartX  = _EdgeStart.x.ToVector3<int>().Swizzle<1,2,0>();
     const auto _EdgeStartY  = _EdgeStart.y.ToVector3<int>().Swizzle<1,2,0>();
-          auto EdgeStartX   = Vector3i256t{ _EdgeStartX.x , _EdgeStartX.y , _EdgeStartX.z };
-            if constexpr( Elements == 8 )
-               EdgeStartX  += EdgeStrideX*i256t{ 0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 };
-            else
-                EdgeStartX += EdgeStrideX*i256t{ 0 , 1 , 2 , 3 };
+    const auto EdgeStartX   = Vector3i256t{ _EdgeStartX.x , _EdgeStartX.y , _EdgeStartX.z } + EdgeStrideX*i256t::ZeroToN;
           auto EdgeStartY   = Vector3i256t{ _EdgeStartY.x , _EdgeStartY.y , _EdgeStartY.z };
     const auto invABC       = f256t{ pTriangle->m_InvABC };
     EdgeStrideX *= pack_size;
@@ -672,7 +678,7 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
     TransformedVertexT      interpolatedVertex;
     Vector4f*               pCurPixel       = Pixels;
     uint32_t*               CoverageMask    = TileCoverage;
-    float*                  pZBuffer        = ZBuffer;
+    float*                  pZBuffer        = ZBufferStart;
     i256t                   write_mask;
     constexpr auto          pack_coverage_mask = (uint32_t(1)<<pack_size)-1;
 
@@ -793,8 +799,11 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
             pCurPixel += TILE_SIZE;
             CoverageMask++;
         }
+        if( g_ThreadPerTile )
+        {
         memcpy( pTileInfo->TileMem  , Pixels  , sizeof(Pixels)  );
         memcpy( pTileInfo->TileZMem , ZBuffer , sizeof(ZBuffer) );
+        }
     }
 
 
@@ -808,30 +817,30 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
     }
 
     // update pixels draw stats
-    if( stats )
-        stats->m_FramePixelsDrawn += pixelsDrawn;
+    if( data.m_pDrawStats )
+        data.m_pDrawStats->m_FramePixelsDrawn += pixelsDrawn;
 }
 
-void SoftwareRenderer::DrawPartialTile(const CommandRenderTile& TD, DrawStats* stats)
+void SoftwareRenderer::DrawPartialTile(const CommandRenderTile& TD, RenderThreadData& data)
 {
     if( g_useSimd )
-        return DrawTileImplSimd<eSimdType::AVX,true,8>( TD, stats );
+        return DrawTileImplSimd<eSimdType::AVX,true,8>( TD, data );
     else
-        return DrawTileImpl<true>(TD, stats);
+        return DrawTileImpl<true>(TD, data);
 }
-void SoftwareRenderer::DrawFullTile(const CommandRenderTile& TD, DrawStats* stats)
+void SoftwareRenderer::DrawFullTile(const CommandRenderTile& TD, RenderThreadData& data)
 {
     if( g_useSimd )
-        return DrawTileImplSimd<eSimdType::AVX,false,8>( TD, stats );
+        return DrawTileImplSimd<eSimdType::AVX,false,8>( TD, data );
     else
-        return DrawTileImpl<false>(TD, stats);
+        return DrawTileImpl<false>(TD, data);
 }
-void SoftwareRenderer::DrawTile(const CommandRenderTile& TD, DrawStats* stats)
+void SoftwareRenderer::DrawTile(const CommandRenderTile& TD, RenderThreadData& data)
 {
     if( TD.IsFullTile )
-        DrawFullTile(TD, stats);
+        DrawFullTile(TD, data);
     else
-        DrawPartialTile(TD, stats);
+        DrawPartialTile(TD, data);
 }
 
 eTileCoverage ClassifyX( Vector2<int64_t> A , Vector2<int64_t> B , Vector2<int64_t> C , Vector2<int64_t> TilePos , const Vector2<int64_t> Close[3] , const Vector2<int64_t> Far[3] )
@@ -1218,8 +1227,13 @@ void SoftwareRenderer::RendererTaskWorker()
 {
     ZoneScoped;
     const auto pCommandBuffer = m_pCommandBuffer;
-    pmr::vector<uint64_t> TmpBuffer{ &m_TransientMemoryResource };
-    TmpBuffer.reserve( 2048 );
+
+    RenderThreadData data
+    {
+        .m_ThreadfastMemResource{ 128*1024 , std::min<size_t>( AVX_ALIGN , 8 ) , m_TransientMemoryResource } ,
+        .m_pDrawStats = &m_DrawStats,
+    };
+
     for(;;)
     {
         auto pCommand = pCommandBuffer->GetNextCommand();
@@ -1234,7 +1248,7 @@ void SoftwareRenderer::RendererTaskWorker()
         case eCommandID::VertexAssemply:         VertexAssemply          (*pCommand->static_cast_to<CommandVertexAssemply>()         );              continue;
         case eCommandID::VertexTransformAndClip: VertexTransformAndClip  (*pCommand->static_cast_to<CommandVertexTransformAndClip>() );              continue;
         case eCommandID::ProcessTriangles:       ProcessTriangles        (*pCommand->static_cast_to<CommandProcessTriangles>()       );              continue;
-        case eCommandID::RenderTile:             DrawTile                (*pCommand->static_cast_to<CommandRenderTile>()             ,&m_DrawStats); continue;
+        case eCommandID::RenderTile:             DrawTile                (*pCommand->static_cast_to<CommandRenderTile>()             ,data); continue;
             ;
         default:
             assert( false && "Unknown command" );

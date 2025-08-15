@@ -1135,6 +1135,7 @@ public:
 
     static const simd_impl Zero          ;
     static const simd_impl One           ;
+    static const simd_impl ZeroToN       ;
     static const simd_impl AllBitsSet    ;
     static const simd_impl Two           ;
     static const simd_impl PI            ;
@@ -1146,6 +1147,8 @@ template< typename T , int Elements , eSimdType Simd >
 const simd_impl<T,Elements,Simd> simd_impl<T,Elements,Simd>::Zero          = { static_cast<T>(0) };
 template< typename T , int Elements , eSimdType Simd >
 const simd_impl<T,Elements,Simd> simd_impl<T,Elements,Simd>::One           = { static_cast<T>(1) };
+template< typename T , int Elements , eSimdType Simd >
+const simd_impl<T,Elements,Simd> simd_impl<T,Elements,Simd>::ZeroToN       = [] -> simd_impl<T,Elements,Simd>{ if constexpr(Elements==8) return {0,1,2,3,4,5,6,7}; else return {0,1,2,3}; }();
 template< typename T , int Elements , eSimdType Simd >
 const simd_impl<T,Elements,Simd> simd_impl<T,Elements,Simd>::AllBitsSet    = { simd_impl<int,Elements,Simd>{ int(0xFFFFFFFF) }.reinterpret_cast_to<T>()  };
 template< typename T , int Elements , eSimdType Simd >
