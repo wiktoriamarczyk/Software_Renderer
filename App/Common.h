@@ -85,12 +85,15 @@ struct DrawStats
 {
     int m_FrameTriangles         = 0;
     int m_FrameTrianglesDrawn    = 0;
+    int m_FrameDrawsPerTile      = 0;
     int m_FramePixels            = 0;
     int m_FramePixelsDrawn       = 0;
+    int m_FramePixelsCalcualted  = 0;
 
     int m_RasterTimeUS           = 0;
     int m_RasterTimePerThreadUS  = 0;
     int m_TransformTimeUS        = 0;
+    int m_TransformTimePerThreadUS=0;
 
     int m_DrawTimeUS             = 0;
     int m_DrawTimePerThreadUS    = 0;
@@ -117,6 +120,9 @@ enum class eRoundMode : uint8_t
 
 #define AVX_ALIGN 32
 #define ALIGN_FOR_AVX alignas(AVX_ALIGN)
+
+#define SSE_ALIGN 16
+#define ALIGN_FOR_SSE alignas(SSE_ALIGN)
 
 // detect clang
 #if defined( __clang__ ) || defined( __GNUC__ )

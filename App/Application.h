@@ -13,11 +13,11 @@ struct DrawSettings
 {
     Vector3f    modelRotation = Vector3f(360 ,0,0);
     Vector3f    modelTranslation = Vector3f(0, 0, 0);//.75f);
-    float       modelScale = 3.0F;// 5.5;
+    float       modelScale = 2.0f;//5.5;//0.3f;//;
     Vector4f    wireFrameColor = Vector4f(1, 0, 1, 1);
     Vector3f    diffuseColor = Vector3f(1, 1, 1);
     Vector3f    ambientColor = Vector3f(1, 1, 1);
-    Vector3f    backgroundColor = Vector3f(0, 1, 1);
+    Vector3f    backgroundColor = Vector3f(0.18f, 0.24f, 0.44f);
     Vector3f    lightPosition = Vector3f(0, 0, -20);
     float       diffuseStrength = 0.7f;
     float       ambientStrength = 0.1f;
@@ -31,7 +31,7 @@ struct DrawSettings
     bool        renderDepthBuffer = false;
     bool        vSync = true;
     int         rendererType = 0;
-    int         mathType = 0;
+    int         mathType = 4;
 };
 
 struct Model
@@ -69,7 +69,7 @@ private:
     static vector<Model> LoadFallbackModel();
     static void OpenDialog(const char* title, const char* filters, function<void()> callback);
     void OpenSceneDataDialog(MyModelPaths& selectedPaths);
-    void DrawRenderingStats();
+    void DrawRenderingStats( int pixels );
 
     const uint8_t MAX_THREADS_COUNT = uint8_t(std::min<int>(16, std::thread::hardware_concurrency()));
 

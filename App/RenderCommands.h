@@ -26,9 +26,18 @@ enum class eCommandID : uint8_t
     CmdReadJump,
 };
 
+struct DrawControl
+{
+    bool IsFullTile : 1 = false;
+    bool ZTest      : 1 = false;
+    bool ZWrite     : 1 = false;
+    bool AlphaBlend : 1 = false;
+};
+
 struct DrawConfig
 {
-    Vector4f m_Color;
+    Vector4f    m_Color;
+    DrawControl m_DrawControl;
 };
 
 struct ISyncBarier
@@ -282,7 +291,7 @@ struct COMMAND_ALIGN CommandRenderTile : Command
     CommandRenderTile()
         : Command(COMMAND_ID)
     {}
-    bool                IsFullTile = false;
+    DrawControl         DrawControl;
     uint32_t            TileDrawID = 0;
     const TriangleData* Triangle;
     const TileInfo*     TileInfo;

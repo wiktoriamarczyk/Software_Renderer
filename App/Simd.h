@@ -12,11 +12,29 @@ __m128 emu_mm_log_ps(const __m128& d);
 __m128 emu_mm_exp_ps(const __m128& d);
 __m128 emu_mm_pow_ps(const __m128& x, const __m128& y);
 __m128 emu_mm_pow_ps(const __m128& x, float y);
+__m128 emu_mm_mask_expandloadu_ps(__m128 src, __m128 mask, const void* mem, int& mask_bits);
+int    emu_mm_mask_compressstoreu_ps(float *dst, __m128 mask, __m128 data);
+int    emu_mm_mask_compressstoreu_ps_ov(float *dst, __m128 mask, __m128 data);
 
 __m256 emu_mm256_log_ps(const __m256& d);
 __m256 emu_mm256_exp_ps(const __m256& d);
 __m256 emu_mm256_pow_ps(const __m256& x, const __m256& y);
 __m256 emu_mm256_pow_ps(const __m256& x, float y);
+__m256 emu_mm256_mask_expandloadu_ps(__m256 src, __m256 mask, const void* mem, int& mask_bits);
+int    emu_mm256_mask_compressstoreu_ps(float *dst, __m256 mask, __m256 data);
+int    emu_mm256_mask_compressstoreu_ps_ov(float *dst, __m256 mask, __m256 data);
+
+int  emu_mm256_mask_compressstoreu_ps_x4   ( float* dstA, float* dstB, float* dstC, float* dstD, __m256 mask, const __m256* dataA, const __m256* dataB, const __m256* dataC, const __m256* dataD);
+int  emu_mm256_mask_compressstoreu_ps_x4_ov( float* dstA, float* dstB, float* dstC, float* dstD, __m256 mask, const __m256* dataA, const __m256* dataB, const __m256* dataC, const __m256* dataD);
+void emu_mm256_mask_expandloadu_ps_x4      (__m256* dstA,__m256* dstB,__m256* dstC,__m256* dstD, __m256 mask, const float* memA, const float* memB, const float* memC, const float* memD, int& mask_bits);
+
+void _mm_transpose_ARGBx4_to_Ax4Rx4Gx4Bx4_ps      ( __m128&  inout0, __m128&  inout1, __m128&  inout2, __m128&  inout3);
+void _mm_transpose_ARGBx4_to_Ax4Rx4Gx4Bx4_epi32   ( __m128i& inout0, __m128i& inout1, __m128i& inout2, __m128i& inout3);
+void _mm_transpose_ARGBx8_to_Ax8Rx8Gx8Bx8_ps      ( __m128&  inout0, __m128&  inout1, __m128&  inout2, __m128&  inout3, __m128&  inout4, __m128&  inout5, __m128&  inout6, __m128&  inout7);
+void _mm_transpose_ARGBx8_to_Ax8Rx8Gx8Bx8_epi32   ( __m128i& inout0, __m128i& inout1, __m128i& inout2, __m128i& inout3, __m128i& inout4, __m128i& inout5, __m128i& inout6, __m128i& inout7);
+
+void _mm256_transpose_ARGBx8_to_Ax8Rx8Gx8Bx8_ps   ( __m256&  inout0, __m256&  inout1, __m256&  inout2, __m256&  inout3);
+void _mm256_transpose_ARGBx8_to_Ax8Rx8Gx8Bx8_epi32( __m256i& inout0, __m256i& inout1, __m256i& inout2, __m256i& inout3);
 
 //****************************************************************
 //  SIMD types and data alignment
@@ -25,6 +43,7 @@ __m256 emu_mm256_pow_ps(const __m256& x, float y);
 enum class eSimdType
 {
     None    = 0,
+    CPU     = 0,
     SSE     = 1,
     AVX     = 2,
 };
@@ -73,9 +92,9 @@ namespace _details
     constexpr inline uint64_t MAX_UINT<8> = 0xFFFFFFFFFFFFFFFF;
 
     template< typename T >
-    constexpr float ALL_BITS_ONE = std::bit_cast<T>( MAX_UINT<sizeof(T)> );
+    constexpr float ALL_BITS_ONE = std::bit_cast<float>( MAX_UINT<sizeof(T)> );
     template< typename T >
-    constexpr float ALL_BITS_ZERO = std::bit_cast<T>( 0 );
+    constexpr float ALL_BITS_ZERO = std::bit_cast<float>( 0 );
 }
 
 //****************************************************************
@@ -142,7 +161,7 @@ struct simd_type_maping< T , eSimdType::None , Elements >
     FORCE_INLINE static void AND(const type& A , const type& B, type& R ) noexcept requires( std::is_integral_v<T> )
     {
         for( int i = 0; i < Elements; ++i )
-            R.v[i] = A.v[i] | B.v[i];
+            R.v[i] = A.v[i] & B.v[i];
     }
 
     FORCE_INLINE static void OR(const type& A , const type& B, type& R ) noexcept requires( std::is_integral_v<T> )
@@ -167,6 +186,11 @@ struct simd_type_maping< T , eSimdType::None , Elements >
         for( int i = 0; i < Elements; ++i )
             R.v[i] = A.v[i] << B;
     }
+    FORCE_INLINE static void shl(const type& A , const simd_data_type<int,Elements>& B , type& R ) noexcept
+    {
+        for( int i = 0; i < Elements; ++i )
+            R.v[i] = A.v[i] << B.v[i];
+    }
 
     FORCE_INLINE static void shr(const type& A , int32_t B , type& R ) noexcept
     {
@@ -174,37 +198,58 @@ struct simd_type_maping< T , eSimdType::None , Elements >
             R.v[i] = A.v[i] << B;
     }
 
-    FORCE_INLINE static void set(float A , type& R ) noexcept
+    FORCE_INLINE static void set(T A , type& R ) noexcept
     {
         for( int i = 0; i < Elements; ++i )
             R.v[i] = A;
     }
 
-    FORCE_INLINE static void set(float A , float B , float C , float D , type& R ) noexcept
+    FORCE_INLINE static void set(T A , T B , T C , T D , type& R ) noexcept
     {
-        R = _mm_set_ps( A , B , C , D );
+        R.v[0] = A;
+        R.v[1] = B;
+        R.v[2] = C;
+        R.v[3] = D;
+    }
+    FORCE_INLINE static void set(T A , T B , T C , T D , T E , T F , T G , T H , type& R ) noexcept
+    {
+        R.v[0] = A;
+        R.v[1] = B;
+        R.v[2] = C;
+        R.v[3] = D;
+        R.v[4] = E;
+        R.v[5] = F;
+        R.v[6] = G;
+        R.v[7] = H;
     }
 
-    FORCE_INLINE static void load( const float* value , type& R , auto align_tag )
+    FORCE_INLINE static void load( const T* value , type& R , auto align_tag )
     {
-        memccpy( R.v, value, 0, sizeof(type));
+        memcpy( R.v, value, sizeof(type));
     }
     FORCE_INLINE static void store( const type& value , T* R , auto align_tag )
     {
-        memccpy( R, value.v, 0, sizeof(type));
-
+        memcpy( R, value.v, sizeof(type));
     }
     FORCE_INLINE static void rsqrt( const type& Value , type& R )
     {
-        Math::Rsqrt( Value , R );
+        for( int i = 0; i < Elements; ++i )
+        {
+            if( Value[i] )
+                R.v[i] = sqrt( 1 / Value.v[i] );
+            else
+                R.v[i] = 0;
+        }
     }
     FORCE_INLINE static void min(const type& A, const type& B, type& R)
     {
-        R = std::min( A , B );
+        for( int i = 0; i < Elements; ++i )
+            R.v[i] = std::min( A.v[i] , B.v[i] );
     }
     FORCE_INLINE static void max(const type& A, const type& B, type& R)
     {
-        R = std::max( A , B );
+        for( int i = 0; i < Elements; ++i )
+            R.v[i] = std::max( A.v[i] , B.v[i] );
     }
     FORCE_INLINE static void cmp_le(const type& A, const type& B, type& R)noexcept
     {
@@ -243,6 +288,28 @@ struct simd_type_maping< T , eSimdType::None , Elements >
         for( int i = 0; i < Elements; ++i )
             R[i] = std::bit_cast<T2>( A[i] );
     }
+    FORCE_INLINE static void blend  (const type& A, const type& B, const type& M, type& R) noexcept
+    {
+        for( int i = 0; i < Elements; ++i )
+        {
+            if( reinterpret_cast<const uint32_t*>(&M.v[i])[0] & 0x80000000 )
+                R.v[i] = B.v[i];
+            else
+                R.v[i] = A.v[i];
+        }
+    }
+
+    FORCE_INLINE static void mask_32(const type& A , int& R ) noexcept
+    {
+        R = 0;
+        for( int i = 0; i < Elements; ++i )
+        {
+            if( reinterpret_cast<const uint32_t*>(&A.v[i])[0] & 0x80000000 )
+                R |= (1 << i);
+            else
+                R &= ~(1 << i);
+        }
+    }
 
     template< typename T2 >
     FORCE_INLINE static void s_cast(const type& A , simd_data_type<T2,Elements>& R ) noexcept
@@ -270,6 +337,43 @@ struct simd_type_maping< T , eSimdType::None , Elements >
     {
         for( int i = 0; i < Elements; ++i )
             R[i] = powf( A[i] , B );
+    }
+
+    static void transpose_ARGBx4_to_Ax4Rx4Gx4Bx4(type& inout0, type& inout1, type& inout2, type& inout3) requires( Elements == 4 )
+    {
+        T tmp[16];
+        for( int i = 0; i < 4; ++i )
+        {
+            tmp[i * 4 + 0] = inout0.v[i];
+            tmp[i * 4 + 1] = inout1.v[i];
+            tmp[i * 4 + 2] = inout2.v[i];
+            tmp[i * 4 + 3] = inout3.v[i];
+        }
+
+        memcpy( inout0.v, tmp + 0 , 0, sizeof(T) * 4);
+        memcpy( inout1.v, tmp + 4 , 0, sizeof(T) * 4);
+        memcpy( inout2.v, tmp + 8 , 0, sizeof(T) * 4);
+        memcpy( inout3.v, tmp + 12, 0, sizeof(T) * 4);
+    }
+
+    static void transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(type& inout0, type& inout1, type& inout2, type& inout3) requires( Elements == 8 )
+    {
+        T tmp[32];
+        for( int i = 0; i < 4; ++i )
+        {
+            tmp[i * 8 + 0] = inout0.v[i];
+            tmp[i * 8 + 1] = inout1.v[i];
+            tmp[i * 8 + 2] = inout2.v[i];
+            tmp[i * 8 + 3] = inout3.v[i];
+            tmp[i * 8 + 4] = inout0.v[i+4];
+            tmp[i * 8 + 5] = inout1.v[i+4];
+            tmp[i * 8 + 6] = inout2.v[i+4];
+            tmp[i * 8 + 7] = inout3.v[i+4];
+        }
+        memcpy( inout0.v, tmp + 0 , sizeof(T) * 8);
+        memcpy( inout1.v, tmp + 8 , sizeof(T) * 8);
+        memcpy( inout2.v, tmp + 16, sizeof(T) * 8);
+        memcpy( inout3.v, tmp + 24, sizeof(T) * 8);
     }
 };
 
@@ -316,6 +420,19 @@ struct simd_type_maping< float , eSimdType::SSE , 4 >
     FORCE_INLINE static void mask_32(const type& A , int& R ) noexcept                              { R = _mm_movemask_ps(A);                   }
     FORCE_INLINE static void mask_64(const type& A , int& R ) noexcept                              { R = _mm_movemask_pd(_mm_castps_pd(A));    }
     FORCE_INLINE static void blend  (const type& A, const type& B, const type& M, type& R) noexcept { R = _mm_blendv_ps(A,B,M);                 }
+    FORCE_INLINE static int  cstore (const type& A, const __m128i& M , float* R , auto OV )
+    {
+        if constexpr( OV() )
+            return emu_mm_mask_compressstoreu_ps_ov(R, _mm_castsi128_ps(M), A);
+        else
+            return emu_mm_mask_compressstoreu_ps   (R, _mm_castsi128_ps(M), A);
+    };
+    FORCE_INLINE static int  expand(const type& A, const __m128i& M , const float* p, type& R )
+    {
+        int bits;
+        R = emu_mm_mask_expandloadu_ps(A, _mm_castsi128_ps(M), p, bits);
+        return bits;
+    };
 
     //FORCE_INLINE static void pow    (const type& A , const type& B, type& R ) noexcept          { R = _mm_getexp_ps (y*log(x)) }
     FORCE_INLINE static void load   (const float* value , type& R , auto align_tag )
@@ -331,6 +448,15 @@ struct simd_type_maping< float , eSimdType::SSE , 4 >
             _mm_store_ps( R , value );
         else
             _mm_storeu_ps( R , value );
+    }
+    FORCE_INLINE static void store( const type& value , float* R , __m128i Mask )
+    {
+        _mm_maskstore_ps( R , Mask ,  value );
+    }
+
+    FORCE_INLINE static void transpose_ARGBx4_to_Ax4Rx4Gx4Bx4(type& inout0, type& inout1, type& inout2, type& inout3)
+    {
+        _mm_transpose_ARGBx4_to_Ax4Rx4Gx4Bx4_ps( inout0, inout1, inout2, inout3);
     }
 };
 
@@ -362,6 +488,18 @@ struct simd_type_maping< float , eSimdType::SSE ,8 >
                                                                                                       R.v[1] = _mm_min_ps( A.v[1] , B.v[1] );       }
     FORCE_INLINE static void max    (const type& A , const type& B, type& R ) noexcept              { R.v[0] = _mm_max_ps( A.v[0] , B.v[0] );
                                                                                                       R.v[1] = _mm_max_ps( A.v[1] , B.v[1] );       }
+    FORCE_INLINE static void cmp_le (const type& A, const type& B, type& R)noexcept                 { R.v[0] = _mm_cmple_ps( A.v[0] , B.v[0] );
+                                                                                                      R.v[1] = _mm_cmple_ps( A.v[1] , B.v[1] );     }
+    FORCE_INLINE static void cmp_lt (const type& A, const type& B, type& R)noexcept                 { R.v[0] = _mm_cmplt_ps( A.v[0] , B.v[0] );
+                                                                                                      R.v[1] = _mm_cmplt_ps( A.v[1] , B.v[1] );     }
+    FORCE_INLINE static void cmp_ge (const type& A, const type& B, type& R)noexcept                 { R.v[0] = _mm_cmpge_ps( A.v[0] , B.v[0] );
+                                                                                                      R.v[1] = _mm_cmpge_ps( A.v[1] , B.v[1] );     }
+    FORCE_INLINE static void cmp_gt (const type& A, const type& B, type& R)noexcept                 { R.v[0] = _mm_cmpgt_ps( A.v[0] , B.v[0] );
+                                                                                                      R.v[1] = _mm_cmpgt_ps( A.v[1] , B.v[1] );     }
+    FORCE_INLINE static void cmp_eq (const type& A, const type& B, type& R)noexcept                 { R.v[0] = _mm_cmpeq_ps( A.v[0] , B.v[0] );
+                                                                                                      R.v[1] = _mm_cmpeq_ps( A.v[1] , B.v[1] );     }
+    FORCE_INLINE static void cmp_neq(const type& A, const type& B, type& R)noexcept                 { R.v[0] = _mm_cmpneq_ps( A.v[0] , B.v[0] );
+                                                                                                      R.v[1] = _mm_cmpneq_ps( A.v[1] , B.v[1] );    }
     FORCE_INLINE static void rsqrt  (const type& A , type& R )noexcept                              { R.v[0] = _mm_rsqrt_ps( A.v[0] );
                                                                                                       R.v[1] = _mm_rsqrt_ps( A.v[1] );              }
     FORCE_INLINE static void set    ( float A , type& R ) noexcept                                  { R.v[0] = _mm_set1_ps( A );
@@ -378,6 +516,14 @@ struct simd_type_maping< float , eSimdType::SSE ,8 >
                                                                                                       R[1] = _mm_cvttps_epi32(A[1]);                }
     FORCE_INLINE static void s_cast (const type& A, simd_data_type<__m128d,2>& R)noexcept           { R[0] = _mm_cvtps_pd(A[0]);
                                                                                                       R[1] = _mm_cvtps_pd(A[1]);                    }
+    FORCE_INLINE static void log    (const type& A , type & R ) noexcept                            { R[0] = emu_mm_log_ps(A[0]);
+                                                                                                      R[1] = emu_mm_log_ps(A[1]);                   }
+    FORCE_INLINE static void exp    (const type& A , type & R ) noexcept                            { R[0] = emu_mm_exp_ps(A[0]);
+                                                                                                      R[1] = emu_mm_exp_ps(A[1]);                   }
+    FORCE_INLINE static void pow    (const type& A , const type& B , type & R ) noexcept            { R[0] = emu_mm_pow_ps(A[0],B[0]);
+                                                                                                      R[1] = emu_mm_pow_ps(A[1],B[1]);              }
+    FORCE_INLINE static void pow    (const type& A , float B , type & R ) noexcept                  { R[0] = emu_mm_pow_ps(A[0],B);
+                                                                                                      R[1] = emu_mm_pow_ps(A[1],B);                 }
     FORCE_INLINE static void s_cast (const type& A, simd_data_type<__m128 ,2>& R)noexcept           { R = A;                                        }
     FORCE_INLINE static void mask_32(const type& A , int& R ) noexcept                              { R = _mm_movemask_ps(A[0]) | (_mm_movemask_ps(A[1]) << 16); }
     FORCE_INLINE static void mask_64(const type& A , int& R ) noexcept                              { R = _mm_movemask_pd(_mm_castps_pd(A[0])) | (_mm_movemask_pd(_mm_castps_pd(A[1])) << 16); }
@@ -409,6 +555,20 @@ struct simd_type_maping< float , eSimdType::SSE ,8 >
             _mm_storeu_ps( R + 0 , value.v[0] );
             _mm_storeu_ps( R + 4 , value.v[1] );
         }
+    }
+    FORCE_INLINE static void store( const type& value , float* R , const simd_data_type<__m128i,2>& Mask )
+    {
+        _mm_maskstore_ps( R+0 , Mask.v[0] ,  value.v[0] );
+        _mm_maskstore_ps( R+4 , Mask.v[1] ,  value.v[1] );
+    }
+
+    FORCE_INLINE static void transpose_ARGBx4_to_Ax4Rx4Gx4Bx4(type& inout0, type& inout1)
+    {
+        _mm_transpose_ARGBx4_to_Ax4Rx4Gx4Bx4_ps( inout0.v[0], inout0.v[1], inout1.v[0], inout1.v[1]);
+    }
+    FORCE_INLINE static void transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(type& inout0, type& inout1, type& inout2, type& inout3)
+    {
+        _mm_transpose_ARGBx8_to_Ax8Rx8Gx8Bx8_ps( inout0.v[0], inout0.v[1], inout1.v[0], inout1.v[1], inout2.v[0], inout2.v[1], inout3.v[0], inout3.v[1]);
     }
 };
 
@@ -476,13 +636,13 @@ struct simd_type_maping< int32_t , eSimdType::SSE , 4 >
     FORCE_INLINE static void add    (const type& A, int32_t B    , type& R ) noexcept                   { R = _mm_add_epi32( A , _mm_set1_epi32( B ) ); }
     FORCE_INLINE static void sub    (const type& A, const type& B, type& R ) noexcept                   { R = _mm_sub_epi32( A , B );                   }
     FORCE_INLINE static void sub    (const type& A, int32_t B    , type& R ) noexcept                   { R = _mm_sub_epi32( A , _mm_set1_epi32( B ) ); }
-    FORCE_INLINE static void mul    (const type& A, const type& B, type& R ) noexcept                   { R = _mm_mul_epi32( A , B );                   }
-    FORCE_INLINE static void mul    (const type& A, int32_t B    , type& R ) noexcept                   { R = _mm_mul_epi32( A , _mm_set1_epi32( B ) ); }
+    FORCE_INLINE static void mul    (const type& A, const type& B, type& R ) noexcept                   { R = _mm_mullo_epi32( A , B );                 }
+    FORCE_INLINE static void mul    (const type& A, int32_t B    , type& R ) noexcept                   { R = _mm_mullo_epi32( A , _mm_set1_epi32( B ) );}
     FORCE_INLINE static void min    (const type& A , const type& B, type& R ) noexcept                  { R = _mm_min_epi32( A , B  );                  }
     FORCE_INLINE static void max    (const type& A , const type& B, type& R ) noexcept                  { R = _mm_max_epi32( A , B  );                  }
     FORCE_INLINE static void cmp_le (const type& A, const type& B, type& R)noexcept                     { R =  _mm_cmpeq_epi32( _mm_cmpgt_epi32( B , A  ) , _mm_setzero_si128() ); }
     FORCE_INLINE static void cmp_lt (const type& A, const type& B, type& R)noexcept                     { R =  _mm_cmplt_epi32( A , B  );               }
-    FORCE_INLINE static void cmp_ge (const type& A, const type& B, type& R)noexcept                     { R =  _mm_cmpeq_epi32( _mm_cmplt_epi32( B , A  ) , _mm_setzero_si128() ); }
+    FORCE_INLINE static void cmp_ge (const type& A, const type& B, type& R)noexcept                     { R =  _mm_or_si128( _mm_cmpgt_epi32( A , B  ) , _mm_cmpeq_epi32( A , B ) ); }
     FORCE_INLINE static void cmp_gt (const type& A, const type& B, type& R)noexcept                     { R =  _mm_cmpgt_epi32( A , B  );               }
     FORCE_INLINE static void cmp_eq (const type& A, const type& B, type& R)noexcept                     { R =  _mm_cmpeq_epi32( A , B  );               }
     FORCE_INLINE static void cmp_neq(const type& A, const type& B, type& R)noexcept                     { R =  _mm_cmpeq_epi32( _mm_cmpeq_epi32( A , B ) , _mm_setzero_si128() ); }
@@ -519,6 +679,19 @@ struct simd_type_maping< int32_t , eSimdType::SSE , 4 >
         else
             _mm_storeu_si128( (__m128i*)R , value );
     }
+    FORCE_INLINE static void store( const type& value , int32_t* R , __m128i Mask )
+    {
+        _mm_maskstore_epi32( R , Mask ,  value );
+    }
+
+    FORCE_INLINE static void transpose_ARGBx4_to_Ax4Rx4Gx4Bx4(type& inout0, type& inout1, type& inout2, type& inout3)
+    {
+        _mm_transpose_ARGBx4_to_Ax4Rx4Gx4Bx4_epi32( inout0, inout1, inout2, inout3 );
+    }
+    FORCE_INLINE static void transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(type& inout0, type& inout1, type& inout2, type& inout3, type& inout4, type& inout5, type& inout6, type& inout7)
+    {
+        _mm_transpose_ARGBx8_to_Ax8Rx8Gx8Bx8_epi32( inout0, inout1, inout2, inout3, inout4, inout5, inout6, inout7 );
+    }
 };
 
 template<>
@@ -535,11 +708,11 @@ struct simd_type_maping< int32_t , eSimdType::SSE , 8 >
     FORCE_INLINE static void sub(const type& A , int32_t     B, type& R ) noexcept                  { auto SB = _mm_set1_epi32( B );
                                                                                                       R.v[0]  = _mm_sub_epi32( A.v[0] , SB );
                                                                                                       R.v[1]  = _mm_sub_epi32( A.v[1] , SB );           }
-    FORCE_INLINE static void mul(const type& A , const type& B, type& R ) noexcept                  { R.v[0]  = _mm_mul_epi32( A.v[0] , B.v[0] );
-                                                                                                      R.v[1]  = _mm_mul_epi32( A.v[1] , B.v[1] );       }
+    FORCE_INLINE static void mul(const type& A , const type& B, type& R ) noexcept                  { R.v[0]  = _mm_mullo_epi32( A.v[0] , B.v[0] );
+                                                                                                      R.v[1]  = _mm_mullo_epi32( A.v[1] , B.v[1] );       }
     FORCE_INLINE static void mul(const type& A , int32_t     B, type& R ) noexcept                  { auto SB = _mm_set1_epi32( B );
-                                                                                                      R.v[0]  = _mm_mul_epi32( A.v[0] , SB );
-                                                                                                      R.v[1]  = _mm_mul_epi32( A.v[1] , SB );           }
+                                                                                                      R.v[0]  = _mm_mullo_epi32( A.v[0] , SB );
+                                                                                                      R.v[1]  = _mm_mullo_epi32( A.v[1] , SB );           }
     FORCE_INLINE static void min    (const type& A , const type& B, type& R ) noexcept              { R.v[0]  = _mm_min_epi32( A.v[0] , B.v[0] );
                                                                                                       R.v[1]  = _mm_min_epi32( A.v[1] , B.v[1] );       }
     FORCE_INLINE static void max    (const type& A , const type& B, type& R ) noexcept              { R.v[0]  = _mm_max_epi32( A.v[0] , B.v[0] );
@@ -550,23 +723,22 @@ struct simd_type_maping< int32_t , eSimdType::SSE , 8 >
                                                                                                       R.v[1]  = _mm_cmpeq_epi32( _mm_cmpgt_epi32( B.v[1] , A.v[1] ) , ZERO );  }
     FORCE_INLINE static void cmp_lt (const type& A, const type& B, type& R)noexcept                 { R.v[0]  = _mm_cmplt_epi32( A.v[0] , B.v[0]  );
                                                                                                       R.v[1]  = _mm_cmplt_epi32( A.v[1] , B.v[1]  );               }
-    FORCE_INLINE static void cmp_ge (const type& A, const type& B, type& R)noexcept                 { auto ZERO = _mm_setzero_si128();
-                                                                                                      R.v[0] =  _mm_cmpeq_epi32( _mm_cmplt_epi32( B.v[0] , A.v[0] ) , ZERO );
-                                                                                                      R.v[1] =  _mm_cmpeq_epi32( _mm_cmplt_epi32( B.v[1] , A.v[1] ) , ZERO ); }
+    FORCE_INLINE static void cmp_ge (const type& A, const type& B, type& R)noexcept                 { R.v[0] =  _mm_or_si128( _mm_cmpgt_epi32( A.v[0], B.v[0]) , _mm_cmpeq_epi32( A.v[0] , B.v[0] ) );
+                                                                                                      R.v[1] =  _mm_or_si128( _mm_cmpgt_epi32( A.v[1], B.v[1]) , _mm_cmpeq_epi32( A.v[1] , B.v[1] ) ); }
     FORCE_INLINE static void cmp_gt (const type& A, const type& B, type& R)noexcept                 { R.v[0]  = _mm_cmpgt_epi32( A.v[0] , B.v[0] );
                                                                                                       R.v[1]  = _mm_cmpgt_epi32( A.v[1] , B.v[1] );                 }
     FORCE_INLINE static void cmp_eq (const type& A, const type& B, type& R)noexcept                 { R.v[0]  = _mm_cmpeq_epi32( A.v[0] , B.v[0] );
                                                                                                       R.v[1]  = _mm_cmpeq_epi32( A.v[1] , B.v[1] );                  }
     FORCE_INLINE static void cmp_neq(const type& A, const type& B, type& R)noexcept                 { auto ONE = _mm_set1_epi32(-1);
-                                                                                                      R.v[0]  = _mm_xor_epi32( _mm_cmpeq_epi32( A.v[0] , B.v[0] ) , ONE );
-                                                                                                      R.v[1]  = _mm_xor_epi32( _mm_cmpeq_epi32( A.v[1] , B.v[1] ) , ONE ); }
-    FORCE_INLINE static void AND(const type& A, const type& B, type& R ) noexcept                   { R.v[0]  = _mm_and_epi32( A.v[0] , B.v[0] );
-                                                                                                      R.v[1]  = _mm_and_epi32( A.v[1] , B.v[1] );       }
-    FORCE_INLINE static void OR (const type& A, const type& B, type& R ) noexcept                   { R.v[0]  = _mm_or_epi32( A.v[0] , B.v[0] );
-                                                                                                      R.v[1]  = _mm_or_epi32( A.v[1] , B.v[1] );        }
+                                                                                                      R.v[0]  = _mm_xor_si128( _mm_cmpeq_epi32( A.v[0] , B.v[0] ) , ONE );
+                                                                                                      R.v[1]  = _mm_xor_si128( _mm_cmpeq_epi32( A.v[1] , B.v[1] ) , ONE ); }
+    FORCE_INLINE static void AND(const type& A, const type& B, type& R ) noexcept                   { R.v[0]  = _mm_and_si128( A.v[0] , B.v[0] );
+                                                                                                      R.v[1]  = _mm_and_si128( A.v[1] , B.v[1] );       }
+    FORCE_INLINE static void OR (const type& A, const type& B, type& R ) noexcept                   { R.v[0]  = _mm_or_si128( A.v[0] , B.v[0] );
+                                                                                                      R.v[1]  = _mm_or_si128( A.v[1] , B.v[1] );        }
     FORCE_INLINE static void NOT(const type& A, type& R                ) noexcept                   { auto ONE = _mm_set1_epi32(-1);
-                                                                                                      R.v[0] = _mm_xor_epi32 ( A.v[0] , ONE );
-                                                                                                      R.v[1] = _mm_xor_epi32 ( A.v[1] , ONE );          }
+                                                                                                      R.v[0] = _mm_xor_si128( A.v[0] , ONE );
+                                                                                                      R.v[1] = _mm_xor_si128( A.v[1] , ONE );          }
     FORCE_INLINE static void set( int32_t A , type& R ) noexcept                                    { R.v[0]  = _mm_set1_epi32( A );
                                                                                                       R.v[1]  = R.v[0];                                 }
     FORCE_INLINE static void shl(const type& A , int32_t B    , type& R ) noexcept                  { R.v[0]  = _mm_slli_epi32( A.v[0] , B );
@@ -592,8 +764,8 @@ struct simd_type_maping< int32_t , eSimdType::SSE , 8 >
                                                                                                       R[1] = _mm_cvtepi32_pd(A[1]);                     }
     FORCE_INLINE static void s_cast (const type& A, simd_data_type<__m128 ,2>& R)noexcept           { R[0] = _mm_cvtepi32_ps(A[0]);
                                                                                                       R[1] = _mm_cvtepi32_ps(A[1]);                     }
-    FORCE_INLINE static void mask_32(const type& A , int& R ) noexcept                              { R = _mm_movemask_ps(_mm_castsi128_ps(A[0])) | (_mm_movemask_ps(_mm_castsi128_ps(A[1])) << 16); }
-    FORCE_INLINE static void mask_64(const type& A , int& R ) noexcept                              { R = _mm_movemask_pd(_mm_castsi128_pd(A[0])) | (_mm_movemask_pd(_mm_castsi128_pd(A[1])) << 16); }
+    FORCE_INLINE static void mask_32(const type& A , int& R ) noexcept                              { R = _mm_movemask_ps(_mm_castsi128_ps(A[0])) | ( _mm_movemask_ps(_mm_castsi128_ps(A[1])) << 4 ); }
+    FORCE_INLINE static void mask_64(const type& A , int& R ) noexcept                              { R = _mm_movemask_pd(_mm_castsi128_pd(A[0])) | ( _mm_movemask_pd(_mm_castsi128_pd(A[1])) << 2 ); }
 
     FORCE_INLINE static void blend  (const type& A, const type& B, const type& M, type& R) noexcept { R[0] = _mm_castps_si128( _mm_blendv_ps(_mm_castsi128_ps(A[0]),_mm_castsi128_ps(B[0]),_mm_castsi128_ps(M[0])) );
                                                                                                       R[1] = _mm_castps_si128( _mm_blendv_ps(_mm_castsi128_ps(A[1]),_mm_castsi128_ps(B[1]),_mm_castsi128_ps(M[1])) ); }
@@ -622,6 +794,20 @@ struct simd_type_maping< int32_t , eSimdType::SSE , 8 >
             _mm_storeu_epi32( R + 0 , value.v[0] );
             _mm_storeu_epi32( R + 4 , value.v[1] );
         }
+    }
+    FORCE_INLINE static void store( const type& value , int32_t* R , const simd_data_type<__m128i,2>& Mask )
+    {
+        _mm_maskstore_epi32( R+0 , Mask.v[0] , value.v[0] );
+        _mm_maskstore_epi32( R+4 , Mask.v[1] , value.v[1] );
+    }
+
+    FORCE_INLINE static void transpose_ARGBx4_to_Ax4Rx4Gx4Bx4(type& inout0, type& inout1)
+    {
+        _mm_transpose_ARGBx4_to_Ax4Rx4Gx4Bx4_epi32( inout0.v[0], inout0.v[1], inout1.v[0], inout1.v[1] );
+    }
+    FORCE_INLINE static void transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(type& inout0, type& inout1, type& inout2, type& inout3)
+    {
+        _mm_transpose_ARGBx8_to_Ax8Rx8Gx8Bx8_epi32( inout0.v[0], inout0.v[1], inout1.v[0], inout1.v[1] , inout2.v[0], inout2.v[1], inout3.v[0], inout3.v[1] );
     }
 };
 
@@ -668,6 +854,36 @@ struct simd_type_maping< float , eSimdType::AVX , 8 >
     FORCE_INLINE static void mask_32(const type& A , int& R ) noexcept                                  { R = _mm256_movemask_ps(A);                    }
     FORCE_INLINE static void mask_64(const type& A , int& R ) noexcept                                  { R = _mm256_movemask_pd(_mm256_castps_pd(A));  }
     FORCE_INLINE static void blend  (const type& A, const type& B, const type& M, type& R) noexcept     { R = _mm256_blendv_ps(A,B,M);                  }
+    FORCE_INLINE static int  cstore (const type& A, const __m256i& M , float* R , auto OV )
+    {
+        if constexpr( OV() )
+            return emu_mm256_mask_compressstoreu_ps_ov(R, _mm256_castsi256_ps(M), A);
+        else
+            return emu_mm256_mask_compressstoreu_ps   (R, _mm256_castsi256_ps(M), A);
+    };
+    FORCE_INLINE static int  expand(const type& A, const __m256i& M , const float* p, type& R )
+    {
+        int bits;
+        R = emu_mm256_mask_expandloadu_ps(A, _mm256_castsi256_ps(M), p, bits);
+        return bits;
+    };
+
+    FORCE_INLINE static int  cstore4( const type* A,const type* B,const type* C,const type* D, const __m256i& M
+                                    , float* RA    ,float* RB    ,float* RC    ,float* RD    , auto OV )
+    {
+        if constexpr( OV() )
+            return emu_mm256_mask_compressstoreu_ps_x4_ov(RA,RB,RC,RD, _mm256_castsi256_ps(M), A,B,C,D);
+        else
+            return emu_mm256_mask_compressstoreu_ps_x4   (RA,RB,RC,RD, _mm256_castsi256_ps(M), A,B,C,D);
+    };
+
+    FORCE_INLINE static int  expand4( const float* pA , const float* pB , const float* pC , const float* pD , const __m256i& M
+                                    , type* RA        , type* RB        , type* RC        , type* RD )
+    {
+        int bits;
+        emu_mm256_mask_expandloadu_ps_x4(RA,RB,RC,RD, _mm256_castsi256_ps(M), pA,pB,pC,pD, bits);
+        return bits;
+    }
 
     FORCE_INLINE static void load   ( const float* value , type& R , auto align_tag )
     {
@@ -676,6 +892,7 @@ struct simd_type_maping< float , eSimdType::AVX , 8 >
         else
             R = _mm256_loadu_ps(value);
     }
+
     template< eDataAlignment A >
     FORCE_INLINE static void store( const type& value , float* R , DataAlignmentTagT<A> align_tag )
     {
@@ -687,6 +904,11 @@ struct simd_type_maping< float , eSimdType::AVX , 8 >
     FORCE_INLINE static void store( const type& value , float* R , __m256i Mask )
     {
         _mm256_maskstore_ps( R , Mask ,  value );
+    }
+
+    FORCE_INLINE static void transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(type& inout0, type& inout1, type& inout2, type& inout3)
+    {
+        _mm256_transpose_ARGBx8_to_Ax8Rx8Gx8Bx8_ps( inout0, inout1, inout2, inout3);
     }
 };
 
@@ -734,6 +956,7 @@ struct simd_type_maping< int32_t , eSimdType::AVX , 8 >
         else
             R = _mm256_loadu_epi32(value);
     }
+
     template< eDataAlignment A >
     FORCE_INLINE static void store( const type& value , int32_t* R , DataAlignmentTagT<A> align_tag )
     {
@@ -745,6 +968,11 @@ struct simd_type_maping< int32_t , eSimdType::AVX , 8 >
     FORCE_INLINE static void store( const type& value , int32_t* R , __m256i Mask )
     {
         _mm256_maskstore_epi32( R , Mask ,  value );
+    }
+
+    FORCE_INLINE static void transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(type& inout0, type& inout1, type& inout2, type& inout3)
+    {
+        _mm256_transpose_ARGBx8_to_Ax8Rx8Gx8Bx8_epi32( inout0, inout1, inout2, inout3);
     }
 };
 
@@ -872,6 +1100,34 @@ public:
         pArray += Elements;
     }
 
+    template< bool Overflow = false >
+    FORCE_INLINE int compressed_store(T* value , const int_variant& Mask , std::bool_constant<Overflow> = {} ) const requires(std::is_same_v<T,T>)
+    {
+        return sse_map_t::cstore( v , Mask.v , value , std::bool_constant<Overflow>{} );
+    }
+    FORCE_INLINE int expand_load(const T* value , const int_variant& Mask ) requires(std::is_same_v<T,T>)
+    {
+        return sse_map_t::expand( v , Mask.v , value , v );
+    }
+    FORCE_INLINE int expand_load(const T* value , const simd_impl& A, const int_variant& Mask ) requires(std::is_same_v<T,T>)
+    {
+        return sse_map_t::expand( A , Mask.v , value , v );
+    }
+
+    template< bool Overflow = false >
+    FORCE_INLINE static int compressed_store_4( const simd_impl* SrcA , const simd_impl* SrcB , const simd_impl* SrcC , const simd_impl* SrcD
+                                              , float*           DstA , float*           DstB , float*           DstC , float*           DstD , const int_variant& Mask , std::bool_constant<Overflow> t = {} ) requires(std::is_same_v<T,T>)
+    {
+        return sse_map_t::cstore4( &SrcA->v , &SrcB->v , &SrcC->v , &SrcD->v , Mask.v, DstA, DstB, DstC, DstD, t );
+    }
+
+    FORCE_INLINE static int expand_load_4( simd_impl* DstA , simd_impl* DstB , simd_impl* DstC , simd_impl* DstD
+                                         , const T*   SrcA , const T*   SrcB , const T*   SrcC , const T*   SrcD , const int_variant& Mask ) requires(std::is_same_v<T,T>)
+    {
+        return sse_map_t::expand4( SrcA, SrcB, SrcC, SrcD , Mask.v, &DstA->v , &DstB->v , &DstC->v , &DstD->v );
+    }
+
+    template< typename T2 >
     FORCE_INLINE void store_to_array(uint32_t Index, T*& pArray , const int_variant& Mask ) const requires(std::is_same_v<T,T>)
     {
         sse_map_t::store( v , pArray , Mask.v );
@@ -903,27 +1159,43 @@ public:
         sse_map_t::min(v, max.v, result.v);
         return result;
     }
-    FORCE_INLINE simd_impl operator+(const simd_impl& other) const noexcept
+    FORCE_INLINE simd_impl add(const simd_impl& other) const noexcept
     {
         simd_impl result;
         sse_map_t::add(v, other.v, result.v);
         return result;
     }
-    FORCE_INLINE simd_impl& operator+=(const simd_impl& other) noexcept
+    FORCE_INLINE simd_impl& add_assign(const simd_impl& other) noexcept
     {
         sse_map_t::add(v, other.v, v);
         return *this;
     }
-    FORCE_INLINE simd_impl operator-(const simd_impl& other) const noexcept
+    FORCE_INLINE simd_impl operator+(const simd_impl& other) const noexcept
+    {
+        return add( other );
+    }
+    FORCE_INLINE simd_impl& operator+=(const simd_impl& other) noexcept
+    {
+        return add_assign( other );
+    }
+    FORCE_INLINE simd_impl sub(const simd_impl& other) const noexcept
     {
         simd_impl result;
         sse_map_t::sub(v, other.v, result.v);
         return result;
     }
-    FORCE_INLINE simd_impl& operator-=(const simd_impl& other) noexcept
+    FORCE_INLINE simd_impl& sub_assign(const simd_impl& other) noexcept
     {
         sse_map_t::sub(v, other.v, v);
         return *this;
+    }
+    FORCE_INLINE simd_impl operator-(const simd_impl& other) const noexcept
+    {
+        return sub(other);
+    }
+    FORCE_INLINE simd_impl& operator-=(const simd_impl& other) noexcept
+    {
+        return sub_assign(other);
     }
     FORCE_INLINE simd_impl operator*(const simd_impl& other) const noexcept
     {
@@ -974,49 +1246,81 @@ public:
         sse_map_t::mul(v, other.v, v);
         return *this;
     }
-    FORCE_INLINE simd_impl operator<<(int32_t other) const noexcept
+    FORCE_INLINE simd_impl shl(int32_t other) const noexcept
     {
         simd_impl result;
         sse_map_t::shl(v, other, result.v);
         return result;
     }
-    FORCE_INLINE simd_impl operator<<(const int_variant& other) const noexcept
+    FORCE_INLINE simd_impl shl(const int_variant& other) const noexcept
     {
         simd_impl result;
         sse_map_t::shl(v, other.v, result.v);
         return result;
     }
-    FORCE_INLINE simd_impl& operator<<=(int32_t other) noexcept
+    FORCE_INLINE simd_impl operator<<(int32_t other) const noexcept
+    {
+        return shl( other );
+    }
+    FORCE_INLINE simd_impl operator<<(const int_variant& other) const noexcept
+    {
+        return shl( other );
+    }
+    FORCE_INLINE simd_impl& shl_assign(int32_t other) noexcept
     {
         sse_map_t::shl(v, other, v);
         return *this;
     }
-    FORCE_INLINE simd_impl& operator<<=(const int_variant& other) noexcept
+    FORCE_INLINE simd_impl& shl_assign(const int_variant& other) noexcept
     {
         sse_map_t::shl(v, other.v, v);
         return *this;
     }
-    FORCE_INLINE simd_impl operator>>(int32_t other) const noexcept
+    FORCE_INLINE simd_impl& operator<<=(int32_t other) noexcept
+    {
+        return shl_assign( other );
+    }
+    FORCE_INLINE simd_impl& operator<<=(const int_variant& other) noexcept
+    {
+        return shl_assign( other );
+    }
+    FORCE_INLINE simd_impl shr(int32_t other) const noexcept
     {
         simd_impl result;
         sse_map_t::shr(v, other, result.v);
         return result;
     }
-    FORCE_INLINE simd_impl operator>>(const int_variant& other) const noexcept
+    FORCE_INLINE simd_impl shr(const int_variant& other) const noexcept
     {
         simd_impl result;
         sse_map_t::shr(v, other.v, result.v);
         return result;
     }
-    FORCE_INLINE simd_impl& operator>>=(int32_t other) noexcept
+    FORCE_INLINE simd_impl operator>>(int32_t other) const noexcept
+    {
+        return shr( other );
+    }
+    FORCE_INLINE simd_impl operator>>(const int_variant& other) const noexcept
+    {
+        return shr( other );
+    }
+    FORCE_INLINE simd_impl& shr_assign(int32_t other) noexcept
     {
         sse_map_t::shr(v, other, v);
         return *this;
     }
-    FORCE_INLINE simd_impl& operator>>=(const int_variant& other) noexcept
+    FORCE_INLINE simd_impl& shr_assign(const int_variant& other) noexcept
     {
         sse_map_t::shr(v, other.v, v);
         return *this;
+    }
+    FORCE_INLINE simd_impl& operator>>=(int32_t other) noexcept
+    {
+        return shr_assign( other );
+    }
+    FORCE_INLINE simd_impl& operator>>=(const int_variant& other) noexcept
+    {
+        return shr_assign( other );
     }
     FORCE_INLINE simd_impl operator*(T value) const noexcept
     {
@@ -1056,30 +1360,50 @@ public:
         return *this;
     }
 
-    FORCE_INLINE simd_impl operator&(const simd_impl& other) const noexcept
+    FORCE_INLINE simd_impl And(const simd_impl& other) const noexcept
     {
         simd_impl result;
         sse_map_t::AND(v, other.v, result.v);
         return result;
     }
 
-    FORCE_INLINE simd_impl& operator&=(const simd_impl& other) noexcept
+    FORCE_INLINE simd_impl& and_assign(const simd_impl& other) noexcept
     {
         sse_map_t::AND(v, other.v, v);
         return *this;
     }
 
-    FORCE_INLINE simd_impl operator|(const simd_impl& other) const noexcept
+    FORCE_INLINE simd_impl Or(const simd_impl& other) const noexcept
     {
         simd_impl result;
         sse_map_t::OR(v, other.v, result.v);
         return result;
     }
 
-    FORCE_INLINE simd_impl& operator|=(const simd_impl& other) noexcept
+    FORCE_INLINE simd_impl& or_assign(const simd_impl& other) noexcept
     {
         sse_map_t::OR(v, other.v, v);
         return *this;
+    }
+
+    FORCE_INLINE simd_impl operator&(const simd_impl& other) const noexcept
+    {
+        return And(other);
+    }
+
+    FORCE_INLINE simd_impl& operator&=(const simd_impl& other) noexcept
+    {
+        return and_assign(other);
+    }
+
+    FORCE_INLINE simd_impl operator|(const simd_impl& other) const noexcept
+    {
+        return Or(other);
+    }
+
+    FORCE_INLINE simd_impl& operator|=(const simd_impl& other) noexcept
+    {
+        return or_assign(other);
     }
 
     FORCE_INLINE simd_impl log()const noexcept
@@ -1129,13 +1453,58 @@ public:
         sse_map_t::mask_64(v, result);
         return result;
     }
+    FORCE_INLINE void set_from_mask_32(int mask) noexcept requires(std::is_integral_v<T>)
+    {
+        set( mask , v );
+        shr_assign( ZeroToN );
+        and_assign( One );
+        *this = Zero - *this;
+    }
+    FORCE_INLINE static int_variant from_mask_32(int mask) noexcept requires(std::is_integral_v<T>)
+    {
+        int_variant vmask{ mask };
+        vmask >>= ZeroToN;
+        vmask &= One;
+        return Zero - vmask;
+    }
 
+    FORCE_INLINE static void transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(int mask) noexcept requires(std::is_integral_v<T>)
+    {
+        int_variant vmask{ mask };
+        vmask >>= ZeroToN;
+        vmask &= One;
+        return Zero - vmask;
+    }
+
+    FORCE_INLINE static void transpose_ARGBx_to_AxRxGxBx(simd_impl& A, simd_impl& B, simd_impl& C, simd_impl& D) requires(Elements==4 || Elements==8)
+    {
+        if constexpr( Elements==4 )
+        {
+            sse_map_t::transpose_ARGBx4_to_Ax4Rx4Gx4Bx4(A.v, B.v, C.v, D.v);
+        }
+        else if constexpr( Elements==8 )
+        {
+            sse_map_t::transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(A.v, B.v, C.v, D.v);
+        }
+    }
+
+    FORCE_INLINE static void transpose_ARGBx4_to_Ax4Rx4Gx4Bx4(simd_impl& A, simd_impl& B, simd_impl& C, simd_impl& D) requires(Elements==4)
+    {
+        sse_map_t::transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(A.v, B.v, C.v, D.v);
+    }
+
+    FORCE_INLINE static void transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(simd_impl& A, simd_impl& B, simd_impl& C, simd_impl& D) requires(Elements==8)
+    {
+        sse_map_t::transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(A.v, B.v, C.v, D.v);
+    }
 
     sse_t v = {};
 
     static const simd_impl Zero          ;
     static const simd_impl One           ;
+    static const simd_impl Ten           ;
     static const simd_impl ZeroToN       ;
+    static const simd_impl NToZero       ;
     static const simd_impl AllBitsSet    ;
     static const simd_impl Two           ;
     static const simd_impl PI            ;
@@ -1148,7 +1517,11 @@ const simd_impl<T,Elements,Simd> simd_impl<T,Elements,Simd>::Zero          = { s
 template< typename T , int Elements , eSimdType Simd >
 const simd_impl<T,Elements,Simd> simd_impl<T,Elements,Simd>::One           = { static_cast<T>(1) };
 template< typename T , int Elements , eSimdType Simd >
-const simd_impl<T,Elements,Simd> simd_impl<T,Elements,Simd>::ZeroToN       = [] -> simd_impl<T,Elements,Simd>{ if constexpr(Elements==8) return {0,1,2,3,4,5,6,7}; else return {0,1,2,3}; }();
+const simd_impl<T,Elements,Simd> simd_impl<T,Elements,Simd>::Ten           = { static_cast<T>(10) };
+template< typename T , int Elements , eSimdType Simd >
+const simd_impl<T,Elements,Simd> simd_impl<T,Elements,Simd>::ZeroToN       = []() -> simd_impl<T,Elements,Simd>{ if constexpr(Elements==8) return {0,1,2,3,4,5,6,7}; else return {0,1,2,3}; }();
+template< typename T , int Elements , eSimdType Simd >
+const simd_impl<T,Elements,Simd> simd_impl<T,Elements,Simd>::NToZero       = []() -> simd_impl<T,Elements,Simd>{ if constexpr(Elements==8) return {7,6,5,4,3,2,1,0}; else return {3,2,1,0}; }();
 template< typename T , int Elements , eSimdType Simd >
 const simd_impl<T,Elements,Simd> simd_impl<T,Elements,Simd>::AllBitsSet    = { simd_impl<int,Elements,Simd>{ int(0xFFFFFFFF) }.reinterpret_cast_to<T>()  };
 template< typename T , int Elements , eSimdType Simd >
@@ -1200,3 +1573,18 @@ using f256A  = f256<eSimdType::AVX>;
 using i128S  = i128<eSimdType::SSE>;
 using i256S = i256<eSimdType::SSE>;
 using i256A  = i256<eSimdType::AVX>;
+
+template< typename T , int Elements , eSimdType Type >
+struct wide_arithmetic_t
+{
+    using type = simd<T, Elements,Type>;
+};
+
+template< typename T , eSimdType Type >
+struct wide_arithmetic_t<T,1,Type>
+{
+    using type = T;
+};
+
+template< typename T , int Elements , eSimdType Type >
+using wide_arithmetic = typename wide_arithmetic_t<T, Elements, Type>::type;

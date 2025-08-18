@@ -25,6 +25,15 @@ enum class eMathType : uint8_t
     AVX
 };
 
+enum class eBlockMathMode : uint8_t
+{
+    CPUx32  = 0x0,
+    CPUx256 = 0x1,
+    SSEx128 = 0x2,
+    SSEx256 = 0x3,
+    AVXx256 = 0x4,
+};
+
 class ITexture
 {
 public:
@@ -51,6 +60,7 @@ public:
     virtual void BeginFrame()=0;
     virtual void Render(const vector<Vertex>& vertices)=0;
     virtual void EndFrame()=0;
+    virtual int GetPixelsDrawn() const { return 0; }
     virtual void RenderDepthBuffer()=0;
     virtual const vector<uint32_t>& GetScreenBuffer() const=0;
     virtual const DrawStats& GetDrawStats() const=0;
@@ -76,5 +86,5 @@ public:
     virtual void SetDrawBBoxes(bool drawBBoxes)=0;
     virtual void SetZWrite(bool zwrite)=0;
     virtual void SetZTest(bool ztest)=0;
-    virtual void SetMathType(eMathType mathType) {}
+    virtual void SetBlockMathMode(eBlockMathMode mathType) {}
 };

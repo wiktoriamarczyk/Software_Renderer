@@ -19,15 +19,33 @@ struct PredefinedModel
     optional<float> RotationX;
     optional<float> RotationY;
     optional<float> RotationZ;
+    optional<float> PositionX;
+    optional<float> PositionY;
+    optional<float> PositionZ;
     optional<float> Scale;
 };
 
 const PredefinedModel s_PredefinedModels[] =
 {
-    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , .RotationX = 214.468 },
-    { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330 , .RotationY = 25    , .Scale = 6.0f },
-    { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280 , .RotationY = 140   , .Scale = 4.0f },
-    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120                      , .Scale = 6.5f },
+    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , .RotationX = 120.f    , .RotationY = 25.f  , .Scale = 2.38f },
+    { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 5.5f },
+    { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 4.59f },
+    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f                         , .Scale = 6.3f },
+
+    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"                             , .RotationY = 25.f  , .Scale = 2.9f },
+    { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 6.837f },
+    { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 5.64f },
+    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f                         , .Scale = 7.72f },
+
+    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"                             , .RotationY = 25.f  , .Scale = 5.05f },
+    { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 12.937f },
+    { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 9.23f  , .PositionX = -2.7f    , .PositionY = -1.3f },
+    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f                         , .Scale = 15.37f , .PositionX = -10.7f   , .PositionY = -6.45f    , .PositionZ = -0.57f },
+
+    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , .RotationX = 0.f      , .RotationY = 25.f  , .Scale = 6.0f },
+    { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 16.f    , .PositionY = 1.4f },
+    { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 10.8f   , .PositionX = -3.7f    , .PositionY = -1.75f },
+    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f    , .RotationY = 90.f  , .Scale = 16.0f   , .PositionY = -2.1f    , .PositionZ = -4.2f },
 };
 
 void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
@@ -48,6 +66,9 @@ void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
     Settings.modelRotation.x        = model.RotationX.value_or(Def.modelRotation.x);
     Settings.modelRotation.y        = model.RotationY.value_or(Def.modelRotation.y);
     Settings.modelRotation.z        = model.RotationZ.value_or(Def.modelRotation.z);
+    Settings.modelTranslation.x     = model.PositionX.value_or(Def.modelTranslation.x);
+    Settings.modelTranslation.y     = model.PositionY.value_or(Def.modelTranslation.y);
+    Settings.modelTranslation.z     = model.PositionZ.value_or(Def.modelTranslation.z);
     Settings.modelScale             = model.Scale.value_or(Def.modelScale);
 }
 
@@ -268,7 +289,6 @@ bool Application::Initialize()
     // create the window
     m_MainWindow.create(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Software renderer", sf::Style::Default, GetSFMLOpenGL4_0_WindowSettings());
     m_MainWindow.setActive(true);
-    m_MainWindow.setFramerateLimit(0);
 
     // create renderers
     m_Contexts[0].pRenderer = RendererFactory::CreateRenderer(eRendererType::Software, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -304,8 +324,8 @@ extern bool g_showTilesBoundry;
 extern bool g_showTilesGrid;
 extern bool g_showTilestype;
 extern bool g_showTriangleBoundry;
-extern bool g_useSimd;
 extern bool g_ThreadPerTile;
+extern bool g_MultithreadedTransformAndClip;
 extern std::atomic<size_t> g_memory_resource_mem ;
 extern std::atomic<int> g_max_overdraw;
 
@@ -433,9 +453,9 @@ int Application::Run()
         ImGui::SliderFloat("Diffuse Strength", &m_DrawSettings.diffuseStrength, 0, 1);
         ImGui::SliderFloat("Specular Strength", &m_DrawSettings.specularStrength, 0, 1);
         ImGui::SliderFloat("Shininess Power", &m_DrawSettings.shininessPower, 1.f , 10.0f );
-        ImGui::SliderFloat3("Rotation", &m_DrawSettings.modelRotation.x, 0, FULL_ANGLE);
+        ImGui::DragFloat3("Rotation", &m_DrawSettings.modelRotation.x, drag_speeed , 0, FULL_ANGLE);
         ImGui::DragFloat3("Translation", &m_DrawSettings.modelTranslation.x, drag_speeed , -15, 15);
-        ImGui::SliderFloat("Scale", &m_DrawSettings.modelScale, 0, 9);
+        ImGui::SliderFloat("Scale", &m_DrawSettings.modelScale, 0, 16);
         ImGui::SliderFloat3("Light Position", &m_DrawSettings.lightPosition.x, -20, 20);
         ImGui::SliderInt("Thread Count", &m_DrawSettings.threadsCount, 1, MAX_THREADS_COUNT);
         //ImGui::Combo("Renderer Type", &m_DrawSettings.rendererType, "Software\0Hardware\0");
@@ -443,15 +463,31 @@ int Application::Run()
 
         ImGui::Checkbox("Wireframe", &m_DrawSettings.drawWireframe);
 
-        ImGui::Checkbox( "UseSimd" , &g_useSimd ); 
-        ImGui::SameLine(); ImGui::Checkbox("Show Tiles Grid" , &g_showTilesGrid);
+        ImGui::Checkbox("Show Tiles Grid" , &g_showTilesGrid);
         ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.colorizeThreads);
         ImGui::SameLine(); ImGui::Checkbox("BBoxes", &m_DrawSettings.drawBBoxes);
+        ImGui::SameLine(); ImGui::Checkbox("Threaded T&C", &g_MultithreadedTransformAndClip);
 
-        if( ImGui::Button("0") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 0); ImGui::SameLine();
-        if( ImGui::Button("1") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 1); ImGui::SameLine();
-        if( ImGui::Button("2") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 2); ImGui::SameLine();
-        if( ImGui::Button("3") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 3);
+
+        if( ImGui::Button("0A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 0); ImGui::SameLine();
+        if( ImGui::Button("1A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 1); ImGui::SameLine();
+        if( ImGui::Button("2A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 2); ImGui::SameLine();
+        if( ImGui::Button("3A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 3);
+
+        if( ImGui::Button("0B") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 4); ImGui::SameLine();
+        if( ImGui::Button("1B") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 5); ImGui::SameLine();
+        if( ImGui::Button("2B") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 6); ImGui::SameLine();
+        if( ImGui::Button("3B") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 7);
+
+        if( ImGui::Button("0C") ) LoadPredefined(m_ModelPaths , m_DrawSettings ,  8); ImGui::SameLine();
+        if( ImGui::Button("1C") ) LoadPredefined(m_ModelPaths , m_DrawSettings ,  9); ImGui::SameLine();
+        if( ImGui::Button("2C") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 10); ImGui::SameLine();
+        if( ImGui::Button("3C") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 11);
+
+        if( ImGui::Button("0D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 12); ImGui::SameLine();
+        if( ImGui::Button("1D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 13); ImGui::SameLine();
+        if( ImGui::Button("2D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 14); ImGui::SameLine();
+        if( ImGui::Button("3D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 15);
 
 
         ImGui::SameLine(); ImGui::Checkbox("Use ZBuffer", &m_DrawSettings.useZBuffer);
@@ -463,7 +499,7 @@ int Application::Run()
         ImGui::Checkbox( "Visualize ZBuffer", &m_DrawSettings.renderDepthBuffer);
         ImGui::SameLine();
         ImGui::Checkbox( "Vertical Sync", &m_DrawSettings.vSync); ImGui::SameLine(); if( ImGui::Button( "Close App" ) ) m_MainWindow.close();
-        ImGui::Combo("Math Type", &m_DrawSettings.mathType, "CPU\0SSE\0AVX\0");
+        ImGui::Combo("Math Type", &m_DrawSettings.mathType, "CPU\0CPUx8\0SSEx4\0SSEx8\0AVXx8\0");
 
         ImGui::End();
 
@@ -491,7 +527,7 @@ int Application::Run()
         renderer->SetClearColor(Vector4f{m_DrawSettings.backgroundColor,1});
         renderer->ClearZBuffer();
         renderer->ClearScreen();
-        renderer->SetMathType(static_cast<eMathType>(m_DrawSettings.mathType));
+        renderer->SetBlockMathMode(static_cast<eBlockMathMode>(m_DrawSettings.mathType));
 
         {
             ZoneScopedN("Frame");
@@ -540,7 +576,7 @@ int Application::Run()
         ImGui::Text("Max Overdraw: %d" , g_max_overdraw.load() );
         ImGui::End();
 
-        DrawRenderingStats();
+        DrawRenderingStats( renderer->GetPixelsDrawn() );
 
         OpenSceneDataDialog(m_ModelPaths);
 
@@ -565,7 +601,7 @@ int Application::Run()
     return 0;
 }
 
-void Application::DrawRenderingStats()
+void Application::DrawRenderingStats( int pixels )
 {
     if( !ImGui::Begin( "Stats" ) )
     {
@@ -587,18 +623,21 @@ void Application::DrawRenderingStats()
     ImGui::TextColored( Col1 , " __________________________________________________________________________________________________________" );
     ImGui::TextColored( Col1 , "|                               |      AVG     |      MIN     |      MAX     |    MEDIAN    |    STD DEV   |" );
     ImGui::TextColored( Col1 , "|-------------------------------|--------------|--------------|--------------|--------------|--------------|" );
-    ImGui::TextColored( Col1 , "| FPS                           | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FPS)                   , int(min.m_FPS)                    , int(max.m_FPS)                    , int(med.m_FPS)                    , int(std.m_FPS)                    );
-    ImGui::TextColored( Col2 , "| Triangles analyzed per frame  | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTriangles)        , int(min.m_FrameTriangles)         , int(max.m_FrameTriangles)         , int(med.m_FrameTriangles)         , int(std.m_FrameTriangles)         );
-    ImGui::TextColored( Col1 , "| Triangles drawn per frame     | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTrianglesDrawn)   , int(min.m_FrameTrianglesDrawn)    , int(max.m_FrameTrianglesDrawn)    , int(med.m_FrameTrianglesDrawn)    , int(std.m_FrameTrianglesDrawn)    );
-    ImGui::TextColored( Col2 , "| Pixels analyzed  per frame    | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixels)           , int(min.m_FramePixels)            , int(max.m_FramePixels)            , int(med.m_FramePixels)            , int(std.m_FramePixels)            );
-    ImGui::TextColored( Col1 , "| Pixels drawn per frame        | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixelsDrawn)      , int(min.m_FramePixelsDrawn)       , int(max.m_FramePixelsDrawn)       , int(med.m_FramePixelsDrawn)       , int(std.m_FramePixelsDrawn)       );
-    ImGui::TextColored( Col2 , "| Frame draw time (US)          | %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimeUS)            , int(min.m_DrawTimeUS)             , int(max.m_DrawTimeUS )            , int(med.m_DrawTimeUS)             , int(std.m_DrawTimeUS)             );
-    ImGui::TextColored( Col1 , "| Frame draw time per thread(US)| %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimePerThreadUS)   , int(min.m_DrawTimePerThreadUS)    , int(max.m_DrawTimePerThreadUS)    , int(med.m_DrawTimePerThreadUS)    , int(std.m_DrawTimePerThreadUS)    );
-    ImGui::TextColored( Col2 , "| Transform Time (US)           | %12d | %12d | %12d | %12d | %12d |", int(avg.m_TransformTimeUS)       , int(min.m_TransformTimeUS)        , int(max.m_TransformTimeUS )       , int(med.m_TransformTimeUS)        , int(std.m_TransformTimeUS)        );
-    ImGui::TextColored( Col1 , "| Raster time (US)              | %12d | %12d | %12d | %12d | %12d |", int(avg.m_RasterTimeUS)          , int(min.m_RasterTimeUS)           , int(max.m_RasterTimeUS)           , int(med.m_RasterTimeUS)           , int(std.m_RasterTimeUS)           );
-    ImGui::TextColored( Col2 , "| Raster time per thread(US)    | %12d | %12d | %12d | %12d | %12d |", int(avg.m_RasterTimePerThreadUS) , int(min.m_RasterTimePerThreadUS)  , int(max.m_RasterTimePerThreadUS)  , int(med.m_RasterTimePerThreadUS)  , int(std.m_RasterTimePerThreadUS)  );
-    ImGui::TextColored( Col1 , "| Fillrate (Kilo pixels/s)      | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FillrateKP)            , int(min.m_FillrateKP)             , int(max.m_FillrateKP)             , int(med.m_FillrateKP)             , int(std.m_FillrateKP)             );
+    ImGui::TextColored( Col1 , "| FPS                           | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FPS)                       , int(min.m_FPS)                    , int(max.m_FPS)                    , int(med.m_FPS)                    , int(std.m_FPS)                    );
+    ImGui::TextColored( Col2 , "| Triangles analyzed per frame  | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTriangles)            , int(min.m_FrameTriangles)         , int(max.m_FrameTriangles)         , int(med.m_FrameTriangles)         , int(std.m_FrameTriangles)         );
+    ImGui::TextColored( Col1 , "| Triangles drawn per frame     | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTrianglesDrawn)       , int(min.m_FrameTrianglesDrawn)    , int(max.m_FrameTrianglesDrawn)    , int(med.m_FrameTrianglesDrawn)    , int(std.m_FrameTrianglesDrawn)    );
+    ImGui::TextColored( Col2 , "| Pixels analyzed  per frame    | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixels)               , int(min.m_FramePixels)            , int(max.m_FramePixels)            , int(med.m_FramePixels)            , int(std.m_FramePixels)            );
+    ImGui::TextColored( Col1 , "| Pixels drawn per frame        | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixelsDrawn)          , int(min.m_FramePixelsDrawn)       , int(max.m_FramePixelsDrawn)       , int(med.m_FramePixelsDrawn)       , int(std.m_FramePixelsDrawn)       );
+    ImGui::TextColored( Col2 , "| Pixels calculated per frame   | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixelsCalcualted)     , int(min.m_FramePixelsCalcualted)  , int(max.m_FramePixelsCalcualted)  , int(med.m_FramePixelsCalcualted)  , int(std.m_FramePixelsCalcualted)  );
+    ImGui::TextColored( Col1 , "| Avg Draws per tile            | %12f | %12f | %12f | %12f | %12f |", (avg.m_FrameDrawsPerTile)*0.01f      , (min.m_FrameDrawsPerTile)*0.01f   , (max.m_FrameDrawsPerTile)*0.01f   , (med.m_FrameDrawsPerTile)*0.01f   , (std.m_FrameDrawsPerTile)*0.01f   );
+    ImGui::TextColored( Col2 , "| Frame draw time (US)          | %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimeUS)                , int(min.m_DrawTimeUS)             , int(max.m_DrawTimeUS )            , int(med.m_DrawTimeUS)             , int(std.m_DrawTimeUS)             );
+    ImGui::TextColored( Col1 , "| Frame draw time per thread(US)| %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimePerThreadUS)       , int(min.m_DrawTimePerThreadUS)    , int(max.m_DrawTimePerThreadUS)    , int(med.m_DrawTimePerThreadUS)    , int(std.m_DrawTimePerThreadUS)    );
+    ImGui::TextColored( Col2 , "| Transform Time (US)           | %12d | %12d | %12d | %12d | %12d |", int(avg.m_TransformTimeUS)           , int(min.m_TransformTimeUS)        , int(max.m_TransformTimeUS )       , int(med.m_TransformTimeUS)        , int(std.m_TransformTimeUS)        );
+    ImGui::TextColored( Col1 , "| Transform Time per thread(US) | %12d | %12d | %12d | %12d | %12d |", int(avg.m_TransformTimePerThreadUS)  , int(min.m_TransformTimePerThreadUS),int(max.m_TransformTimePerThreadUS),int(med.m_TransformTimePerThreadUS),int(std.m_TransformTimePerThreadUS));
+    ImGui::TextColored( Col2 , "| Raster time (US)              | %12d | %12d | %12d | %12d | %12d |", int(avg.m_RasterTimeUS)              , int(min.m_RasterTimeUS)           , int(max.m_RasterTimeUS)           , int(med.m_RasterTimeUS)           , int(std.m_RasterTimeUS)           );
+    ImGui::TextColored( Col1 , "| Raster time per thread(US)    | %12d | %12d | %12d | %12d | %12d |", int(avg.m_RasterTimePerThreadUS)     , int(min.m_RasterTimePerThreadUS)  , int(max.m_RasterTimePerThreadUS)  , int(med.m_RasterTimePerThreadUS)  , int(std.m_RasterTimePerThreadUS)  );
+    ImGui::TextColored( Col2 , "| Fillrate (Kilo pixels/s)      | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FillrateKP)                , int(min.m_FillrateKP)             , int(max.m_FillrateKP)             , int(med.m_FillrateKP)             , int(std.m_FillrateKP)             );
     ImGui::TextColored( Col1 , "|_______________________________|______________|______________|______________|______________|______________|" );
-    ImGui::TextColored( Col1 , " Screen coverage %u%% (%u pixels / %u pixels)", med.m_FramePixelsDrawn*100/ScreenPixels, med.m_FramePixelsDrawn, ScreenPixels);
+    ImGui::TextColored( Col1 , " Screen coverage %u%% (%u pixels / %u pixels)", pixels*100/ScreenPixels, pixels, ScreenPixels);
     ImGui::End();
 }

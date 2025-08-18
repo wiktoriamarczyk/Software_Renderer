@@ -65,6 +65,15 @@ enum class eDrawTriVersion : uint8_t
     DrawTri     ,
 };
 
+template< int Elements , eSimdType Type = eSimdType::None >
+struct RenderParamsSimd
+{
+    Vector3<fsimd<Elements,Type>> m_LightPosition;
+    Vector3<fsimd<Elements,Type>> m_DiffuseColor;
+    Vector3<fsimd<Elements,Type>> m_AmbientColor;
+    Vector3<fsimd<Elements,Type>> m_CameraPosition;
+};
+
 class SoftwareRenderer : public IRenderer
 {
 public:
@@ -103,7 +112,8 @@ public:
     void SetDrawBBoxes(bool drawBBoxes)override;
     void SetZWrite(bool zWrite)override;
     void SetZTest(bool zTest)override;
-    void SetMathType(eMathType mathType)override;
+    void SetBlockMathMode(eBlockMathMode mathType)override;
+    virtual int GetPixelsDrawn() const override;
 
     template< typename T >
     static T EdgeFunction(const Vector2<T>& A, const Vector2<T>& B, const Vector2<T>& C);
@@ -122,16 +132,12 @@ private:
     void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
 
 
-    template< eSimdType Type , bool Partial , int Elements = 8 >
+    template< eSimdType Type , int Elements = 8 >
     void DrawTileImplSimd(const CommandRenderTile& TD, RenderThreadData& data);
-    template< bool Partial >
     void DrawTileImpl   (const CommandRenderTile& TD, RenderThreadData& data);
-
-    void DrawFullTile   (const CommandRenderTile& TD, RenderThreadData& data);
-    void DrawPartialTile(const CommandRenderTile& TD, RenderThreadData& data);
     void DrawTile       (const CommandRenderTile& TD, RenderThreadData& data);
 
-    void GenerateTileJobs(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, DrawStats& stats, const PipelineSharedData* pPipelineSharedData, uint32_t tri_index , pmr::vector<const Command*>& outCommmands );
+    void GenerateTileJobs(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, DrawStats& stats, const PipelineSharedData* pPipelineSharedData, uint32_t tri_index , pmr::vector<const Command*>& outCommmands );
 
 
     template< typename MathT , DrawFunctionConfig Config >
@@ -155,11 +161,12 @@ private:
 
     void                RendererTaskWorker();
     void                VertexAssemply( const CommandVertexAssemply& cmd );
+    void                DoVertexAssemplyTransformAndClip( const CommandVertexAssemply& cmd );
     void                ExecuteExitCommand();
     void                ClearBuffers(const CommandClear& cmd);
     void                Fill32BitBuffer( const CommandFill32BitBuffer& cmd );
-    void                VertexTransformAndClip( const CommandVertexTransformAndClip& cmd );
-    void                ProcessTriangles( const CommandProcessTriangles& cmd );
+    void                VertexTransformAndClip( const CommandVertexTransformAndClip& cmd , RenderThreadData& data );
+    void                ProcessTriangles( const CommandProcessTriangles& cmd , RenderThreadData& data );
     void                WaitForSync(const CommandSyncBarier& cmd);
     CommandBuffer*      AllocTransientCommandBuffer(){ return CommandBuffer::CreateCommandBuffer( m_TransientMemoryResource); }
 
@@ -176,17 +183,35 @@ private:
     Vector2si           m_LastTile;
 
     Vector4f            m_WireFrameColor = Vector4f(1, 1, 1, 1);
+    Vector4f            m_VertexColor = Vector4f(1, 1, 1, 1);
     Vector3f            m_DiffuseColor = Vector3f(1, 1, 1);
     Vector3f            m_AmbientColor = Vector3f(1, 1, 1);
     Vector3f            m_LightPosition = Vector3f(0, 0, -20);
     Vector3f            m_CameraPosition = Vector3f(0, 0, 0);
-    Vector4f            m_ThreadColors[16];
     uint32_t            m_ClearColor = 0xFF000000;
 
-    Vector3f256A        m_LightPositionSimd;
-    Vector3f256A        m_DiffuseColorSimd;
-    Vector3f256A        m_AmbientColorSimd;
-    Vector3f256A        m_CameraPositionSimd;
+    using RenderPrmCPU  = RenderParamsSimd<8, eSimdType::CPU>;
+    using RenderPrmSSE  = RenderParamsSimd<4, eSimdType::SSE>;
+    using RenderPrmSSE8 = RenderParamsSimd<8, eSimdType::SSE>;
+    using RenderPrmAVX  = RenderParamsSimd<8, eSimdType::AVX>;
+
+    RenderPrmCPU        m_RenderParamsCPU;
+    RenderPrmSSE        m_RenderParamsSSE;
+    RenderPrmSSE8       m_RenderParamsSSE8;
+    RenderPrmAVX        m_RenderParamsAVX;
+
+    template< int Elements , eSimdType Type >
+    auto&               GetRenderParams()
+    {
+        if constexpr (Type == eSimdType::CPU && Elements == 8)
+            return m_RenderParamsCPU;
+        if constexpr (Type == eSimdType::SSE && Elements == 4)
+            return m_RenderParamsSSE;
+        else if constexpr (Type == eSimdType::SSE && Elements == 8)
+            return m_RenderParamsSSE8;
+        else if constexpr( Type == eSimdType::AVX )
+            return m_RenderParamsAVX;
+    }
 
     Matrix4f            m_ModelMatrix;
     Matrix4f            m_ViewMatrix;
@@ -198,6 +223,7 @@ private:
     bool                m_DrawBBoxes = false;
     bool                m_ZWrite = true;
     bool                m_ZTest = true;
+    bool                m_AlphaBlend = false;
     std::atomic<bool>   m_ShutingDown = false;
     eDrawTriVersion     m_DrawTriVersion = eDrawTriVersion::DrawTri;
     float               m_DiffuseStrength = 0.3f;
@@ -211,27 +237,22 @@ private:
     atomic_int          m_FrameTrianglesDrawn = 0;
     atomic_int          m_FramePixels = 0;
     atomic_int          m_FramePixelsDrawn = 0;
+    atomic_int          m_FramePixelsCalcualted = 0;
     atomic_int          m_FrameRasterTimeUS = 0;
     atomic_int          m_FrameTransformTimeUS = 0;
     atomic_int          m_FrameDrawTimeThreadUS = 0;
     atomic_int          m_FrameDrawTimeMainUS = 0;
+    atomic_int          m_FrameDrawsPerTile = 0;
     atomic_int          m_FillrateKP = 0;
 
     DrawStats           m_DrawStats;
 
     shared_ptr<Texture> m_Texture;
     shared_ptr<Texture> m_DefaultTexture;
-    SimpleThreadPool    m_ThreadPool;
     SimpleThreadPool    m_TileThreadPool;
 
     transient_memory_resource m_TransientMemoryResource;
     transient_allocator m_TransientAllocator{ m_TransientMemoryResource };
 
-    int                 m_MathIndex = 0;
-    MathCPU             m_MathCPU;
-    MathSSE             m_MathSSE;
-    MathAVX             m_MathAVX;
-    const IMath*        m_MathArray[3] = { &m_MathCPU , &m_MathSSE , &m_MathAVX };
-    //const IMath*        m_MathArray[3] = { &m_MathCPU , &m_MathSSE , &m_MathCPU };
-    const IMath*        m_pSelectedMath = &m_MathCPU;
+    eBlockMathMode      m_BlockMathMode = eBlockMathMode::AVXx256;
 };
