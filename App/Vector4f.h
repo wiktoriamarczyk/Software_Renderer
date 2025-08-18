@@ -16,27 +16,27 @@ template< typename T >
 class Vector4
 {
 public:
-    Vector4() = default;
-    Vector4(const Vector2<T>& v,T z, T w);
-    Vector4(const Vector3<T>& v,T w);
-    Vector4(T x, T y, T z, T w);
+    constexpr Vector4() = default;
+    constexpr Vector4(const Vector2<T>& v,T z, T w);
+    constexpr Vector4(const Vector3<T>& v,T w);
+    constexpr Vector4(T x, T y, T z, T w);
     template< typename U , typename ... A >
         requires HasConstructFromArray<T,U,A...>
-    Vector4( const U* pArray , const A& ... args )
+    constexpr Vector4( const U* pArray , const A& ... args )
         : x{ T::construct_from_array( 0 , pArray , args... ) }
         , y{ T::construct_from_array( 1 , pArray , args... ) }
         , z{ T::construct_from_array( 2 , pArray , args... ) }
         , w{ T::construct_from_array( 3 , pArray , args... ) }
     {}
 
-    Vector4<T> operator+(Vector4<T> other)const;
-    Vector4<T> operator-(Vector4<T> other)const;
-    Vector4<T> operator*(Vector4<T> other)const;
-    Vector4<T> operator*(T value)const;
-    Vector4<T> operator+(T value)const;
-    Vector4<T> operator/(T value)const;
+    constexpr Vector4<T> operator+(Vector4<T> other)const;
+    constexpr Vector4<T> operator-(Vector4<T> other)const;
+    constexpr Vector4<T> operator*(Vector4<T> other)const;
+    constexpr Vector4<T> operator*(T value)const;
+    constexpr Vector4<T> operator+(T value)const;
+    constexpr Vector4<T> operator/(T value)const;
 
-    friend Vector4<T> operator*(T value, const Vector4& v)
+    constexpr friend Vector4<T> operator*(T value, const Vector4& v)
     {
         return Vector4(v.x * value, v.y * value, v.z * value, v.w * value);
     }
@@ -72,12 +72,15 @@ public:
     Vector2<T> xy()const;
     Vector3<T> xyz()const;
 
-    T* Data() { return &x; }
+          T* Data() { return &x; }
     const T* Data() const { return &x; }
 
-    static uint32_t ToARGB(const Vector4& color);
-    inline uint32_t ToARGB()const{ return ToARGB(*this); }
-    static Vector4<T> FromARGB(uint32_t color);
+          T* data()       { return &x; }
+    const T* data() const { return &x; }
+
+    constexpr static uint32_t ToARGB(const Vector4& color);
+    constexpr inline uint32_t ToARGB()const{ return ToARGB(*this); }
+    constexpr static Vector4<T> FromARGB(uint32_t color);
 
     T x{};
     T y{};
@@ -86,7 +89,7 @@ public:
 };
 
 template< typename T >
-inline Vector4<T>::Vector4(T x, T y, T z, T w)
+constexpr inline Vector4<T>::Vector4(T x, T y, T z, T w)
 {
     this->x = x;
     this->y = y;
@@ -95,7 +98,7 @@ inline Vector4<T>::Vector4(T x, T y, T z, T w)
 }
 
 template< typename T >
-inline Vector4<T>::Vector4(const Vector2<T>& v, T z, T w)
+constexpr inline Vector4<T>::Vector4(const Vector2<T>& v, T z, T w)
 {
     this->x = v.x;
     this->y = v.y;
@@ -104,7 +107,7 @@ inline Vector4<T>::Vector4(const Vector2<T>& v, T z, T w)
 }
 
 template< typename T >
-inline Vector4<T>::Vector4(const Vector3<T>& v, T w)
+constexpr inline Vector4<T>::Vector4(const Vector3<T>& v, T w)
 {
     this->x = v.x;
     this->y = v.y;
@@ -113,37 +116,37 @@ inline Vector4<T>::Vector4(const Vector3<T>& v, T w)
 }
 
 template< typename T >
-inline Vector4<T> Vector4<T>::operator+(Vector4<T> other)const
+constexpr inline Vector4<T> Vector4<T>::operator+(Vector4<T> other)const
 {
     return Vector4(x + other.x, y + other.y, z + other.z, w + other.w);
 }
 
 template< typename T >
-inline Vector4<T> Vector4<T>::operator-(Vector4<T> other)const
+constexpr inline Vector4<T> Vector4<T>::operator-(Vector4<T> other)const
 {
     return Vector4(x - other.x, y - other.y, z - other.z, w - other.w);
 }
 
 template< typename T >
-inline Vector4<T> Vector4<T>::operator*(Vector4<T> other) const
+constexpr inline Vector4<T> Vector4<T>::operator*(Vector4<T> other) const
 {
     return Vector4(x * other.x, y * other.y, z * other.z, w * other.w);
 }
 
 template< typename T >
-inline Vector4<T> Vector4<T>::operator*(T value)const
+constexpr inline Vector4<T> Vector4<T>::operator*(T value)const
 {
     return Vector4(x * value, y * value, z * value, w * value);
 }
 
 template< typename T >
-inline Vector4<T> Vector4<T>::operator+(T value)const
+constexpr inline Vector4<T> Vector4<T>::operator+(T value)const
 {
     return Vector4(x + value, y + value, z + value, w + value);
 }
 
 template< typename T >
-inline Vector4<T> Vector4<T>::operator/(T value)const
+constexpr inline Vector4<T> Vector4<T>::operator/(T value)const
 {
     return Vector4(x / value, y / value, z / value, w / value);
 }
@@ -161,7 +164,7 @@ inline Vector2<T> Vector4<T>::xy() const
 }
 
 template< typename T >
-inline uint32_t Vector4<T>::ToARGB(const Vector4& color)
+constexpr inline uint32_t Vector4<T>::ToARGB(const Vector4& color)
 {
     return (uint32_t)(color.w * 255) << 24 | (uint32_t)(color.z * 255) << 16 | (uint32_t)(color.y * 255) << 8 | (uint32_t)(color.x * 255);
 }
@@ -212,7 +215,7 @@ Vector4<T> Vector4<T>::CWiseMax(const Vector4<T>& other) const
 
 
 template< typename T >
-Vector4<T> Vector4<T>::FromARGB(uint32_t color)
+constexpr Vector4<T> Vector4<T>::FromARGB(uint32_t color)
 {
     return Vector4((T)(color & 0xFF), (T)((color >> 8) & 0xFF), (T)((color >> 16) & 0xFF), (T)((color >> 24))) * 1.0f / 255.0f;
 }

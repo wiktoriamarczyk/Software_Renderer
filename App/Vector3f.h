@@ -10,17 +10,6 @@
 
 class Matrix4f;
 
-//inline void FastNormalize4( const float lpInput[4], float lpOutput[4])
-//{
-//    __m128 vInput = _mm_load_ps(lpInput); // load input vector (x, y, z, a)
-//    __m128 vSquared = _mm_mul_ps(vInput, vInput); // square the input values
-//    __m128 vHalfSum = _mm_hadd_ps(vSquared, vSquared);
-//    __m128 vSum = _mm_hadd_ps(vHalfSum, vHalfSum); // compute the sum of values
-//    float fInvSqrt; _mm_store_ss(&fInvSqrt, _mm_rsqrt_ss(vSum)); // compute the inverse sqrt
-//    __m128 vNormalized = _mm_mul_ps(vInput, _mm_set1_ps(fInvSqrt)); // normalize the input vector
-//    _mm_store_ps(lpOutput, vNormalized); // store normalized vector (x, y, z, a)
-//}
-
 inline void FastNormalize3( const float lpInput[3], float lpOutput[3])
 {
     __m128 vInputA = _mm_load_ss(lpInput+0); // load input vector (x, y, z, a)
@@ -53,6 +42,14 @@ public:
     Vector3()=default;
     Vector3(T x, T y, T z);
 
+    template< typename U , typename ... A >
+        requires HasConstructFromArray<T,U,A...>
+    Vector3( const U* pArray , const A& ... args )
+        : x{ T::construct_from_array( 0 , pArray , args... ) }
+        , y{ T::construct_from_array( 1 , pArray , args... ) }
+        , z{ T::construct_from_array( 2 , pArray , args... ) }
+    {}
+
     template< typename T2 , eRoundMode RM = eRoundMode::Floor >
     constexpr Vector3<T2> ToVector3()const
     {
@@ -64,6 +61,24 @@ public:
             return Vector3<T2>( round(x) , round(y) , round(z) );
         else
             return Vector3<T2>( ceil(x) , ceil(y) , ceil(z) );
+    }
+
+    template< typename U , typename ... A >
+        requires HasLoadFromArray<T,U,A...>
+    void load( const U* pArray , const A& ... args )
+    {
+        x.load_from_array( 0 , pArray , args... );
+        y.load_from_array( 1 , pArray , args... );
+        z.load_from_array( 2 , pArray , args... );
+    }
+
+    template< typename U , typename ... A >
+        requires HasStoreToArray<T,U,A...>
+    void store( U* pArray , const A& ... args )const
+    {
+        x.store_to_array( 0 , pArray , args... );
+        y.store_to_array( 1 , pArray , args... );
+        z.store_to_array( 2 , pArray , args... );
     }
 
     Vector3 operator+(const Vector3& other)const;
@@ -306,6 +321,8 @@ using Vector3f256 = Vector3< f256<Type> >;
 template< eSimdType Type = eSimdType::SSE >
 using Vector3i256 = Vector3< i256<Type> >;
 
-using Vector3f128A = Vector3f128<eSimdType::AVX>;
+using Vector3f128S = Vector3f128<eSimdType::SSE>;
+using Vector3f128S8= Vector3f256<eSimdType::SSE>;
 using Vector3f256A = Vector3f256<eSimdType::AVX>;
+using Vector3f256C = Vector3f256<eSimdType::CPU>;
 using Vector3i256A = Vector3i256<eSimdType::AVX>;
