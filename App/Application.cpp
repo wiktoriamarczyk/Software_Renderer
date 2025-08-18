@@ -19,10 +19,10 @@ struct PredefinedModel
     optional<float> RotationX;
     optional<float> RotationY;
     optional<float> RotationZ;
+    optional<float> Scale;
     optional<float> PositionX;
     optional<float> PositionY;
     optional<float> PositionZ;
-    optional<float> Scale;
 };
 
 const PredefinedModel s_PredefinedModels[] =
@@ -45,7 +45,7 @@ const PredefinedModel s_PredefinedModels[] =
     { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , .RotationX = 0.f      , .RotationY = 25.f  , .Scale = 6.0f },
     { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 16.f    , .PositionY = 1.4f },
     { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 10.8f   , .PositionX = -3.7f    , .PositionY = -1.75f },
-    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f    , .RotationY = 90.f  , .Scale = 16.0f   , .PositionY = -2.1f    , .PositionZ = -4.2f },
+    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"                                  , .RotationY = 90.f  , .Scale = 16.0f   , .PositionY = -2.1f    , .PositionZ = -4.2f },
 };
 
 void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )

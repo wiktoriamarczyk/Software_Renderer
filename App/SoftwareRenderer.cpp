@@ -709,9 +709,8 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
             , EdgeFunctions += EdgeStrideX
             )
         {
-            LineCoverageMask >>= pack_size;
-
             // prepare coverage mask for bits from current pixel pack
+            LineCoverageMask >>= pack_size;
 
             // initialize coverage with 1s - initially we assume that all pixels in current pack will be written
             uint32_t CurrentPackCoverageMask = 0xFFFFFFFF;
@@ -719,8 +718,7 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
             if constexpr( Partial )
             {
                 // compute edge functions for current pixel pack and generate mask with 1s for pixels that are inside triangle
-                auto orr = (EdgeFunctions.x | EdgeFunctions.y | EdgeFunctions.z);
-                write_mask = orr >= i256t::Zero;
+                write_mask = (EdgeFunctions.x | EdgeFunctions.y | EdgeFunctions.z) >= i256t::Zero;
 
                 // convert write_mask to 32-bit mask (8 least significant bits represent coverage for each pixel in the pack)
                 CurrentPackCoverageMask = write_mask.to_mask_32();
