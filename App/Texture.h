@@ -36,6 +36,7 @@ private:
         wide_arithmetic<float,Elements,Type>    m_fMaxHeight   = {};
 
         wide_arithmetic<int,Elements,Type>      m_SizeShiftX   = {};
+        wide_arithmetic<int,Elements,Type>      m_SizeShiftY   = {};
         wide_arithmetic<int,Elements,Type>      m_SizeMaskX    = {};
         wide_arithmetic<int,Elements,Type>      m_SizeMaskY    = {};
     };
@@ -168,7 +169,7 @@ Vector4<fsimd<Elements,Type>> Texture::Sample(const Vector2<fsimd<Elements,Type>
     }
 
     simd_vec4 simd_samples;
-    data_array<float,eDataAlignment::AVX,8,data_array<float,eDataAlignment::AVX>> Data{ samples->data() };
+    data_array<float,eDataAlignment::AVX,Elements,data_array<float,eDataAlignment::AVX>> Data{ samples->data() };
     simd_samples.load( Data );
     simd_float::transpose_ARGBx_to_AxRxGxBx( simd_samples.x , simd_samples.y , simd_samples.z , simd_samples.w );
     return simd_samples;

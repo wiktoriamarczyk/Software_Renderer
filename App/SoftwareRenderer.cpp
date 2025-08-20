@@ -653,7 +653,11 @@ uint32_t Lanes_To_ARGBTile( const Vector2si& TilePos , const Vector4f* pPixels ,
     {
         int32_t* Out    = reinterpret_cast<int32_t*>( pScreenBuf ) + y * ScreenSize.x + TilePos.x;
 
-        simd_int Mask   = simd_int{ int(SwapBytes( pCoverageData[0] )) } << (simd_int::NToZero + (32 - CoverageData.Bits) );
+        auto CoverageLine = SwapBytes( pCoverageData[0] );
+        if constexpr( simd_float::elements_count == 4 )
+            CoverageLine = ((CoverageLine & 0x0F0F0F0F)<<4) | ((CoverageLine & 0xF0F0F0F0)>>4);
+
+        simd_int Mask   = simd_int{ int(CoverageLine) } << (simd_int::NToZero + (32 - CoverageData.Bits) );
         PixelsDrawn    += Math::CountBitsSetTo1( pCoverageData[0]);
 
         for( int x = 0 ; x < TILE_SIZE ; x+=simd_float::elements_count , d+=simd_float::elements_count )
@@ -729,7 +733,7 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
     if( g_ThreadPerTile )
     {
         if( AlphaBlend )
-            ARGB_ToLanesAVXTile<eSimdType::AVX,8>( TilePosition , TILE_SIZE, m_ScreenBuffer.data() , Pixels, m_ScreenSize);
+            ARGB_ToLanesAVXTile<Type,Elements>( TilePosition , TILE_SIZE, m_ScreenBuffer.data() , Pixels, m_ScreenSize);
         memcpy( ZBuffer , pTileZBuffer , sizeof(ZBuffer) );
     }
 
@@ -1096,7 +1100,7 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
         if( g_ThreadPerTile )
             memcpy( pTileZBuffer , ZBuffer , sizeof(ZBuffer) );
 
-        Lanes_To_ARGBTile<eSimdType::AVX,8,true,TILE_SIZE>( TilePosition , Pixels , TileCoverage , m_ScreenBuffer.data() , White , m_ScreenSize );
+        Lanes_To_ARGBTile<Type,Elements,true,TILE_SIZE>( TilePosition , Pixels , TileCoverage , m_ScreenBuffer.data() , White , m_ScreenSize );
     }
 
 
