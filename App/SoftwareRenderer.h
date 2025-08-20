@@ -168,7 +168,6 @@ private:
     void                RendererTaskWorker();
     void                RecreateBuffers( uint8_t TileSize , int screenWidth , int screenHeight );
     void                VertexAssemply( const CommandVertexAssemply& cmd );
-    void                DoVertexAssemplyTransformAndClip( const CommandVertexAssemply& cmd );
     void                ExecuteExitCommand();
     void                ClearBuffers(const CommandClear& cmd);
     void                Fill32BitBuffer( const CommandFill32BitBuffer& cmd );

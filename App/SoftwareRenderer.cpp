@@ -1546,22 +1546,8 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
     pConfig->m_DrawControl.ZWrite     = m_ZWrite;
 
     m_pCommandBuffer->AddSyncBarrier( "Pre-VertexAssemply Sync" , m_ThreadsCount );
-    if( g_MultithreadedTransformAndClip )
-    {
-        m_pCommandBuffer->PushCommand<CommandVertexAssemply>( vertices , *pConfig );
-        m_pCommandBuffer->AddSyncBarrier( "Post VertexAssemply Sync" , m_ThreadsCount );
-    }
-    else
-    {
-        FrameMarkNamed( "Main Thread T&C" );
-        const auto TandCTime = std::chrono::high_resolution_clock::now();
-
-        auto pCommandVertexAssemply = m_TransientAllocator.allocate<CommandVertexAssemply>( vertices , *pConfig );
-
-        DoVertexAssemplyTransformAndClip( *pCommandVertexAssemply );
-
-        m_FrameDrawTimeThreadUS += std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - TandCTime).count();
-    }
+    m_pCommandBuffer->PushCommand<CommandVertexAssemply>( vertices , *pConfig );
+    m_pCommandBuffer->AddSyncBarrier( "Post VertexAssemply Sync" , m_ThreadsCount );
 
     FrameMarkNamed( "Tasks launched" );
     m_TileThreadPool.LaunchTasks( { m_ThreadsCount , [this](){ RendererTaskWorker(); } } );
@@ -1723,15 +1709,18 @@ void SoftwareRenderer::VertexAssemply( const CommandVertexAssemply& cmd )
         constexpr auto TRIANGLES_PER_COMMAND = 100;
 
         size_t i=0;
-        for(  ; i < VerticesCount ; i+=TRIANGLES_PER_COMMAND*3 )
+        if( g_MultithreadedTransformAndClip )
         {
-            if( vertices.size() <  + TRIANGLES_PER_COMMAND*3 )
-                break;
+            for(  ; i < VerticesCount ; i+=TRIANGLES_PER_COMMAND*3 )
+            {
+                if( vertices.size() <  + TRIANGLES_PER_COMMAND*3 )
+                    break;
 
-            auto SubSpan = vertices.subspan( 0 , TRIANGLES_PER_COMMAND*3 );
-            vertices = vertices.subspan(SubSpan.size());
+                auto SubSpan = vertices.subspan( 0 , TRIANGLES_PER_COMMAND*3 );
+                vertices = vertices.subspan(SubSpan.size());
 
-            pWorkCmdBuffer->PushCommand<CommandVertexTransformAndClip>( SubSpan , *pData , i/3 );
+                pWorkCmdBuffer->PushCommand<CommandVertexTransformAndClip>( SubSpan , *pData , i/3 );
+            }
         }
 
         if( !vertices.empty() )
@@ -1760,88 +1749,6 @@ void SoftwareRenderer::VertexAssemply( const CommandVertexAssemply& cmd )
     pData->m_pRenderTilesCmdBufferSync->m_Barrier.emplace( m_ThreadsCount );
 
     m_pCommandBuffer->PushCommandBuffer( *pWorkCmdBuffer );
-}
-
-void SoftwareRenderer::DoVertexAssemplyTransformAndClip( const CommandVertexAssemply& cmd)
-{
-    ZoneScoped;
-    auto vertices = cmd.m_Vertices;
-    if( vertices.empty() )
-        return;
-
-    auto VerticesCount  = vertices.size();
-
-    PipelineSharedData* pData = nullptr;
-
-    {
-        ZoneScopedN("Prepare PipelineSharedData");
-
-        pData = m_TransientAllocator.allocate<PipelineSharedData>();
-        pData->m_pProcessTrianglesCmdBuffer = AllocTransientCommandBuffer();
-        pData->m_pProcessTrianglesCmdBufferSync = m_TransientAllocator.allocate<SyncBarrier>();
-        pData->m_pRenderTilesCmdBuffer = AllocTransientCommandBuffer();
-        pData->m_pRenderTilesCmdBufferSync = m_TransientAllocator.allocate<SyncBarrier>();
-        pData->m_pDrawConfig = cmd.m_pConfig;
-    }
-
-    m_MVPMatrix.GetFrustumNearPlane(pData->m_NearFrustumPlane);
-
-
-    {
-        ZoneScopedN( "VertexAssemply transform and clip" );
-        ZoneColor( 0xE000E0 );
-        span<TransformedVertex> transformedVertices;
-
-        {
-            ZoneScopedN( "Clip" );
-            ZoneColor( 0xE000E0 );
-            vertices = ClipTriangles(pData->m_NearFrustumPlane, 0.001f, vertices);
-        }
-
-        {
-            ZoneScopedN( "Transform" );
-            ZoneColor( 0xE000E0 );
-            transformedVertices = m_TransientAllocator.allocate_array<TransformedVertex>(vertices.size());
-
-            const auto startTime = std::chrono::high_resolution_clock::now();
-
-
-            for (int i = 0; i < vertices.size(); ++i)
-                transformedVertices[i].ProjToScreen(vertices[i], m_ModelMatrix, m_MVPMatrix,m_ScreenSize);
-
-            constexpr auto TRIANGLES_PER_COMMAND = 100;
-
-            size_t i=0;
-            for(  ; i < VerticesCount ; i+=TRIANGLES_PER_COMMAND*3 )
-            {
-                if( transformedVertices.size() <  + TRIANGLES_PER_COMMAND*3 )
-                    break;
-
-                auto SubSpan = transformedVertices.subspan( 0 , TRIANGLES_PER_COMMAND*3 );
-                transformedVertices = transformedVertices.subspan(SubSpan.size());
-
-                pData->m_pProcessTrianglesCmdBuffer->PushCommand<CommandProcessTriangles>( SubSpan , *pData , i/3 );
-            }
-
-            if( !vertices.empty() )
-                pData->m_pProcessTrianglesCmdBuffer->PushCommand<CommandProcessTriangles>( transformedVertices , *pData , i/3 );
-
-            m_FrameTransformTimeUS += std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
-        }
-    }
-    pData->m_pRenderTilesCmdBufferSync->m_Barrier.emplace( m_ThreadsCount );
-
-    pData->m_pProcessTrianglesCmdBufferSync->m_Barrier.emplace( m_ThreadsCount , triviall_function_ref{}.Assign( m_TransientMemoryResource , [=,this]()
-    {
-        m_pCommandBuffer->PushCommandBuffer( *pData->m_pRenderTilesCmdBuffer );
-
-        pData->m_pRenderTilesCmdBufferSync->name = "render triles end";
-        m_pCommandBuffer->AddSyncPoint( *pData->m_pRenderTilesCmdBufferSync , m_ThreadsCount );
-        m_pCommandBuffer->Finish();
-    }));
-
-    m_pCommandBuffer->PushCommandBuffer( *pData->m_pProcessTrianglesCmdBuffer );
-    m_pCommandBuffer->AddSyncPoint( *pData->m_pProcessTrianglesCmdBufferSync , m_ThreadsCount );
 }
 
 void SoftwareRenderer::ExecuteExitCommand()
@@ -1876,6 +1783,28 @@ void SoftwareRenderer::VertexTransformAndClip( const CommandVertexTransformAndCl
             transformedVertices[i].ProjToScreen(vertices[i], m_ModelMatrix, m_MVPMatrix,m_ScreenSize);
 
         data.m_pDrawStats->m_TransformTimeUS += std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now() - startTime).count();
+    }
+
+    if( !g_MultithreadedTransformAndClip )
+    {
+        ZoneScopedN("Process Tri dispatch");
+        constexpr auto TRIANGLES_PER_COMMAND = 100;
+
+        const auto VerticesCount = transformedVertices.size();
+
+        if( g_MultithreadedTransformAndClip )
+        {
+            for( size_t i=0 ; i < VerticesCount ; i+=TRIANGLES_PER_COMMAND*3 )
+            {
+                if( transformedVertices.size() <  + TRIANGLES_PER_COMMAND*3 )
+                    break;
+
+                auto SubSpan = transformedVertices.subspan( 0 , TRIANGLES_PER_COMMAND*3 );
+                transformedVertices = transformedVertices.subspan(SubSpan.size());
+
+                cmd.m_pPipelineSharedData->m_pProcessTrianglesCmdBuffer->PushCommand<CommandProcessTriangles>( SubSpan , *cmd.m_pPipelineSharedData , cmd.m_StartTriIndex + i/3 );
+            }
+        }
     }
 
     //cmd.m_pPipelineSharedData->m_pProcessTrianglesCmdBuffer->PushCommandSync<CommandProcessTriangles>( cmd.m_pPipelineSharedData->m_pProcessTrianglesCmdBufferSync , transformedVertices , *cmd.m_pPipelineSharedData );
