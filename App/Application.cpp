@@ -580,8 +580,7 @@ int Application::Run()
         ImGui::Begin("FPS", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::SetWindowPos(ImVec2(0, 0));
         ImGui::Text("FPS: %d", fps);
-        ImGui::Text("Build: %s" , sizeof(void*) == 8 ? "x64" : "x86");
-        ImGui::Text("Math: %d", m_DrawSettings.mathType );
+        ImGui::Text("%s %s (%s)" ,CMAKE_BUILD_NAME, sizeof(void*) == 8 ? "x64" : "x86", COMPILER_NAME);
         ImGui::Text("Mem : %u KB" , uint32_t(g_memory_resource_mem.load()/1024) );
         ImGui::Text("Max Overdraw: %d" , g_max_overdraw.load() );
         ImGui::End();

@@ -131,10 +131,14 @@ enum class eRoundMode : uint8_t
     #define FORCE_INLINE __forceinline
 #endif
 
+constexpr const char* CMAKE_BUILD_NAME = CMAKE_INTDIR;
+
 // detect clang
 #if defined( __clang__ ) || defined( __GNUC__ )
+    constexpr const char* COMPILER_NAME = "Clang";
     #define FINAVX2 __attribute__((target("avx2")))
 #else
+    constexpr const char* COMPILER_NAME = "MSVC";
     #define FINAVX2 __forceinline
 #endif
 //#define ALIGN_FOR_AVX
