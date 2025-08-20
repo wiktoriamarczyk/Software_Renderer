@@ -168,7 +168,8 @@ Vector4<fsimd<Elements,Type>> Texture::Sample(const Vector2<fsimd<Elements,Type>
     }
 
     simd_vec4 simd_samples;
-    simd_samples.load( samples->data() , simd_alignment::AVX );
+    data_array<float,eDataAlignment::AVX,8,data_array<float,eDataAlignment::AVX>> Data{ samples->data() };
+    simd_samples.load( Data );
     simd_float::transpose_ARGBx_to_AxRxGxBx( simd_samples.x , simd_samples.y , simd_samples.z , simd_samples.w );
     return simd_samples;
 }

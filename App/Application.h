@@ -29,9 +29,12 @@ struct DrawSettings
     bool        colorizeThreads = false;
     bool        useZBuffer = true;
     bool        renderDepthBuffer = false;
+    bool        alphaBlend = false;
+    bool        backfaceCulling = true;
     bool        vSync = true;
     int         rendererType = 0;
     int         mathType = 4;
+    int         tileMode = 0;
 };
 
 struct Model

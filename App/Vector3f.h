@@ -43,11 +43,11 @@ public:
     Vector3(T x, T y, T z);
 
     template< typename U , typename ... A >
-        requires HasConstructFromArray<T,U,A...>
-    Vector3( const U* pArray , const A& ... args )
-        : x{ T::construct_from_array( 0 , pArray , args... ) }
-        , y{ T::construct_from_array( 1 , pArray , args... ) }
-        , z{ T::construct_from_array( 2 , pArray , args... ) }
+        requires HasConstructFrom<T,U,A...>
+    Vector3( const U& Array , const A& ... args )
+        : x{ Array[ 0 ] , args... }
+        , y{ Array[ 1 ] , args... }
+        , z{ Array[ 2 ] , args... }
     {}
 
     template< typename T2 , eRoundMode RM = eRoundMode::Floor >
@@ -64,21 +64,21 @@ public:
     }
 
     template< typename U , typename ... A >
-        requires HasLoadFromArray<T,U,A...>
-    void load( const U* pArray , const A& ... args )
+        requires HasLoadFrom<T,U,A...>
+    void load( const U& Array , const A& ... args )
     {
-        x.load_from_array( 0 , pArray , args... );
-        y.load_from_array( 1 , pArray , args... );
-        z.load_from_array( 2 , pArray , args... );
+        x.load( Array[0] , args... );
+        y.load( Array[1] , args... );
+        z.load( Array[2] , args... );
     }
 
     template< typename U , typename ... A >
-        requires HasStoreToArray<T,U,A...>
-    void store( U* pArray , const A& ... args )const
+        requires HasStoreTo<T,U,A...>
+    void store( U& Array , const A& ... args )const
     {
-        x.store_to_array( 0 , pArray , args... );
-        y.store_to_array( 1 , pArray , args... );
-        z.store_to_array( 2 , pArray , args... );
+        x.store( Array[0] , args... );
+        y.store( Array[1] , args... );
+        z.store( Array[2] , args... );
     }
 
     Vector3 operator+(const Vector3& other)const;

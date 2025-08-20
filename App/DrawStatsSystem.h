@@ -11,7 +11,7 @@ class DrawStatsSystem
 {
     DrawStatsSystem()=default;
 public:
-    static inline constexpr int FRAME_SAMPLES_COUNT = 60;
+    static inline constexpr int FRAME_SAMPLES_COUNT = 120;
 
     struct Stats : DrawStats
     {

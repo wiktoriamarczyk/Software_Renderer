@@ -28,6 +28,10 @@ int  emu_mm256_mask_compressstoreu_ps_x4   ( float* dstA, float* dstB, float* ds
 int  emu_mm256_mask_compressstoreu_ps_x4_ov( float* dstA, float* dstB, float* dstC, float* dstD, __m256 mask, const __m256* dataA, const __m256* dataB, const __m256* dataC, const __m256* dataD);
 void emu_mm256_mask_expandloadu_ps_x4      (__m256* dstA,__m256* dstB,__m256* dstC,__m256* dstD, __m256 mask, const float* memA, const float* memB, const float* memC, const float* memD, int& mask_bits);
 
+int  emu_mm_mask_compressstoreu_ps_x4      ( float* dstA, float* dstB, float* dstC, float* dstD, __m128 mask, const __m128* dataA, const __m128* dataB, const __m128* dataC, const __m128* dataD);
+int  emu_mm_mask_compressstoreu_ps_x4_ov   ( float* dstA, float* dstB, float* dstC, float* dstD, __m128 mask, const __m128* dataA, const __m128* dataB, const __m128* dataC, const __m128* dataD);
+void emu_mm_mask_expandloadu_ps_x4         (__m128* dstA,__m128* dstB,__m128* dstC,__m128* dstD, __m128 mask, const float* memA, const float* memB, const float* memC, const float* memD, int& mask_bits);
+
 void _mm_transpose_ARGBx4_to_Ax4Rx4Gx4Bx4_ps      ( __m128&  inout0, __m128&  inout1, __m128&  inout2, __m128&  inout3);
 void _mm_transpose_ARGBx4_to_Ax4Rx4Gx4Bx4_epi32   ( __m128i& inout0, __m128i& inout1, __m128i& inout2, __m128i& inout3);
 void _mm_transpose_ARGBx8_to_Ax8Rx8Gx8Bx8_ps      ( __m128&  inout0, __m128&  inout1, __m128&  inout2, __m128&  inout3, __m128&  inout4, __m128&  inout5, __m128&  inout6, __m128&  inout7);
@@ -71,6 +75,46 @@ namespace simd_alignment
     constexpr DataAlignmentSSETag  SSE;
     constexpr DataAlignmentAVXTag  AVX;
 }
+
+template< typename T , eDataAlignment alignment = eDataAlignment::None , int stride = 1 , typename RT = T >
+struct data_array
+{
+    static constexpr inline bool IsContiguous   = stride==1;
+    static constexpr inline auto Stride         = stride;
+
+    FORCE_INLINE data_array( T* pData ) noexcept
+        : pData(pData)
+    {}
+
+    FORCE_INLINE T* data() const noexcept
+    {
+        return pData;
+    }
+
+    FORCE_INLINE T& operator[](int i) const noexcept requires( std::is_same_v<RT, T> )
+    {
+        return pData[i * Stride];
+    }
+    FORCE_INLINE RT operator[](int i) const noexcept requires( !std::is_same_v<RT, T> )
+    {
+        return pData + i * Stride;
+    }
+
+    FORCE_INLINE static constexpr bool IsAlignedFor( eDataAlignment alignment )
+    {
+        return static_cast<size_t>(alignment) % size_t(alignment) == 0;
+    }
+
+    FORCE_INLINE auto get_const()const noexcept -> data_array<const T, alignment, stride, const RT>
+    {
+        return data_array<const T, alignment, stride, const RT>(pData);
+    }
+
+    T* pData = nullptr;
+};
+
+template< typename T , int StrideLvl0 = 8 , int StrideLvl1 = 1 , eDataAlignment alignment = eDataAlignment::None >
+using simd_array_lvl2 = data_array<T, alignment, StrideLvl1, data_array<T, alignment, StrideLvl0>>;
 
 template< typename T >
 consteval auto GetDataAlignmentTagFor()
@@ -197,6 +241,11 @@ struct simd_type_maping< T , eSimdType::None , Elements >
         for( int i = 0; i < Elements; ++i )
             R.v[i] = A.v[i] << B;
     }
+    FORCE_INLINE static void shr(const type& A , const simd_data_type<int,Elements>& B , type& R ) noexcept
+    {
+        for( int i = 0; i < Elements; ++i )
+            R.v[i] = A.v[i] << B[i];
+    }
 
     FORCE_INLINE static void set(T A , type& R ) noexcept
     {
@@ -242,6 +291,34 @@ struct simd_type_maping< T , eSimdType::None , Elements >
                 R[i] = value.v[i];
         }
     }
+
+
+    template< eDataAlignment A , int Stride >
+    FORCE_INLINE static void load( data_array<const T,A,Stride> value , type& R )
+    {
+        if constexpr( Stride > 1 )
+            set( value[0] , value[1] , value[2] , value[3] , R );
+        else
+            load( value.data() , R , DataAlignmentTagT<A>{} );
+    }
+
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<T,A,1> R )
+    {
+        store( value , R.data() , DataAlignmentTagT<A>{} );
+    }
+    template< eDataAlignment A , typename U >
+    FORCE_INLINE static void store( const type& value , data_array<T,A,1> R , const simd_data_type<U,Elements>& M )
+    {
+        auto mask = reinterpret_cast<const uint32_t*>(&M.v);
+        for( int i = 0; i < Elements; ++i )
+        {
+            if( mask[i] & 0x80000000 )
+                R[i] = value.v[i];
+        }
+    }
+
+
     FORCE_INLINE static void rsqrt( const type& Value , type& R )
     {
         for( int i = 0; i < Elements; ++i )
@@ -395,6 +472,48 @@ struct simd_type_maping< T , eSimdType::None , Elements >
         memcpy( inout3.v, tmp + 24, sizeof(T) * 8);
     }
 
+    template< typename U >
+    static int  cstore4( const type* A,const type* B,const type* C,const type* D, const simd_data_type<U,Elements>& M
+                                    , float* RA    ,float* RB    ,float* RC    ,float* RD    , auto OV )
+    {
+        int c = 0;
+        auto mask = reinterpret_cast<const uint32_t*>(&M.v);
+        for( int i = 0; i < Elements; ++i )
+        {
+            if( !(mask[i] & 0x80000000) )
+                continue;
+
+            RA[c] = (*A)[i];
+            RB[c] = (*B)[i];
+            RC[c] = (*C)[i];
+            RD[c] = (*D)[i];
+
+            c++;
+        }
+        return c;
+    };
+
+    template< typename U >
+    FORCE_INLINE static int  expand4( const float* pA , const float* pB , const float* pC , const float* pD , const simd_data_type<U,Elements>& M
+                                    , type* RA        , type* RB        , type* RC        , type* RD )
+    {
+        int c = 0;
+        auto mask = reinterpret_cast<const uint32_t*>(&M.v);
+        for( int i = 0; i < Elements; ++i )
+        {
+            if( !(mask[i] & 0x80000000) )
+                continue;
+
+            (*RA)[i] = pA[c];
+            (*RB)[i] = pB[c];
+            (*RC)[i] = pC[c];
+            (*RD)[i] = pD[c];
+
+            c++;
+        }
+        return c;
+    }
+
     static T debug_at( const type& A, int i ) noexcept
     {
         return A.v[i];
@@ -481,6 +600,43 @@ struct simd_type_maping< float , eSimdType::SSE , 4 >
     FORCE_INLINE static void transpose_ARGBx4_to_Ax4Rx4Gx4Bx4(type& inout0, type& inout1, type& inout2, type& inout3)
     {
         _mm_transpose_ARGBx4_to_Ax4Rx4Gx4Bx4_ps( inout0, inout1, inout2, inout3);
+    }
+
+    FORCE_INLINE static int  cstore4( const type* A,const type* B,const type* C,const type* D, const __m128i& M
+                                    , float* RA    ,float* RB    ,float* RC    ,float* RD    , auto OV )
+    {
+        if constexpr( OV() )
+            return emu_mm_mask_compressstoreu_ps_x4_ov(RA,RB,RC,RD, _mm_castsi128_ps(M), A,B,C,D);
+        else
+            return emu_mm_mask_compressstoreu_ps_x4   (RA,RB,RC,RD, _mm_castsi128_ps(M), A,B,C,D);
+    };
+
+    FORCE_INLINE static int  expand4( const float* pA , const float* pB , const float* pC , const float* pD , const __m128i& M
+                                    , type* RA        , type* RB        , type* RC        , type* RD )
+    {
+        int bits;
+        emu_mm_mask_expandloadu_ps_x4(RA,RB,RC,RD, _mm_castsi128_ps(M), pA,pB,pC,pD, bits);
+        return bits;
+    }
+
+    template< eDataAlignment A , int Stride >
+    FORCE_INLINE static void load( data_array<const float,A,Stride> value , type& R )
+    {
+        if constexpr( Stride > 1 )
+            set( value[0] , value[1] , value[2] , value[3] , R );
+        else if constexpr( A >= eDataAlignment::SSE )
+            load( value.data() , R , DataAlignmentTagT<A>{} );
+    }
+
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<float,A,1> R )
+    {
+        return store(value, R.data(), DataAlignmentTagT<A>{});
+    }
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<float,A,1> R , __m128i Mask )
+    {
+        return store(value, R.data(), Mask);
     }
 
     static float debug_at( const type& A, int i ) noexcept
@@ -590,6 +746,56 @@ struct simd_type_maping< float , eSimdType::SSE ,8 >
             _mm_storeu_ps( R + 4 , value.v[1] );
         }
     }
+
+    template< eDataAlignment A , int Stride >
+    FORCE_INLINE static void load( data_array<const float,A,Stride> value , type& R )
+    {
+        if constexpr( Stride > 1 )
+            set( value[0] , value[1] , value[2] , value[3] , value[4] , value[5] , value[6] , value[7] , R );
+        else
+            load( value.data() , R , DataAlignmentTagT<A>{} );
+    }
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<float,A,1> R )
+    {
+        store( value , R.data() , DataAlignmentTagT<A>{} );
+    }
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<float,A,1> R , const simd_data_type<__m128i,2>& Mask )
+    {
+        store( value , R.data() , Mask );
+    }
+
+
+
+    FORCE_INLINE static int  cstore4( const type* A,const type* B,const type* C,const type* D, const simd_data_type<__m128i,2>& M
+                                    , float* RA    ,float* RB    ,float* RC    ,float* RD    , auto OV )
+    {
+        int result[2];
+        if constexpr( OV() )
+        {
+            result[0] = emu_mm_mask_compressstoreu_ps_x4_ov(RA+0,RB+0,RC+0,RD+0, _mm_castsi128_ps(M.v[0]), &A->v[0],&A->v[0],&A->v[0],&A->v[0]);
+            result[1] = emu_mm_mask_compressstoreu_ps_x4_ov(RA+4,RB+4,RC+4,RD+4, _mm_castsi128_ps(M.v[1]), &A->v[1],&A->v[1],&A->v[1],&A->v[1]);
+        }
+        else
+        {
+            result[0] = emu_mm_mask_compressstoreu_ps_x4(RA+0,RB+0,RC+0,RD+0, _mm_castsi128_ps(M.v[0]), &A->v[0],&A->v[0],&A->v[0],&A->v[0]);
+            result[1] = emu_mm_mask_compressstoreu_ps_x4(RA+4,RB+4,RC+4,RD+4, _mm_castsi128_ps(M.v[1]), &A->v[1],&A->v[1],&A->v[1],&A->v[1]);
+        }
+        return result[0] + result[1];
+    };
+
+    FORCE_INLINE static int  expand4( const float* pA , const float* pB , const float* pC , const float* pD , const simd_data_type<__m128i,2>& M
+                                    , type* RA        , type* RB        , type* RC        , type* RD )
+    {
+        int bits[2]= {};
+        emu_mm_mask_expandloadu_ps_x4(&RA->v[0],&RA->v[0],&RA->v[0],&RA->v[0], _mm_castsi128_ps(M.v[0]), pA,pB,pC,pD, bits[0]);
+        emu_mm_mask_expandloadu_ps_x4(&RA->v[0],&RA->v[0],&RA->v[0],&RA->v[0], _mm_castsi128_ps(M.v[1]), pA,pB,pC,pD, bits[1]);
+
+        return bits[0] + bits[1];
+    }
+
+
     FORCE_INLINE static void store( const type& value , float* R , const simd_data_type<__m128i,2>& Mask )
     {
         _mm_maskstore_ps( R+0 , Mask.v[0] ,  value.v[0] );
@@ -747,6 +953,27 @@ struct simd_type_maping< int32_t , eSimdType::SSE , 4 >
         _mm_transpose_ARGBx8_to_Ax8Rx8Gx8Bx8_epi32( inout0, inout1, inout2, inout3, inout4, inout5, inout6, inout7 );
     }
 
+    template< eDataAlignment A , int Stride >
+    FORCE_INLINE static void load( data_array<const int32_t,A,Stride> value , type& R )
+    {
+        if constexpr( Stride > 1 )
+            set( value[0] , value[1] , value[2] , value[3] , R );
+        else
+            load( value.data() , R , DataAlignmentTagT<A>{} );
+    }
+
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<int32_t,A,1> R )
+    {
+        store( value , R.data() , DataAlignmentTagT<A>{} );
+    }
+
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<int32_t,A,1> R , __m128i Mask )
+    {
+        store( value , R.data() , Mask );
+    }
+
     static int32_t debug_at( const type& A, int i ) noexcept
     {
         // msvc
@@ -859,6 +1086,28 @@ struct simd_type_maping< int32_t , eSimdType::SSE , 8 >
             _mm_storeu_epi32( R + 4 , value.v[1] );
         }
     }
+
+    template< eDataAlignment A , int Stride >
+    FORCE_INLINE static void load( data_array<const int32_t,A,Stride> value , type& R )
+    {
+        if constexpr( Stride > 1 )
+            set( value[0] , value[1] , value[2] , value[3] , value[4] , value[5] , value[6] , value[7] , R );
+        else
+            load( value.data() , R , DataAlignmentTagT<A>{} );
+    }
+
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<int32_t,A,1> R )
+    {
+        store( value , R.data() , A );
+    }
+
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<int32_t,A,1> R , __m128i Mask )
+    {
+        store( value , R.data() , Mask );
+    }
+
     FORCE_INLINE static void store( const type& value , int32_t* R , const simd_data_type<__m128i,2>& Mask )
     {
         _mm_maskstore_epi32( R+0 , Mask.v[0] , value.v[0] );
@@ -980,6 +1229,27 @@ struct simd_type_maping< float , eSimdType::AVX , 8 >
         _mm256_maskstore_ps( R , Mask ,  value );
     }
 
+    template< eDataAlignment A , int Stride >
+    FORCE_INLINE static void load( data_array<const float,A,Stride> value , type& R )
+    {
+        if constexpr( Stride > 1 )
+            set( value[0] , value[1] , value[2] , value[3] , value[4] , value[5] , value[6] , value[7] , R );
+        else
+            load( value.data() , R , DataAlignmentTagT<A>{} );
+    }
+
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<float,A,1> R )
+    {
+        store( value , R.data() , DataAlignmentTagT<A>{} );
+    }
+
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<float,A,1> R , __m256i Mask )
+    {
+        store( value , R.data() , Mask );
+    }
+
     FORCE_INLINE static void transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(type& inout0, type& inout1, type& inout2, type& inout3)
     {
         _mm256_transpose_ARGBx8_to_Ax8Rx8Gx8Bx8_ps( inout0, inout1, inout2, inout3);
@@ -1052,6 +1322,27 @@ struct simd_type_maping< int32_t , eSimdType::AVX , 8 >
     FORCE_INLINE static void store( const type& value , int32_t* R , __m256i Mask )
     {
         _mm256_maskstore_epi32( R , Mask ,  value );
+    }
+
+    template< eDataAlignment A , int Stride >
+    FORCE_INLINE static void load( data_array<const int32_t,A,Stride> value , type& R )
+    {
+        if constexpr( Stride > 1 )
+            set( value[0] , value[1] , value[2] , value[3] , value[4] , value[5] , value[6] , value[7] , R );
+        else
+            load( value.data() , R , DataAlignmentTagT<A>{} );
+    }
+
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<int32_t,A,1> R )
+    {
+        store( value , R.data() , DataAlignmentTagT<A>{} );
+    }
+
+    template< eDataAlignment A >
+    FORCE_INLINE static void store( const type& value , data_array<int32_t,A,1> R , __m256i Mask )
+    {
+        store( value , R.data() , Mask );
     }
 
     FORCE_INLINE static void transpose_ARGBx8_to_Ax8Rx8Gx8Bx8(type& inout0, type& inout1, type& inout2, type& inout3)
@@ -1128,6 +1419,17 @@ public:
         sse_map_t::set( value , v );
     }
 
+    template< typename U1 , eDataAlignment Alignment = eDataAlignment::None , int Stride , typename U2 >
+    FORCE_INLINE simd_impl(data_array<const U1,Alignment,Stride,U2> value ) requires(std::is_same_v<T,T>)
+    {
+        sse_map_t::load( value , v );
+    }
+    template< typename U1 , eDataAlignment Alignment = eDataAlignment::None , int Stride , typename U2 >
+    FORCE_INLINE simd_impl(data_array<U1,Alignment,Stride,U2> value ) requires(std::is_same_v<T,T>)
+    {
+        sse_map_t::load( value.get_const() , v );
+    }
+
     template< eDataAlignment Alignment = eDataAlignment::None >
     FORCE_INLINE simd_impl(const T* value , DataAlignmentTagT<Alignment> t = {} ) requires(std::is_same_v<T,T>)
     {
@@ -1167,6 +1469,16 @@ public:
     {
         sse_map_t::load( value , v , t );
     }
+    template< typename U1 , eDataAlignment Alignment = eDataAlignment::None , int Stride , typename U2 >
+    FORCE_INLINE void load(data_array<const U1,Alignment,Stride,U2> value ) requires(std::is_same_v<T,T>)
+    {
+        sse_map_t::load( value , v );
+    }
+    template< typename U1 , eDataAlignment Alignment = eDataAlignment::None , int Stride , typename U2 >
+    FORCE_INLINE void load(data_array<U1,Alignment,Stride,U2> value ) requires(std::is_same_v<T,T>)
+    {
+        sse_map_t::load( value.get_const() , v );
+    }
 
     template< eDataAlignment Alignment = eDataAlignment::None >
     FORCE_INLINE void load_from_array(uint32_t Index, const T*& pArray , DataAlignmentTagT<Alignment> t = {} ) requires(std::is_same_v<T,T>)
@@ -1183,6 +1495,17 @@ public:
 
     template< eDataAlignment Alignment = eDataAlignment::None >
     FORCE_INLINE void store(T* value , const int_variant& Mask ) const requires(std::is_same_v<T,T>)
+    {
+        sse_map_t::store( v , value , Mask.v );
+    }
+
+    template< typename U1 , eDataAlignment Alignment = eDataAlignment::None , int Stride , typename U2 >
+    FORCE_INLINE void store(data_array<U1,Alignment,Stride,U2> value ) const requires(std::is_same_v<T,T>)
+    {
+        sse_map_t::store( v , value );
+    }
+    template< typename U1 , eDataAlignment Alignment = eDataAlignment::None , int Stride , typename U2 >
+    FORCE_INLINE void store(data_array<U1,Alignment,Stride,U2> value , const int_variant& Mask ) const requires(std::is_same_v<T,T>)
     {
         sse_map_t::store( v , value , Mask.v );
     }
@@ -1221,7 +1544,6 @@ public:
         return sse_map_t::expand4( SrcA, SrcB, SrcC, SrcD , Mask.v, &DstA->v , &DstB->v , &DstC->v , &DstD->v );
     }
 
-    template< typename T2 >
     FORCE_INLINE void store_to_array(uint32_t Index, T*& pArray , const int_variant& Mask ) const requires(std::is_same_v<T,T>)
     {
         sse_map_t::store( v , pArray , Mask.v );

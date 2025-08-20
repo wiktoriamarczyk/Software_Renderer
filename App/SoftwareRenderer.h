@@ -24,11 +24,10 @@ struct TileInfo
     using at_CmdDrawTile    = atomic<CommandRenderTile*>;
 
     Vector2si               TileIndex;
-    Spinlock                Lock;
+    uint32_t                TileMemOffset   = 0;
+    uint32_t                TileZOffset     = 0;
     mutable at_i16          DrawCount       = 0;
-    Vector2i                TileScreenPos;
-    Vector4f*               TileMem         = nullptr;
-    float*                  TileZMem        = nullptr;
+    Spinlock                Lock;
     mutable at_CmdDrawTile  pRenderTileCmd  = nullptr;
 };
 
@@ -113,10 +112,16 @@ public:
     void SetZWrite(bool zWrite)override;
     void SetZTest(bool zTest)override;
     void SetBlockMathMode(eBlockMathMode mathType)override;
+    virtual void SetTileMode(eTileMode tileMode)override;
+    virtual void SetAlphaBlending(bool Enable)override;
+    virtual void SetBackfaceCulling(bool Enable)override;
     virtual int GetPixelsDrawn() const override;
 
     template< typename T >
     static T EdgeFunction(const Vector2<T>& A, const Vector2<T>& B, const Vector2<T>& C);
+
+    template< typename T >
+    static Vector2<T> EdgeFunctionSeparate(const Vector2<T>& A, const Vector2<T>& B, const Vector2<T>& C);
 private:
     struct RenderThreadData;
     template< typename , DrawFunctionConfig >
@@ -132,8 +137,9 @@ private:
     void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
 
 
-    template< eSimdType Type , int Elements = 8 >
+    template< uint8_t TILE_SIZE , eSimdType Type , int Elements = 8 >
     void DrawTileImplSimd(const CommandRenderTile& TD, RenderThreadData& data);
+    template< uint8_t TILE_SIZE >
     void DrawTileImpl   (const CommandRenderTile& TD, RenderThreadData& data);
     void DrawTile       (const CommandRenderTile& TD, RenderThreadData& data);
 
@@ -160,6 +166,7 @@ private:
     }
 
     void                RendererTaskWorker();
+    void                RecreateBuffers( uint8_t TileSize , int screenWidth , int screenHeight );
     void                VertexAssemply( const CommandVertexAssemply& cmd );
     void                DoVertexAssemplyTransformAndClip( const CommandVertexAssemply& cmd );
     void                ExecuteExitCommand();
@@ -176,6 +183,11 @@ private:
 
     // 8 bit - one channel (8*4=32 - rgba)
     vector<uint32_t>    m_ScreenBuffer;
+    Vector2si           m_ScreenSize;
+    Vector2si           m_PublicScreenSize;
+    uint8_t             m_TileSize = 32;
+    eTileMode           m_TileMode = eTileMode::Tile_32x32;
+
     vector<AlignedPixel>m_TilesBuffer;
     unique_ptr<TileInfo[]>m_TilesGrid;
     vector<float>       m_ZBuffer;
@@ -224,6 +236,7 @@ private:
     bool                m_ZWrite = true;
     bool                m_ZTest = true;
     bool                m_AlphaBlend = false;
+    bool                m_BackfaceCulling = false;
     std::atomic<bool>   m_ShutingDown = false;
     eDrawTriVersion     m_DrawTriVersion = eDrawTriVersion::DrawTri;
     float               m_DiffuseStrength = 0.3f;

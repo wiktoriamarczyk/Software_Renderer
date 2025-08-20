@@ -12,6 +12,17 @@
 #include <assimp/postprocess.h>
 #include "../ImGuiFileDialog/ImGuiFileDialog.h"
 
+extern bool g_showTilesBoundry;
+extern bool g_showTilesGrid;
+extern bool g_showTilestype;
+extern bool g_showTriangleBoundry;
+extern bool g_ThreadPerTile;
+extern bool g_MultithreadedTransformAndClip;
+extern bool g_TrivialFS;
+extern bool g_CompressedPartialTile;
+extern std::atomic<size_t> g_memory_resource_mem ;
+extern std::atomic<int> g_max_overdraw;
+
 struct PredefinedModel
 {
     const char* modelPath   = "";
@@ -320,15 +331,6 @@ bool Application::Initialize()
     return true;
 }
 
-extern bool g_showTilesBoundry;
-extern bool g_showTilesGrid;
-extern bool g_showTilestype;
-extern bool g_showTriangleBoundry;
-extern bool g_ThreadPerTile;
-extern bool g_MultithreadedTransformAndClip;
-extern std::atomic<size_t> g_memory_resource_mem ;
-extern std::atomic<int> g_max_overdraw;
-
 int Application::Run()
 {
     struct Frustum
@@ -453,20 +455,31 @@ int Application::Run()
         ImGui::SliderFloat("Diffuse Strength", &m_DrawSettings.diffuseStrength, 0, 1);
         ImGui::SliderFloat("Specular Strength", &m_DrawSettings.specularStrength, 0, 1);
         ImGui::SliderFloat("Shininess Power", &m_DrawSettings.shininessPower, 1.f , 10.0f );
-        ImGui::DragFloat3("Rotation", &m_DrawSettings.modelRotation.x, drag_speeed , 0, FULL_ANGLE);
-        ImGui::DragFloat3("Translation", &m_DrawSettings.modelTranslation.x, drag_speeed , -15, 15);
+        ImGui::SliderFloat3("Rotation", &m_DrawSettings.modelRotation.x , 0, FULL_ANGLE);
+        ImGui::SliderFloat3("Translation", &m_DrawSettings.modelTranslation.x , -12, 12);
         ImGui::SliderFloat("Scale", &m_DrawSettings.modelScale, 0, 16);
         ImGui::SliderFloat3("Light Position", &m_DrawSettings.lightPosition.x, -20, 20);
         ImGui::SliderInt("Thread Count", &m_DrawSettings.threadsCount, 1, MAX_THREADS_COUNT);
-        //ImGui::Combo("Renderer Type", &m_DrawSettings.rendererType, "Software\0Hardware\0");
-        ImGui::SliderInt("Renderer Type", &m_DrawSettings.rendererType , 0 , 1 );
+        ImGui::Combo("Renderer Type", &m_DrawSettings.rendererType, "Software\0Hardware\0");
 
         ImGui::Checkbox("Wireframe", &m_DrawSettings.drawWireframe);
-
-        ImGui::Checkbox("Show Tiles Grid" , &g_showTilesGrid);
-        ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.colorizeThreads);
         ImGui::SameLine(); ImGui::Checkbox("BBoxes", &m_DrawSettings.drawBBoxes);
+        ImGui::SameLine(); ImGui::Checkbox("Show Tiles Grid" , &g_showTilesGrid);
+        ImGui::SameLine(); ImGui::Checkbox( "Visualize ZBuffer", &m_DrawSettings.renderDepthBuffer);
+
+      //ImGui::SameLine(); ImGui::Checkbox("Alpha Blend" , &m_DrawSettings.alphaBlend);
+
+        ImGui::Checkbox("Trivial FS", &g_TrivialFS);
+        ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.colorizeThreads);
         ImGui::SameLine(); ImGui::Checkbox("Threaded T&C", &g_MultithreadedTransformAndClip);
+        ImGui::SameLine(); ImGui::Checkbox( "Vertical Sync", &m_DrawSettings.vSync);
+        ImGui::SameLine(); if( ImGui::Button( "Close App" ) ) m_MainWindow.close();
+
+        ImGui::Checkbox("Compressed Partial Tile", &g_CompressedPartialTile);
+        ImGui::SameLine(); ImGui::Checkbox("Use ZBuffer", &m_DrawSettings.useZBuffer);
+        ImGui::SameLine(); ImGui::Checkbox("One Thread Per Tile", &g_ThreadPerTile);
+
+      //ImGui::SameLine(); ImGui::Checkbox("Backface Culling", &m_DrawSettings.backfaceCulling);
 
 
         if( ImGui::Button("0A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 0); ImGui::SameLine();
@@ -489,17 +502,11 @@ int Application::Run()
         if( ImGui::Button("2D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 14); ImGui::SameLine();
         if( ImGui::Button("3D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 15);
 
-
-        ImGui::SameLine(); ImGui::Checkbox("Use ZBuffer", &m_DrawSettings.useZBuffer);
-        ImGui::SameLine(); ImGui::Checkbox("One Thread Per Tile", &g_ThreadPerTile);
-
         ImGui::ColorEdit3("Ambient Color", &m_DrawSettings.ambientColor.x);
         ImGui::ColorEdit3("Diffuse Color", &m_DrawSettings.diffuseColor.x);
         ImGui::ColorEdit3("Background Color", &m_DrawSettings.backgroundColor.x);
-        ImGui::Checkbox( "Visualize ZBuffer", &m_DrawSettings.renderDepthBuffer);
-        ImGui::SameLine();
-        ImGui::Checkbox( "Vertical Sync", &m_DrawSettings.vSync); ImGui::SameLine(); if( ImGui::Button( "Close App" ) ) m_MainWindow.close();
         ImGui::Combo("Math Type", &m_DrawSettings.mathType, "CPU\0CPUx8\0SSEx4\0SSEx8\0AVXx8\0");
+        ImGui::Combo("Tile Size", &m_DrawSettings.tileMode, "32x32\0""16x16\08x8\0");
 
         ImGui::End();
 
@@ -525,9 +532,12 @@ int Application::Run()
         renderer->SetZTest(m_DrawSettings.useZBuffer);
         renderer->SetZWrite(m_DrawSettings.useZBuffer);
         renderer->SetClearColor(Vector4f{m_DrawSettings.backgroundColor,1});
+        renderer->SetAlphaBlending(m_DrawSettings.alphaBlend);
+        renderer->SetBackfaceCulling(m_DrawSettings.backfaceCulling);
         renderer->ClearZBuffer();
         renderer->ClearScreen();
         renderer->SetBlockMathMode(static_cast<eBlockMathMode>(m_DrawSettings.mathType));
+        renderer->SetTileMode(static_cast<eTileMode>(m_DrawSettings.tileMode));
 
         {
             ZoneScopedN("Frame");

@@ -69,14 +69,14 @@ const string INIT_TEXTURE_PATH = "../Data/Checkerboard.png";
 inline const char* MODEL_FORMATS = ".fbx,.glb,.gltf,.blend,.obj";
 inline const char* TEXTURE_FORMATS = ".png,.jpg,.jpeg,.bmp";
 
-template< typename T1 , typename T2 , typename ... A >
-concept HasConstructFromArray = requires( const T2* p , uint32_t index , const A& ... args ){ { T1::construct_from_array( index , p , args... ) }; };
+template< typename DataT , typename ArrayT , typename ... A >
+concept HasStoreTo = requires( const DataT& Data , ArrayT& Array , const A& ... args ){ { Data.store( Array[0] , args... ) }; };
 
-template< typename T1 , typename T2 , typename ... A >
-concept HasLoadFromArray = requires( T1& t1 , const T2* p , uint32_t index , const A& ... args ){ { t1.load_from_array( index , p , args... ) }; };
+template< typename DataT , typename ArrayT , typename ... A >
+concept HasLoadFrom = requires( DataT& Data , const ArrayT& Array , const A& ... args ){ { Data.load( Array[0] , args... ) }; };
 
-template< typename T1 , typename T2 , typename ... A >
-concept HasStoreToArray = requires( const T1& t1 , T2* p , uint32_t index , const A& ... args ){ { t1.store_to_array( index , p , args... ) }; };
+template< typename DataT , typename ArrayT , typename ... A >
+concept HasConstructFrom = requires( const ArrayT& Array , const A& ... args ){ { DataT( Array[0] , args... ) }; };
 
 template< typename T >
 class Vector2;
@@ -187,6 +187,12 @@ inline T Max( const T& A , const T& B )
     T result;
     Max( A , B , result );
     return result;
+}
+
+template< std::integral T >
+FORCE_INLINE auto CountBitsSetTo1( T val )
+{
+    return std::popcount( static_cast< std::make_unsigned_t<T> >( val ) );
 }
 
 }

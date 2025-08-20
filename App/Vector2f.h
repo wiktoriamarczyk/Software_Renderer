@@ -20,6 +20,13 @@ public:
     constexpr Vector2(T x, T y);
               Vector2(Vector3<T> vector);
 
+    template< typename U , typename ... A >
+        requires HasConstructFrom<T,U,A...>
+    Vector2( const U& Array , const A& ... args )
+        : x{ Array[ 0 ] , args... }
+        , y{ Array[ 1 ] , args... }
+    {}
+
     template< typename T2 , eRoundMode RM = eRoundMode::Floor >
     constexpr Vector2<T2> ToVector2()const
     {
@@ -31,6 +38,22 @@ public:
             return Vector2<T2>( round(x) , round(y) );
         else
             return Vector2<T2>( ceil(x) , ceil(y) );
+    }
+
+    template< typename U , typename ... A >
+        requires HasLoadFrom<T,U,A...>
+    void load( const U& Array , const A& ... args )
+    {
+        x.load( Array[0] , args... );
+        y.load( Array[1] , args... );
+    }
+
+    template< typename U , typename ... A >
+        requires HasStoreTo<T,U,A...>
+    void store( U& Array , const A& ... args )const
+    {
+        x.store( Array[0] , args... );
+        y.store( Array[1] , args... );
     }
 
     constexpr Vector2<int> ToVector2i() const requires(std::is_floating_point<T>::value)

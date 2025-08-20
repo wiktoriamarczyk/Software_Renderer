@@ -34,6 +34,14 @@ enum class eBlockMathMode : uint8_t
     AVXx256 = 0x4,
 };
 
+enum class eTileMode : uint8_t
+{
+    Tile_32x32  = 0,
+    Tile_16x16  = 1,
+    Tile_8x8    = 2,
+};
+
+
 class ITexture
 {
 public:
@@ -87,4 +95,7 @@ public:
     virtual void SetZWrite(bool zwrite)=0;
     virtual void SetZTest(bool ztest)=0;
     virtual void SetBlockMathMode(eBlockMathMode mathType) {}
+    virtual void SetAlphaBlending(bool Enable) {}
+    virtual void SetTileMode(eTileMode tileMode) {}
+    virtual void SetBackfaceCulling(bool Enable) {}
 };

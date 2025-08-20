@@ -20,13 +20,14 @@ public:
     constexpr Vector4(const Vector2<T>& v,T z, T w);
     constexpr Vector4(const Vector3<T>& v,T w);
     constexpr Vector4(T x, T y, T z, T w);
+
     template< typename U , typename ... A >
-        requires HasConstructFromArray<T,U,A...>
-    constexpr Vector4( const U* pArray , const A& ... args )
-        : x{ T::construct_from_array( 0 , pArray , args... ) }
-        , y{ T::construct_from_array( 1 , pArray , args... ) }
-        , z{ T::construct_from_array( 2 , pArray , args... ) }
-        , w{ T::construct_from_array( 3 , pArray , args... ) }
+        requires HasConstructFrom<T,U,A...>
+    constexpr Vector4( const U& Array , const A& ... args )
+        : x{ Array[0] , args... }
+        , y{ Array[1] , args... }
+        , z{ Array[2] , args... }
+        , w{ Array[3] , args... }
     {}
 
     constexpr Vector4<T> operator+(Vector4<T> other)const;
@@ -42,23 +43,23 @@ public:
     }
 
     template< typename U , typename ... A >
-        requires HasLoadFromArray<T,U,A...>
-    void load( const U* pArray , const A& ... args )
+        requires HasLoadFrom<T,U,A...>
+    void load( const U& Array , const A& ... args )
     {
-        x.load_from_array( 0 , pArray , args... );
-        y.load_from_array( 1 , pArray , args... );
-        z.load_from_array( 2 , pArray , args... );
-        w.load_from_array( 3 , pArray , args... );
+        x.load( Array[0] , args... );
+        y.load( Array[1] , args... );
+        z.load( Array[2] , args... );
+        w.load( Array[3] , args... );
     }
 
     template< typename U , typename ... A >
-        requires HasStoreToArray<T,U,A...>
-    void store( U* pArray , const A& ... args )
+        requires HasStoreTo<T,U,A...>
+    void store( U& Array , const A& ... args )const
     {
-        x.store_to_array( 0 , pArray , args... );
-        y.store_to_array( 1 , pArray , args... );
-        z.store_to_array( 2 , pArray , args... );
-        w.store_to_array( 3 , pArray , args... );
+        x.store( Array[0] , args... );
+        y.store( Array[1] , args... );
+        z.store( Array[2] , args... );
+        w.store( Array[3] , args... );
     }
 
     T GetLength()const;
@@ -69,8 +70,11 @@ public:
     Vector4<T> CWiseMin(const Vector4& other)const;
     Vector4<T> CWiseMax(const Vector4& other)const;
 
-    Vector2<T> xy()const;
-    Vector3<T> xyz()const;
+          Vector2<T>& xy();
+    const Vector2<T>& xy()const;
+
+          Vector3<T>& xyz();
+    const Vector3<T>& xyz()const;
 
           T* Data() { return &x; }
     const T* Data() const { return &x; }
@@ -152,15 +156,27 @@ constexpr inline Vector4<T> Vector4<T>::operator/(T value)const
 }
 
 template< typename T >
-inline Vector3<T> Vector4<T>::xyz() const
+inline const Vector3<T>& Vector4<T>::xyz() const
 {
-    return Vector3(x, y, z);
+    return reinterpret_cast<const Vector3<T>&>(*this);
 }
 
 template< typename T >
-inline Vector2<T> Vector4<T>::xy() const
+inline Vector3<T>& Vector4<T>::xyz()
 {
-    return Vector2(x, y);
+    return reinterpret_cast<Vector3<T>&>(*this);
+}
+
+template< typename T >
+inline Vector2<T>& Vector4<T>::xy()
+{
+    return reinterpret_cast<Vector2<T>&>(*this);
+}
+
+template< typename T >
+inline const Vector2<T>& Vector4<T>::xy()const
+{
+    return reinterpret_cast<const Vector2<T>&>(*this);
 }
 
 template< typename T >

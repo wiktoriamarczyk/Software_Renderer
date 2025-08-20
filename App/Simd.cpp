@@ -324,6 +324,54 @@ int emu_mm_mask_compressstoreu_ps(float *dst, __m128 mask, __m128 data)
     return maskbits;
 }
 
+int emu_mm_mask_compressstoreu_ps_x4( float* dstA, float* dstB, float* dstC, float* dstD, __m128 mask, const __m128* dataA, const __m128* dataB, const __m128* dataC, const __m128* dataD)
+{
+    const auto maskbits     = _mm_movemask_ps(mask);
+    const auto skipbits     = 8-std::popcount(uint32_t(maskbits));
+    const auto permute_ctrl = mm_compress_lookup.data[maskbits];
+
+    __m128 permuted[4];
+
+    ALIGN_FOR_SSE constexpr uint32_t init_mask[4] =
+    {
+        uint32_t(0b11110000) << 24 , uint32_t(0b11100000) << 24 , uint32_t(0b11000000) << 24 , uint32_t(0b10000000) << 24 ,
+    };
+
+    permuted[0] = _mm_permutevar_ps(*dataA, permute_ctrl );
+    permuted[1] = _mm_permutevar_ps(*dataB, permute_ctrl );
+    permuted[2] = _mm_permutevar_ps(*dataC, permute_ctrl );
+    permuted[3] = _mm_permutevar_ps(*dataD, permute_ctrl );
+
+    auto write_mask = i128S{(const int32_t*)init_mask , simd_alignment::SSE} << skipbits;
+
+    _mm_maskstore_ps(dstA, write_mask.v , permuted[0]);
+    _mm_maskstore_ps(dstB, write_mask.v , permuted[1]);
+    _mm_maskstore_ps(dstC, write_mask.v , permuted[2]);
+    _mm_maskstore_ps(dstD, write_mask.v , permuted[3]);
+
+    return maskbits;
+}
+
+int emu_mm_mask_compressstoreu_ps_x4_ov( float* dstA, float* dstB, float* dstC, float* dstD, __m128 mask, const __m128* dataA, const __m128* dataB, const __m128* dataC, const __m128* dataD)
+{
+    const auto maskbits     = _mm_movemask_ps(mask);
+    const auto permute_ctrl = mm_compress_lookup.data[maskbits];
+
+    __m128 permuted[4];
+
+    permuted[0] = _mm_permutevar_ps(*dataA, permute_ctrl );
+    permuted[1] = _mm_permutevar_ps(*dataB, permute_ctrl );
+    permuted[2] = _mm_permutevar_ps(*dataC, permute_ctrl );
+    permuted[3] = _mm_permutevar_ps(*dataD, permute_ctrl );
+
+    _mm_storeu_ps(dstA, permuted[0]);
+    _mm_storeu_ps(dstB, permuted[1]);
+    _mm_storeu_ps(dstC, permuted[2]);
+    _mm_storeu_ps(dstD, permuted[3]);
+
+    return maskbits;
+}
+
 int emu_mm_mask_compressstoreu_ps_ov(float *dst, __m128 mask, __m128 data)
 {
     const auto maskbits = static_cast<uint8_t>( _mm_movemask_ps(mask) );
@@ -333,6 +381,22 @@ int emu_mm_mask_compressstoreu_ps_ov(float *dst, __m128 mask, __m128 data)
     _mm_storeu_ps(dst , permuted);
 
     return maskbits;
+}
+
+void emu_mm_mask_expandloadu_ps_x4(__m128* dstA,__m128* dstB,__m128* dstC,__m128* dstD, __m128 mask, const float* memA, const float* memB, const float* memC, const float* memD, int& mask_bits)
+{
+    mask_bits = _mm_movemask_ps(mask);
+    const auto permute_ctrl = mm_decompress_lookup.data[mask_bits];
+
+    dstA[0] = _mm_loadu_ps(memA);
+    dstB[0] = _mm_loadu_ps(memB);
+    dstC[0] = _mm_loadu_ps(memC);
+    dstD[0] = _mm_loadu_ps(memD);
+
+    dstA[0] = _mm_permutevar_ps( dstA[0] , permute_ctrl );
+    dstB[0] = _mm_permutevar_ps( dstB[0] , permute_ctrl );
+    dstC[0] = _mm_permutevar_ps( dstC[0] , permute_ctrl );
+    dstD[0] = _mm_permutevar_ps( dstD[0] , permute_ctrl );
 }
 
 __m128 emu_mm_mask_expandloadu_ps(__m128 src, __m128 mask, const void* mem, int& mask_bits)

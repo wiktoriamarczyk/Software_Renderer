@@ -43,11 +43,10 @@ struct ALIGN_FOR_AVX TransformedVertex
         return result;
     }
 
-    void ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix);
+    void ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix,Vector2si ScreenSize);
 };
 
-inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f
-    & worldMatrix, const Matrix4f& mvpMatrix)
+inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix,Vector2si ScreenSize)
 {
     m_WorldPosition = v.position.Multiplied(worldMatrix);
     m_Normal        = v.normal.TransformedVec(worldMatrix).Normalized();
@@ -62,8 +61,8 @@ inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f
     m_ScreenPosition.y *= oneOverW;
     m_ScreenPosition.z *= oneOverW;
 
-    m_ScreenPosition.x = (m_ScreenPosition.x + 1) * SCREEN_WIDTH / 2;
-    m_ScreenPosition.y = (m_ScreenPosition.y + 1) * SCREEN_HEIGHT / 2;
+    m_ScreenPosition.x = (m_ScreenPosition.x + 1) * ScreenSize.x / 2;
+    m_ScreenPosition.y = (m_ScreenPosition.y + 1) * ScreenSize.y / 2;
 }
 
 template< int Elements = 8 , eSimdType Type = eSimdType::AVX >
