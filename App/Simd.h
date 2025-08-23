@@ -239,12 +239,12 @@ struct simd_type_maping< T , eSimdType::None , Elements >
     FORCE_INLINE static void shr(const type& A , int32_t B , type& R ) noexcept
     {
         for( int i = 0; i < Elements; ++i )
-            R.v[i] = A.v[i] << B;
+            R.v[i] = A.v[i] >> B;
     }
     FORCE_INLINE static void shr(const type& A , const simd_data_type<int,Elements>& B , type& R ) noexcept
     {
         for( int i = 0; i < Elements; ++i )
-            R.v[i] = A.v[i] << B[i];
+            R.v[i] = A.v[i] >> B[i];
     }
 
     FORCE_INLINE static void set(T A , type& R ) noexcept
@@ -774,25 +774,28 @@ struct simd_type_maping< float , eSimdType::SSE ,8 >
         int result[2];
         if constexpr( OV() )
         {
-            result[0] = emu_mm_mask_compressstoreu_ps_x4_ov(RA+0,RB+0,RC+0,RD+0, _mm_castsi128_ps(M.v[0]), &A->v[0],&A->v[0],&A->v[0],&A->v[0]);
-            result[1] = emu_mm_mask_compressstoreu_ps_x4_ov(RA+4,RB+4,RC+4,RD+4, _mm_castsi128_ps(M.v[1]), &A->v[1],&A->v[1],&A->v[1],&A->v[1]);
+            result[0] = emu_mm_mask_compressstoreu_ps_x4_ov(RA+0   ,RB+0   ,RC+0   ,RD+0   , _mm_castsi128_ps(M.v[0]), &A->v[0],&B->v[0],&C->v[0],&D->v[0]);
+            auto bits = std::popcount( static_cast< std::make_unsigned_t<uint32_t> >( result[0] ) );
+            result[1] = emu_mm_mask_compressstoreu_ps_x4_ov(RA+bits,RB+bits,RC+bits,RD+bits, _mm_castsi128_ps(M.v[1]), &A->v[1],&B->v[1],&C->v[1],&D->v[1]);
         }
         else
         {
-            result[0] = emu_mm_mask_compressstoreu_ps_x4(RA+0,RB+0,RC+0,RD+0, _mm_castsi128_ps(M.v[0]), &A->v[0],&A->v[0],&A->v[0],&A->v[0]);
-            result[1] = emu_mm_mask_compressstoreu_ps_x4(RA+4,RB+4,RC+4,RD+4, _mm_castsi128_ps(M.v[1]), &A->v[1],&A->v[1],&A->v[1],&A->v[1]);
+            result[0] = emu_mm_mask_compressstoreu_ps_x4(RA+0   ,RB+0   ,RC+0   ,RD+0   , _mm_castsi128_ps(M.v[0]), &A->v[0],&B->v[0],&C->v[0],&D->v[0]);
+            auto bits = std::popcount( static_cast< std::make_unsigned_t<uint32_t> >( result[0] ) );
+            result[1] = emu_mm_mask_compressstoreu_ps_x4(RA+bits,RB+bits,RC+bits,RD+bits, _mm_castsi128_ps(M.v[1]), &A->v[1],&B->v[1],&C->v[1],&D->v[1]);
         }
-        return result[0] + result[1];
+        return result[0] | ( result[1] << 4 );
     };
 
     FORCE_INLINE static int  expand4( const float* pA , const float* pB , const float* pC , const float* pD , const simd_data_type<__m128i,2>& M
                                     , type* RA        , type* RB        , type* RC        , type* RD )
     {
-        int bits[2]= {};
-        emu_mm_mask_expandloadu_ps_x4(&RA->v[0],&RA->v[0],&RA->v[0],&RA->v[0], _mm_castsi128_ps(M.v[0]), pA,pB,pC,pD, bits[0]);
-        emu_mm_mask_expandloadu_ps_x4(&RA->v[0],&RA->v[0],&RA->v[0],&RA->v[0], _mm_castsi128_ps(M.v[1]), pA,pB,pC,pD, bits[1]);
+        int bit_halfs[2]= {};
+        emu_mm_mask_expandloadu_ps_x4(&RA->v[0],&RB->v[0],&RC->v[0],&RD->v[0], _mm_castsi128_ps(M.v[0]), pA+0   ,pB+0   ,pC+0   ,pD+0   , bit_halfs[0]);
+        auto bits = std::popcount( static_cast< std::make_unsigned_t<uint32_t> >( bit_halfs[0] ) );
+        emu_mm_mask_expandloadu_ps_x4(&RA->v[1],&RB->v[1],&RC->v[1],&RD->v[1], _mm_castsi128_ps(M.v[1]), pA+bits,pB+bits,pC+bits,pD+bits, bit_halfs[1]);
 
-        return bits[0] + bits[1];
+        return bit_halfs[0] | ( bit_halfs[1] << 4 );
     }
 
 
