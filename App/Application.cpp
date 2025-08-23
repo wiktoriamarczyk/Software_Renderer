@@ -59,24 +59,43 @@ void process_dispatch_queue()
     dispath_queue.clear();
 }
 
-bool stats_ready(uint32_t wait_start, uint32_t mintime, uint32_t maxtime)
+int stats_ready(uint32_t wait_start, uint32_t mintime, uint32_t maxtime)
 {
     std::this_thread::sleep_for(std::chrono::milliseconds(30));
     if (!dispath_queue.empty())
-        return false;
+        return 0;
 
     auto elapsed = miliseconds_from_app_start() - wait_start;
-    return FRAMES_RENDERED > 140 && ((elapsed > mintime && LAST_FPS_STD_DEV < LAST_FPS / 20) || elapsed > maxtime);
+    if (elapsed > maxtime)
+    {
+        if (FRAMES_RENDERED >= 480)
+            return 480;
+        if (FRAMES_RENDERED >= 240)
+            return 240;
+        if (FRAMES_RENDERED >= 120)
+            return 120;
+        if (FRAMES_RENDERED >= 60)
+            return 60;
+        if (FRAMES_RENDERED >= 30)
+            return 30;
+    }
+
+    if (FRAMES_RENDERED > 480 && (elapsed > mintime && LAST_FPS_STD_DEV < LAST_FPS / 20))
+        return 480;
+
+    return 0;
 }
 
-void wait_for_stats()
+int wait_for_stats()
 {
     FRAMES_RENDERED = 0;
     auto wait_start = miliseconds_from_app_start();
+    int ready = 0;
 
-    for (; !stats_ready(wait_start, 1000, 7000);) {}
+    for (; !(ready = stats_ready(wait_start, 1000, 7000));) {}
 
-    printf("frames done, waited %u ms (fps:%u, std:%u)\n", miliseconds_from_app_start() - wait_start, LAST_FPS.load(), LAST_FPS_STD_DEV.load());
+    printf("%d frames done, waited %u ms (fps:%u, std:%u)\n", ready, miliseconds_from_app_start() - wait_start, LAST_FPS.load(), LAST_FPS_STD_DEV.load());
+    return ready;
 }
 
 struct PredefinedModel
@@ -139,7 +158,7 @@ void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
     Settings.modelScale             = model.Scale.value_or(Def.modelScale);
 }
 
-int RASTER_MODES[] = { 4 };                     // 0,1,2,3,4
+int RASTER_MODES[] = { 0,1,2,3,4 };             // 0,1,2,3,4
 int TILE_MODES[] = { 0, 1, 2 };                 // 0,1,2
 bool COMPRESSED_MODES[] = { true, false };      // true,false
 bool FRAGMENT_SHADER_MODES[] = { true, false }; // true,false
@@ -189,12 +208,12 @@ void Application::StatsThreadChange()
 
                                 s_syncBarrier.arrive_and_wait();
 
-                                wait_for_stats();
+                                int frames = wait_for_stats();
 
-                                dispath([this]
+                                dispath([this, frames]
                                     {
                                         auto renderer = m_Contexts[m_DrawSettings.rendererType].pRenderer;
-                                        SaveStats(renderer->GetPixelsDrawn());
+                                        SaveStats(renderer->GetPixelsDrawn(), frames);
                                         s_syncBarrier.arrive_and_wait();
                                         THREADS++;
                                     });
@@ -802,13 +821,45 @@ void Application::DrawRenderingStats( int pixels )
     ImGui::End();
 }
 
-void Application::SaveStats(int pixels)
+struct DrawStatsCollection
 {
-    auto& avg = DrawStatsSystem::GetAvg();
-    auto& min = DrawStatsSystem::GetMin();
-    auto& max = DrawStatsSystem::GetMax();
-    auto& med = DrawStatsSystem::GetMed();
-    auto& std = DrawStatsSystem::GetStd();
+    const DrawStatsSystem::Stats& avg;
+    const DrawStatsSystem::Stats& min;
+    const DrawStatsSystem::Stats& max;
+    const DrawStatsSystem::Stats& med;
+    const DrawStatsSystem::Stats& std;
+};
+
+template< int FRAMES >
+DrawStatsCollection GetDrawStatsCollectionImpl()
+{
+    return DrawStatsCollection
+    {
+        DrawStatsSystem::GetAvg<FRAMES>(),
+        DrawStatsSystem::GetMin<FRAMES>(),
+        DrawStatsSystem::GetMax<FRAMES>(),
+        DrawStatsSystem::GetMed<FRAMES>(),
+        DrawStatsSystem::GetStd<FRAMES>()
+    };
+}
+
+DrawStatsCollection GetDrawStatsCollection(int frames)
+{
+    if (frames == 480)
+        return GetDrawStatsCollectionImpl<480>();
+    if (frames == 240)
+        return GetDrawStatsCollectionImpl<240>();
+    if (frames == 120)
+        return GetDrawStatsCollectionImpl<120>();
+    if (frames == 60)
+        return GetDrawStatsCollectionImpl<60>();
+
+    return GetDrawStatsCollectionImpl<30>();
+}
+
+void Application::SaveStats(int pixels, int frames)
+{
+    auto [avg2, min, max, med, std] = GetDrawStatsCollection(frames);
 
     auto ScreenPixels = SCREEN_WIDTH * SCREEN_HEIGHT;
     int screenCoverage = pixels * 100 / ScreenPixels;
@@ -846,20 +897,20 @@ void Application::SaveStats(int pixels)
             stats[key][tIndex] = val;
         };
 
-    LAST_FPS = avg.m_FPS;
+    LAST_FPS = med.m_FPS;
     LAST_FPS_STD_DEV = std.m_FPS;
 
-    setVal("FPS----------------------------", int(avg.m_FPS));
-    setVal("Raster time (us)---------------", int(avg.m_RasterTimeUS));
-    setVal("Fillrate (Kilo pixels/s)-------", int(avg.m_FillrateKP));
-    setVal("Transform Time (us)------------", int(avg.m_TransformTimeUS));
-    setVal("Frame draw time (us)-----------", int(avg.m_DrawTimeUS));
-    setVal("Frame draw time per thread (us)", int(avg.m_DrawTimePerThreadUS));
-    setVal("Raster time per thread (us)----", int(avg.m_RasterTimePerThreadUS));
-    setVal("Triangles analyzed per frame---", int(avg.m_FrameTriangles));
-    setVal("Triangles drawn per frame------", int(avg.m_FrameTrianglesDrawn));
-    setVal("Pixels analyzed per frame------", int(avg.m_FramePixels));
-    setVal("Pixels drawn per frame---------", int(avg.m_FramePixelsDrawn));
+    setVal("FPS----------------------------", int(med.m_FPS));
+    setVal("Raster time (us)---------------", int(med.m_RasterTimeUS));
+    setVal("Fillrate (Kilo pixels/s)-------", int(med.m_FillrateKP));
+    setVal("Transform Time (us)------------", int(med.m_TransformTimeUS));
+    setVal("Frame draw time (us)-----------", int(med.m_DrawTimeUS));
+    setVal("Frame draw time per thread (us)", int(med.m_DrawTimePerThreadUS));
+    setVal("Raster time per thread (us)----", int(med.m_RasterTimePerThreadUS));
+    setVal("Triangles analyzed per frame---", int(med.m_FrameTriangles));
+    setVal("Triangles drawn per frame------", int(med.m_FrameTrianglesDrawn));
+    setVal("Pixels analyzed per frame------", int(med.m_FramePixels));
+    setVal("Pixels drawn per frame---------", int(med.m_FramePixelsDrawn));
 
     std::ofstream fout(filename, std::ios::trunc);
     if (!fout.is_open())

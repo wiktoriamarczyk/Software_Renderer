@@ -6,10 +6,15 @@
 
 #include "DrawStatsSystem.h"
 
-DrawStatsSystem DrawStatsSystem::s_Instance;
+template< int SAMPLES >
+DrawStatsSystem::Data<SAMPLES> DrawStatsSystem::Data<SAMPLES>::s_Instance;
 
-void DrawStatsSystem::Update()
+
+template< int SAMPLES >
+void DrawStatsSystem::Data<SAMPLES>::Update()
 {
+    if (!m_Dirty)
+        return;
     ZoneScoped;
 
     m_Avg = {};
@@ -233,4 +238,12 @@ void DrawStatsSystem::Update()
     m_StdDev.m_TransformTimeUS          = int( sqrt( StdDev_TransformTimeUS         / double(FRAME_SAMPLES_COUNT) ) );
     m_StdDev.m_TransformTimePerThreadUS = int( sqrt(StdDev_TransformTimePerThreadUS / double(FRAME_SAMPLES_COUNT) ) );
 
+    m_Dirty = false;
 }
+
+
+template struct DrawStatsSystem::Data<480>;
+template struct DrawStatsSystem::Data<240>;
+template struct DrawStatsSystem::Data<120>;
+template struct DrawStatsSystem::Data<60>;
+template struct DrawStatsSystem::Data<30>;
