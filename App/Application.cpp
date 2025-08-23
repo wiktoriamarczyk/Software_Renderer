@@ -5,6 +5,9 @@
 */
 
 #include "Application.h"
+
+#include <iostream>
+
 #include "Fallback.h"
 #include "DrawStatsSystem.h"
 #include <assimp/cimport.h>
@@ -23,6 +26,59 @@ extern bool g_CompressedPartialTile;
 extern std::atomic<size_t> g_memory_resource_mem ;
 extern std::atomic<int> g_max_overdraw;
 
+std::atomic<bool> STATS_DUMP{ true };
+std::atomic<int> THREADS{ 1 };
+std::atomic<int> FRAMES_RENDERED{ 0 };
+std::atomic<int> LAST_FPS{ 0 };
+std::atomic<int> LAST_FPS_STD_DEV{ 0 };
+
+std::mutex dispath_mutex;
+std::vector<std::function<void()>> dispath_queue;
+std::barrier s_syncBarrier(2);
+
+auto global_start = std::chrono::high_resolution_clock::now();
+
+uint32_t miliseconds_from_app_start()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - global_start).count();
+
+}
+void dispath(std::function<void()> func)
+{
+    std::lock_guard<std::mutex> lock(dispath_mutex);
+    dispath_queue.push_back(func);
+}
+
+void process_dispatch_queue()
+{
+    std::lock_guard<std::mutex> lock(dispath_mutex);
+    for (auto& func : dispath_queue)
+    {
+        func();
+    }
+    dispath_queue.clear();
+}
+
+bool stats_ready(uint32_t wait_start, uint32_t mintime, uint32_t maxtime)
+{
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    if (!dispath_queue.empty())
+        return false;
+
+    auto elapsed = miliseconds_from_app_start() - wait_start;
+    return FRAMES_RENDERED > 140 && ((elapsed > mintime && LAST_FPS_STD_DEV < LAST_FPS / 20) || elapsed > maxtime);
+}
+
+void wait_for_stats()
+{
+    FRAMES_RENDERED = 0;
+    auto wait_start = miliseconds_from_app_start();
+
+    for (; !stats_ready(wait_start, 1000, 7000);) {}
+
+    printf("frames done, waited %u ms (fps:%u, std:%u)\n", miliseconds_from_app_start() - wait_start, LAST_FPS.load(), LAST_FPS_STD_DEV.load());
+}
+
 struct PredefinedModel
 {
     const char* modelPath   = "";
@@ -40,23 +96,23 @@ const PredefinedModel s_PredefinedModels[] =
 {
     { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , .RotationX = 120.f    , .RotationY = 25.f  , .Scale = 2.38f },
     { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 5.5f },
-    { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 4.59f },
-    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f                         , .Scale = 6.3f },
+    { .modelPath = "../Data/Shiba/shiba.fbx"        , .texturePath = "../Data/Shiba/shiba.png"      , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 4.59f },
+    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f    , .Scale = 6.3f },
 
-    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"                             , .RotationY = 25.f  , .Scale = 2.9f },
+    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"                                , .RotationY = 25.f  , .Scale = 2.9f },
     { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 6.837f },
-    { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 5.64f },
-    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f                         , .Scale = 7.72f },
+    { .modelPath = "../Data/Shiba/shiba.fbx"        , .texturePath = "../Data/Shiba/shiba.png"      , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 5.64f },
+    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f    , .Scale = 7.72f },
 
-    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"                             , .RotationY = 25.f  , .Scale = 5.05f },
+    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"                                , .RotationY = 25.f  , .Scale = 5.05f },
     { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 12.937f },
-    { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 9.23f  , .PositionX = -2.7f    , .PositionY = -1.3f },
-    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f                         , .Scale = 15.37f , .PositionX = -10.7f   , .PositionY = -6.45f    , .PositionZ = -0.57f },
+    { .modelPath = "../Data/Shiba/shiba.fbx"        , .texturePath = "../Data/Shiba/shiba.png"      , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 9.23f  , .PositionX = -2.7f    , .PositionY = -1.3f },
+    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f    , .Scale = 15.37f , .PositionX = -10.7f   , .PositionY = -6.45f    , .PositionZ = -0.57f },
 
     { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , .RotationX = 0.f      , .RotationY = 25.f  , .Scale = 6.0f },
     { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 16.f    , .PositionY = 1.4f },
-    { .modelPath = "../Data/Shiba2.fbx"             , .texturePath = "../Data/Shiba2.png"           , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 10.8f   , .PositionX = -3.7f    , .PositionY = -1.75f },
-    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"                                  , .RotationY = 90.f  , .Scale = 16.0f   , .PositionY = -2.1f    , .PositionZ = -4.2f },
+    { .modelPath = "../Data/Shiba/shiba.fbx"        , .texturePath = "../Data/Shiba/shiba.png"      , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 10.8f   , .PositionX = -3.7f    , .PositionY = -1.75f },
+    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 90.f     , .Scale = 16.0f   , .PositionY = -2.1f    , .PositionZ = -4.2f },
 };
 
 void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
@@ -81,6 +137,83 @@ void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
     Settings.modelTranslation.y     = model.PositionY.value_or(Def.modelTranslation.y);
     Settings.modelTranslation.z     = model.PositionZ.value_or(Def.modelTranslation.z);
     Settings.modelScale             = model.Scale.value_or(Def.modelScale);
+}
+
+int RASTER_MODES[] = { 4 };                     // 0,1,2,3,4
+int TILE_MODES[] = { 0, 1, 2 };                 // 0,1,2
+bool COMPRESSED_MODES[] = { true, false };      // true,false
+bool FRAGMENT_SHADER_MODES[] = { true, false }; // true,false
+
+void Application::StatsThreadChange()
+{
+    if (!STATS_DUMP || THREADS >= MAX_THREADS_COUNT)
+        return;
+
+    STATS_DUMP = false;
+
+    std::thread([this]
+    {
+        auto max = 4 * 16 * 16;
+        auto it = 0;
+
+        for (bool compressed : COMPRESSED_MODES)
+        {
+            for (int tile_size : TILE_MODES)
+            {
+                for (bool fragment_shader : FRAGMENT_SHADER_MODES)
+                {
+                    for (int raster : RASTER_MODES)
+                    {
+                        m_DrawSettings.mathType = raster;
+                        m_DrawSettings.tileMode = tile_size;
+                        for (int model_type = 0; model_type < sizeof(s_PredefinedModels) / sizeof(s_PredefinedModels[0]); ++model_type)
+                        //for (int model_type : { 5 })
+                        {
+                            THREADS = 1;
+
+                            while (THREADS <= 16)
+                            {
+                                auto start = miliseconds_from_app_start();
+
+                                dispath([this, model_type, fragment_shader, compressed]
+                                    {
+                                        auto time = miliseconds_from_app_start();
+                                        LoadPredefined(m_ModelPaths, m_DrawSettings, model_type);
+                                        g_TrivialFS = !fragment_shader;
+                                        g_CompressedPartialTile = compressed;
+                                        auto load_time = miliseconds_from_app_start() - time;
+                                        if (load_time > 5)
+                                            printf("model load done in %u ms\n", load_time);
+                                        s_syncBarrier.arrive_and_wait();
+                                    });
+
+                                s_syncBarrier.arrive_and_wait();
+
+                                wait_for_stats();
+
+                                dispath([this]
+                                    {
+                                        auto renderer = m_Contexts[m_DrawSettings.rendererType].pRenderer;
+                                        SaveStats(renderer->GetPixelsDrawn());
+                                        s_syncBarrier.arrive_and_wait();
+                                        THREADS++;
+                                    });
+
+                                s_syncBarrier.arrive_and_wait();
+
+                                auto elapsed = miliseconds_from_app_start() - start;
+                                printf("time elapsed: %lld ms, threads: %d, tile mode: %d, fs: %d, model: %d, %f%%\n\n",
+                                    elapsed, THREADS.load(), m_DrawSettings.mathType, fragment_shader, model_type, float(it) * 100 / float(max));
+
+                                it++;
+                            }
+                        }
+
+                    }
+                }
+            }
+        }
+    }).detach();
 }
 
 vector<Model> Application::LoadFromScene(const aiScene* pScene)
@@ -384,12 +517,16 @@ int Application::Run()
     // run the program as long as the window is open
     while (m_MainWindow.isOpen())
     {
+        if (THREADS != m_DrawSettings.threadsCount && THREADS > 0 && THREADS < 17)
+            m_DrawSettings.threadsCount = THREADS;
+
         FrameMark;
         ZoneScopedN("Main Loop");
 
         const auto now = std::chrono::high_resolution_clock::now();
         const auto durationUS = std::chrono::duration_cast<std::chrono::microseconds>(now - m_LastFrameTime).count();
         const int fps = int(durationUS ? 1000'000.0f / durationUS : 0.0f);
+        FRAMES_RENDERED++;
         m_LastFrameTime = now;
 
         auto renderer     = m_Contexts[m_DrawSettings.rendererType].pRenderer;
@@ -413,8 +550,10 @@ int Application::Run()
                     if (event.key.code == sf::Keyboard::Space)
                         m_DrawSettings.rendererType = (m_DrawSettings.rendererType+1)%2;
                 }
+            }
         }
-        }
+
+        process_dispatch_queue();
 
         // load model and texture if user selected them
         if (m_LastModelPaths.modelPath != m_ModelPaths.modelPath)
@@ -459,7 +598,12 @@ int Application::Run()
         ImGui::SliderFloat3("Translation", &m_DrawSettings.modelTranslation.x , -12, 12);
         ImGui::SliderFloat("Scale", &m_DrawSettings.modelScale, 0, 16);
         ImGui::SliderFloat3("Light Position", &m_DrawSettings.lightPosition.x, -20, 20);
-        ImGui::SliderInt("Thread Count", &m_DrawSettings.threadsCount, 1, MAX_THREADS_COUNT);
+
+        if (ImGui::SliderInt("Thread Count", &m_DrawSettings.threadsCount, 1, MAX_THREADS_COUNT))
+        {
+            THREADS = m_DrawSettings.threadsCount;
+        }
+
         ImGui::Combo("Renderer Type", &m_DrawSettings.rendererType, "Software\0Hardware\0");
 
         ImGui::Checkbox("Wireframe", &m_DrawSettings.drawWireframe);
@@ -501,6 +645,13 @@ int Application::Run()
         if( ImGui::Button("1D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 13); ImGui::SameLine();
         if( ImGui::Button("2D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 14); ImGui::SameLine();
         if( ImGui::Button("3D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 15);
+
+        ImGui::SameLine();
+        if (ImGui::Button("Save Stats"))
+        {
+            STATS_DUMP = true;
+            StatsThreadChange();
+        }
 
         ImGui::ColorEdit3("Ambient Color", &m_DrawSettings.ambientColor.x);
         ImGui::ColorEdit3("Diffuse Color", &m_DrawSettings.diffuseColor.x);
@@ -649,4 +800,98 @@ void Application::DrawRenderingStats( int pixels )
     ImGui::TextColored( Col1 , "|_______________________________|______________|______________|______________|______________|______________|" );
     ImGui::TextColored( Col1 , " Screen coverage %u%% (%u pixels / %u pixels)", pixels*100/ScreenPixels, pixels, ScreenPixels);
     ImGui::End();
+}
+
+void Application::SaveStats(int pixels)
+{
+    auto& avg = DrawStatsSystem::GetAvg();
+    auto& min = DrawStatsSystem::GetMin();
+    auto& max = DrawStatsSystem::GetMax();
+    auto& med = DrawStatsSystem::GetMed();
+    auto& std = DrawStatsSystem::GetStd();
+
+    auto ScreenPixels = SCREEN_WIDTH * SCREEN_HEIGHT;
+    int screenCoverage = pixels * 100 / ScreenPixels;
+
+    string modelPath = m_ModelPaths.texturePath.empty() ? m_LastModelPaths.texturePath : m_ModelPaths.texturePath;
+
+    string tileSize = "32x32";
+    if (m_DrawSettings.tileMode == 1)
+        tileSize = "16x16";
+    else if (m_DrawSettings.tileMode == 2)
+        tileSize = "8x8";
+
+    std::filesystem::path p(modelPath);
+    std::string baseName = p.stem().string();
+    std::string filename = "AVG_" + baseName +
+        "_SC_" + std::to_string(screenCoverage) +
+        "_T_" + std::to_string(m_DrawSettings.mathType) +
+        "_FS_" + std::to_string(!g_TrivialFS) +
+        "_MULTI_" + std::to_string(g_MultithreadedTransformAndClip) +
+        "_COM_" + std::to_string(g_CompressedPartialTile) +
+        "_" + tileSize + ".txt";
+
+    static std::unordered_map<std::string, std::vector<int>> stats;
+    static std::vector<std::string> metricOrder;
+
+    int tIndex = m_DrawSettings.threadsCount - 1;
+
+    auto setVal = [&](const std::string& key, int val)
+        {
+            if (!stats.contains(key))
+            {
+                stats[key] = std::vector<int>(MAX_THREADS_COUNT, 0);
+                metricOrder.push_back(key);
+            }
+            stats[key][tIndex] = val;
+        };
+
+    LAST_FPS = avg.m_FPS;
+    LAST_FPS_STD_DEV = std.m_FPS;
+
+    setVal("FPS----------------------------", int(avg.m_FPS));
+    setVal("Raster time (us)---------------", int(avg.m_RasterTimeUS));
+    setVal("Fillrate (Kilo pixels/s)-------", int(avg.m_FillrateKP));
+    setVal("Transform Time (us)------------", int(avg.m_TransformTimeUS));
+    setVal("Frame draw time (us)-----------", int(avg.m_DrawTimeUS));
+    setVal("Frame draw time per thread (us)", int(avg.m_DrawTimePerThreadUS));
+    setVal("Raster time per thread (us)----", int(avg.m_RasterTimePerThreadUS));
+    setVal("Triangles analyzed per frame---", int(avg.m_FrameTriangles));
+    setVal("Triangles drawn per frame------", int(avg.m_FrameTrianglesDrawn));
+    setVal("Pixels analyzed per frame------", int(avg.m_FramePixels));
+    setVal("Pixels drawn per frame---------", int(avg.m_FramePixelsDrawn));
+
+    std::ofstream fout(filename, std::ios::trunc);
+    if (!fout.is_open())
+    {
+        std::cerr << "Couldn't open file " << filename << " to save.\n";
+        return;
+    }
+
+    const size_t colWidth = 5;
+
+    std::string header = "Metric-------------------------";
+    fout << header;
+    for (int t = 1; t <= MAX_THREADS_COUNT; t++)
+    {
+        std::string h = "T_" + std::to_string(t);
+        if (h.size() < colWidth) h.resize(colWidth, ' ');
+        fout << "\t" << h;
+    }
+    fout << "\n";
+
+    for (const auto& metric : metricOrder)
+    {
+        fout << metric;
+        for (int v : stats[metric])
+        {
+            std::string s = (v == 0 ? "-" : std::to_string(v));
+            if (s.size() < colWidth) s.resize(colWidth, ' ');
+            fout << "\t" << s;
+        }
+        fout << "\n";
+    }
+
+    fout.close();
+    std::cout << "Stats saved/updated in: " << filename << " for " << std::to_string(m_DrawSettings.threadsCount) << " threads.""\n";
 }

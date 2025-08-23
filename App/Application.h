@@ -62,6 +62,8 @@ class Application
 {
 public:
     Application()=default;
+    void SaveStats(int pixels);
+    void StatsThreadChange();
 
     bool Initialize();
     int Run();

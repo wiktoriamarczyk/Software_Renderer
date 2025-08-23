@@ -51,6 +51,13 @@ SET(APP_SRC_FILES_LIST
     App/SimpleThreadPool.cpp
     App/GlRenderer.h
     App/GlRenderer.cpp
+    App/Simd.cpp
+    App/Simd.h
+    App/RenderCommandsBuffer.cpp
+    App/RenderCommandsBuffer.h
+    App/RenderCommands.h
+    App/TransientAllocator.h
+    App/TransientAllocator.cpp
 
     imgui/imgui.h
     imgui/imgui.cpp
@@ -106,8 +113,8 @@ ADD_EXECUTABLE(SoftwareRenderer ${APP_SRC_FILES_LIST} )
 #*****************************************************
 
 if( USE_LLVM_COMPILER_IN_VS )
-    #target_compile_options(SoftwareRenderer PRIVATE "/clang:-mfma" "/clang:-fno-slp-vectorize")	
-	target_compile_options(SoftwareRenderer PRIVATE "/clang:-mfma" "/clang:-fno-slp-vectorize" "/clang:-msse2" "/clang:-mno-avx" "/clang:-mno-avx2")	
+    #target_compile_options(SoftwareRenderer PRIVATE "/clang:-mfma" "/clang:-fno-slp-vectorize")
+	target_compile_options(SoftwareRenderer PRIVATE "/clang:-mfma" "/clang:-fno-slp-vectorize" "/clang:-msse2" "/clang:-mno-avx" "/clang:-mno-avx2")
 endif()
 
 #*****************************************************
