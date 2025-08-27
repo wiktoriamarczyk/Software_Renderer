@@ -25,6 +25,7 @@
 #include <numbers>
 #include <bit>
 #include <span>
+#include <string_view>
 #include <barrier>
 
 using std::vector;
@@ -48,6 +49,8 @@ using std::thread;
 using std::array;
 using std::span;
 using std::atomic;
+using std::pair;
+using std::string_view;
 
 namespace pmr
 {

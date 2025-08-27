@@ -7,10 +7,10 @@
 #include "Simd.h"
 #include <bit>
 
-const __m128 c_v4f_Inf         =    _mm_set1_ps(-logf(0.0f));
-const __m128 c_v4f_InfMinus    =    _mm_set1_ps( logf(0.0f));
-const __m256 c_v8f_Inf         = _mm256_set1_ps(-logf(0.0f));
-const __m256 c_v8f_InfMinus    = _mm256_set1_ps( logf(0.0f));
+alignas(16) const __m128 c_v4f_Inf         =    _mm_set1_ps(-logf(0.0f));
+alignas(16) const __m128 c_v4f_InfMinus    =    _mm_set1_ps( logf(0.0f));
+alignas(32) const __m256 c_v8f_Inf         = _mm256_set1_ps(-logf(0.0f));
+alignas(32) const __m256 c_v8f_InfMinus    = _mm256_set1_ps( logf(0.0f));
 
 #define _v4f_is_ninf(x)               _mm_cmpeq_ps(x, c_v4f_InfMinus)
 #define _v8f_is_ninf(x)              _mm256_cmp_ps(x, c_v8f_InfMinus,_CMP_EQ_OQ)

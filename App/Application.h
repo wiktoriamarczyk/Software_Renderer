@@ -11,7 +11,7 @@
 
 struct DrawSettings
 {
-    Vector3f    modelRotation = Vector3f(360 ,0,0);
+    Vector3f    modelRotation = Vector3f(360, 0, 0);
     Vector3f    modelTranslation = Vector3f(0, 0, 0);//.75f);
     float       modelScale = 2.0f;//5.5;//0.3f;//;
     Vector4f    wireFrameColor = Vector4f(1, 0, 1, 1);
@@ -31,7 +31,7 @@ struct DrawSettings
     bool        renderDepthBuffer = false;
     bool        alphaBlend = false;
     bool        backfaceCulling = true;
-    bool        vSync = true;
+    bool        vSync = false;
     int         rendererType = 0;
     int         mathType = 4;
     int         tileMode = 0;
@@ -75,6 +75,7 @@ private:
     static void OpenDialog(const char* title, const char* filters, function<void()> callback);
     void OpenSceneDataDialog(MyModelPaths& selectedPaths);
     void DrawRenderingStats( int pixels );
+    void SetupStatsToSave();
 
     const uint8_t MAX_THREADS_COUNT = uint8_t(std::min<int>(16, std::thread::hardware_concurrency()));
 
@@ -92,4 +93,12 @@ private:
     sf::Clock m_DeltaClock;
     std::chrono::steady_clock::time_point m_LastFrameTime;
     bool m_VSync = true;
+
+    // stats
+    vector<pair<int ,bool>> m_SelectedModels;
+    vector<pair<int ,bool>> m_SelectedRasterModes;
+    vector<pair<int ,bool>> m_SelectedTileModes;
+    vector<pair<bool,bool>> m_SelectedCompressed;
+    vector<pair<bool,bool>> m_SelectedMultiTC;
+    vector<pair<bool,bool>> m_SelectedFragmentShader;
 };

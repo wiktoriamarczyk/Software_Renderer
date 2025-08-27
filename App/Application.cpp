@@ -15,6 +15,43 @@
 #include <assimp/postprocess.h>
 #include "../ImGuiFileDialog/ImGuiFileDialog.h"
 
+
+struct PredefinedModel
+{
+    const char* modelPath = "";
+    const char* texturePath = "";
+    optional<float> RotationX;
+    optional<float> RotationY;
+    optional<float> RotationZ;
+    optional<float> Scale;
+    optional<float> PositionX;
+    optional<float> PositionY;
+    optional<float> PositionZ;
+};
+
+const PredefinedModel s_PredefinedModels[] =
+{
+    {.modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , .RotationX = 120.f    , .RotationY = 25.f  , .Scale = 2.38f },
+    {.modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 5.5f },
+    {.modelPath = "../Data/Shiba/shiba.fbx"        , .texturePath = "../Data/Shiba/shiba.png"      , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 4.59f },
+    {.modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f    , .Scale = 6.3f },
+
+    {.modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"                                , .RotationY = 25.f  , .Scale = 2.9f },
+    {.modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 6.837f },
+    {.modelPath = "../Data/Shiba/shiba.fbx"        , .texturePath = "../Data/Shiba/shiba.png"      , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 5.64f },
+    {.modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f    , .Scale = 7.72f },
+
+    {.modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"                                , .RotationY = 25.f  , .Scale = 5.05f },
+    {.modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 12.937f },
+    {.modelPath = "../Data/Shiba/shiba.fbx"        , .texturePath = "../Data/Shiba/shiba.png"      , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 9.23f  , .PositionX = -2.7f    , .PositionY = -1.3f },
+    {.modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f    , .Scale = 15.37f , .PositionX = -10.7f   , .PositionY = -6.45f    , .PositionZ = -0.57f },
+
+    {.modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , .RotationX = 0.f      , .RotationY = 25.f  , .Scale = 6.0f },
+    {.modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 16.f    , .PositionY = 1.4f },
+    {.modelPath = "../Data/Shiba/shiba.fbx"        , .texturePath = "../Data/Shiba/shiba.png"      , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 10.8f   , .PositionX = -3.7f    , .PositionY = -1.75f },
+    {.modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 90.f     , .Scale = 16.0f   , .PositionY = -2.1f    , .PositionZ = -4.2f },
+};
+
 extern bool g_showTilesBoundry;
 extern bool g_showTilesGrid;
 extern bool g_showTilestype;
@@ -37,6 +74,8 @@ std::vector<std::function<void()>> dispath_queue;
 std::barrier s_syncBarrier(2);
 
 auto global_start = std::chrono::high_resolution_clock::now();
+
+static bool show_panel = false;
 
 uint32_t miliseconds_from_app_start()
 {
@@ -98,41 +137,6 @@ int wait_for_stats()
     return ready;
 }
 
-struct PredefinedModel
-{
-    const char* modelPath   = "";
-    const char* texturePath = "";
-    optional<float> RotationX;
-    optional<float> RotationY;
-    optional<float> RotationZ;
-    optional<float> Scale;
-    optional<float> PositionX;
-    optional<float> PositionY;
-    optional<float> PositionZ;
-};
-
-const PredefinedModel s_PredefinedModels[] =
-{
-    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , .RotationX = 120.f    , .RotationY = 25.f  , .Scale = 2.38f },
-    { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 5.5f },
-    { .modelPath = "../Data/Shiba/shiba.fbx"        , .texturePath = "../Data/Shiba/shiba.png"      , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 4.59f },
-    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f    , .Scale = 6.3f },
-
-    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"                                , .RotationY = 25.f  , .Scale = 2.9f },
-    { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 6.837f },
-    { .modelPath = "../Data/Shiba/shiba.fbx"        , .texturePath = "../Data/Shiba/shiba.png"      , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 5.64f },
-    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f    , .Scale = 7.72f },
-
-    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"                                , .RotationY = 25.f  , .Scale = 5.05f },
-    { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 12.937f },
-    { .modelPath = "../Data/Shiba/shiba.fbx"        , .texturePath = "../Data/Shiba/shiba.png"      , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 9.23f  , .PositionX = -2.7f    , .PositionY = -1.3f },
-    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 120.f    , .Scale = 15.37f , .PositionX = -10.7f   , .PositionY = -6.45f    , .PositionZ = -0.57f },
-
-    { .modelPath = "x"                              , .texturePath = "../Data/Checkerboard.png"     , .RotationX = 0.f      , .RotationY = 25.f  , .Scale = 6.0f },
-    { .modelPath = "../Data/teapot/Teapot.gltf"     , .texturePath = "../Data/teapot/Teapot.png"    , .RotationX = 330.f    , .RotationY = 25.f  , .Scale = 16.f    , .PositionY = 1.4f },
-    { .modelPath = "../Data/Shiba/shiba.fbx"        , .texturePath = "../Data/Shiba/shiba.png"      , .RotationX = 280.f    , .RotationY = 140.f , .Scale = 10.8f   , .PositionX = -3.7f    , .PositionY = -1.75f },
-    { .modelPath = "../Data/dog/dog.glb"            , .texturePath = "../Data/dog/dog.png"          , .RotationY = 90.f     , .Scale = 16.0f   , .PositionY = -2.1f    , .PositionZ = -4.2f },
-};
 
 void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
 {
@@ -158,10 +162,7 @@ void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
     Settings.modelScale             = model.Scale.value_or(Def.modelScale);
 }
 
-int RASTER_MODES[] = { 0,1,2,3,4 };             // 0,1,2,3,4
-int TILE_MODES[] = { 0, 1, 2 };                 // 0,1,2
-bool COMPRESSED_MODES[] = { true, false };      // true,false
-bool FRAGMENT_SHADER_MODES[] = { true, false }; // true,false
+
 
 void Application::StatsThreadChange()
 {
@@ -175,59 +176,75 @@ void Application::StatsThreadChange()
         auto max = 4 * 16 * 16;
         auto it = 0;
 
-        for (bool compressed : COMPRESSED_MODES)
+        for (auto& multi_tc : m_SelectedMultiTC)
         {
-            for (int tile_size : TILE_MODES)
+            if (!multi_tc.second)
+                continue;
+            for (auto& compressed : m_SelectedCompressed)
             {
-                for (bool fragment_shader : FRAGMENT_SHADER_MODES)
+                if (!compressed.second)
+                    continue;
+                for (auto& tile_size : m_SelectedTileModes)
                 {
-                    for (int raster : RASTER_MODES)
+                    if (!tile_size.second)
+                        continue;
+                    for (auto& fragment_shader : m_SelectedFragmentShader)
                     {
-                        m_DrawSettings.mathType = raster;
-                        m_DrawSettings.tileMode = tile_size;
-                        for (int model_type = 0; model_type < sizeof(s_PredefinedModels) / sizeof(s_PredefinedModels[0]); ++model_type)
-                        //for (int model_type : { 5 })
+                        if (!fragment_shader.second)
+                            continue;
+                        for (auto& raster : m_SelectedRasterModes)
                         {
-                            THREADS = 1;
-
-                            while (THREADS <= 16)
+                            if (!raster.second)
+                                continue;
+                            m_DrawSettings.mathType = raster.first;
+                            m_DrawSettings.tileMode = tile_size.first;
+                            for (auto& model_type : m_SelectedModels)
                             {
-                                auto start = miliseconds_from_app_start();
+                                if (!model_type.second)
+                                    continue;
 
-                                dispath([this, model_type, fragment_shader, compressed]
-                                    {
-                                        auto time = miliseconds_from_app_start();
-                                        LoadPredefined(m_ModelPaths, m_DrawSettings, model_type);
-                                        g_TrivialFS = !fragment_shader;
-                                        g_CompressedPartialTile = compressed;
-                                        auto load_time = miliseconds_from_app_start() - time;
-                                        if (load_time > 5)
-                                            printf("model load done in %u ms\n", load_time);
-                                        s_syncBarrier.arrive_and_wait();
-                                    });
+                                THREADS = 1;
 
-                                s_syncBarrier.arrive_and_wait();
+                                while (THREADS <= 16)
+                                {
+                                    auto start = miliseconds_from_app_start();
 
-                                int frames = wait_for_stats();
+                                    dispath([this, model_type, fragment_shader, compressed, multi_tc]
+                                        {
+                                            auto time = miliseconds_from_app_start();
+                                            LoadPredefined(m_ModelPaths, m_DrawSettings, model_type.first);
+                                            g_TrivialFS = !fragment_shader.first;
+                                            g_CompressedPartialTile = compressed.first;
+                                            g_MultithreadedTransformAndClip = multi_tc.first;
+                                            auto load_time = miliseconds_from_app_start() - time;
+                                            if (load_time > 5)
+                                                printf("model load done in %u ms\n", load_time);
+                                            s_syncBarrier.arrive_and_wait();
+                                        });
 
-                                dispath([this, frames]
-                                    {
-                                        auto renderer = m_Contexts[m_DrawSettings.rendererType].pRenderer;
-                                        SaveStats(renderer->GetPixelsDrawn(), frames);
-                                        s_syncBarrier.arrive_and_wait();
-                                        THREADS++;
-                                    });
+                                    s_syncBarrier.arrive_and_wait();
 
-                                s_syncBarrier.arrive_and_wait();
+                                    int frames = wait_for_stats();
 
-                                auto elapsed = miliseconds_from_app_start() - start;
-                                printf("time elapsed: %lld ms, threads: %d, tile mode: %d, fs: %d, model: %d, %f%%\n\n",
-                                    elapsed, THREADS.load(), m_DrawSettings.mathType, fragment_shader, model_type, float(it) * 100 / float(max));
+                                    dispath([this, frames]
+                                        {
+                                            auto renderer = m_Contexts[m_DrawSettings.rendererType].pRenderer;
+                                            SaveStats(renderer->GetPixelsDrawn(), frames);
+                                            s_syncBarrier.arrive_and_wait();
+                                            THREADS++;
+                                        });
 
-                                it++;
+                                    s_syncBarrier.arrive_and_wait();
+
+                                    auto elapsed = miliseconds_from_app_start() - start;
+                                    printf("time elapsed: %u ms, threads: %d, tile mode: %d, fs: %d, model: %d, %f%%\n\n",
+                                        elapsed, THREADS.load(), m_DrawSettings.mathType, fragment_shader.first, model_type.first, float(it) * 100 / float(max));
+
+                                    it++;
+                                }
                             }
-                        }
 
+                        }
                     }
                 }
             }
@@ -480,6 +497,37 @@ bool Application::Initialize()
 
     m_LastFrameTime = std::chrono::high_resolution_clock::now();
 
+    m_SelectedModels.resize(16);
+    m_SelectedRasterModes.resize(5);
+    m_SelectedTileModes.resize(3);
+
+    m_SelectedCompressed.resize(2);
+    m_SelectedMultiTC.resize(2);
+    m_SelectedFragmentShader.resize(2);
+
+    m_SelectedModels[0] = { 0 , true };
+    for (int i = 1; i < m_SelectedModels.size(); ++i)
+        m_SelectedModels[(i%4)*4 + i/4] = { i , false };
+
+    m_SelectedRasterModes[0] = { 0 , true };
+    for (int i = 1; i < m_SelectedRasterModes.size(); ++i)
+        m_SelectedRasterModes[i] = { i , false };
+
+    m_SelectedTileModes[0] = { 0 , true };
+    for (int i = 1; i < m_SelectedTileModes.size(); ++i)
+        m_SelectedTileModes[i] = { i , false };
+
+    for (int i = 0; i < m_SelectedCompressed.size(); ++i)
+    {
+        m_SelectedCompressed[i] = { !i , !i };
+        m_SelectedMultiTC[i] = { !i , !i };
+        m_SelectedFragmentShader[i] = { !i , !i };
+    }
+
+    sf::Image icon;
+    icon.loadFromFile("../Data/icon.png");
+    m_MainWindow.setIcon(icon.getSize().x, icon.getSize().y, icon.getPixelsPtr());
+
     return true;
 }
 
@@ -630,20 +678,18 @@ int Application::Run()
         ImGui::SameLine(); ImGui::Checkbox("Show Tiles Grid" , &g_showTilesGrid);
         ImGui::SameLine(); ImGui::Checkbox( "Visualize ZBuffer", &m_DrawSettings.renderDepthBuffer);
 
-      //ImGui::SameLine(); ImGui::Checkbox("Alpha Blend" , &m_DrawSettings.alphaBlend);
+        //ImGui::SameLine(); ImGui::Checkbox("Alpha Blend" , &m_DrawSettings.alphaBlend);
 
         ImGui::Checkbox("Trivial FS", &g_TrivialFS);
         ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.colorizeThreads);
         ImGui::SameLine(); ImGui::Checkbox("Threaded T&C", &g_MultithreadedTransformAndClip);
         ImGui::SameLine(); ImGui::Checkbox( "Vertical Sync", &m_DrawSettings.vSync);
-        ImGui::SameLine(); if( ImGui::Button( "Close App" ) ) m_MainWindow.close();
 
         ImGui::Checkbox("Compressed Partial Tile", &g_CompressedPartialTile);
         ImGui::SameLine(); ImGui::Checkbox("Use ZBuffer", &m_DrawSettings.useZBuffer);
         ImGui::SameLine(); ImGui::Checkbox("One Thread Per Tile", &g_ThreadPerTile);
 
-      //ImGui::SameLine(); ImGui::Checkbox("Backface Culling", &m_DrawSettings.backfaceCulling);
-
+        //ImGui::SameLine(); ImGui::Checkbox("Backface Culling", &m_DrawSettings.backfaceCulling);
 
         if( ImGui::Button("0A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 0); ImGui::SameLine();
         if( ImGui::Button("1A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 1); ImGui::SameLine();
@@ -665,11 +711,16 @@ int Application::Run()
         if( ImGui::Button("2D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 14); ImGui::SameLine();
         if( ImGui::Button("3D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 15);
 
-        ImGui::SameLine();
-        if (ImGui::Button("Save Stats"))
+        if (ImGui::Button("Stats panel"))
         {
-            STATS_DUMP = true;
-            StatsThreadChange();
+            show_panel = !show_panel;
+        }
+
+        if (show_panel)
+        {
+            ImGui::Begin("Stats panel", &show_panel);
+            SetupStatsToSave();
+            ImGui::End();
         }
 
         ImGui::ColorEdit3("Ambient Color", &m_DrawSettings.ambientColor.x);
@@ -780,6 +831,47 @@ int Application::Run()
     return 0;
 }
 
+template<typename T>
+void SelectCheckboxOptions(span<pair<T,bool>> values, span<const string_view> labels)
+{
+    for (int i = 0; i < values.size(); ++i)
+    {
+        ImGui::Checkbox(labels[i].data(), &values[i].second);
+    }
+}
+
+void Application::SetupStatsToSave()
+{
+    constexpr string_view s_PredefinedModelNames[] = { "Cube 15%", "Cube 25%", "Cube 75%", "Cube 100%", "Teapot 15%", "Teapot 25%", "Teapot 75%", "Teapot 100%", "Shiba 15%", "Shiba 25%", "Shiba 75%", "Shiba 100%", "Dog 15%", "Dog 25%", "Dog 75%", "Dog 100%" };
+    constexpr string_view s_TileModeNames[] = { "32x32", "16x16", "8x8" };
+    constexpr string_view s_RasterModeNames[] = { "CPU", "CPUx8", "SSEx4", "SSEx8", "AVXx8" };
+    constexpr string_view s_YesNo[] = { "Yes", "No" };
+
+    if (ImGui::CollapsingHeader("Models"))
+        SelectCheckboxOptions<int>(m_SelectedModels, s_PredefinedModelNames);
+
+    if (ImGui::CollapsingHeader("Tile mode"))
+        SelectCheckboxOptions<int>(m_SelectedTileModes, s_TileModeNames);
+
+    if (ImGui::CollapsingHeader("Raster mode"))
+        SelectCheckboxOptions<int>(m_SelectedRasterModes, s_RasterModeNames);
+
+    if (ImGui::CollapsingHeader("Compress Partial Tiles"))
+        SelectCheckboxOptions<bool>(m_SelectedCompressed, s_YesNo);
+
+    if (ImGui::CollapsingHeader("Multithreaded Transform and Clip"))
+        SelectCheckboxOptions<bool>(m_SelectedMultiTC, s_YesNo);
+
+    if (ImGui::CollapsingHeader("Fragment Shader On"))
+        SelectCheckboxOptions<bool>(m_SelectedFragmentShader, s_YesNo);
+
+    if (ImGui::Button("Save Stats"))
+    {
+        STATS_DUMP = true;
+        StatsThreadChange();
+    }
+}
+
 void Application::DrawRenderingStats( int pixels )
 {
     if( !ImGui::Begin( "Stats" ) )
@@ -874,7 +966,7 @@ void Application::SaveStats(int pixels, int frames)
 
     std::filesystem::path p(modelPath);
     std::string baseName = p.stem().string();
-    std::string filename = "AVG_" + baseName +
+    std::string filename = "MED_" + baseName +
         "_SC_" + std::to_string(screenCoverage) +
         "_T_" + std::to_string(m_DrawSettings.mathType) +
         "_FS_" + std::to_string(!g_TrivialFS) +
