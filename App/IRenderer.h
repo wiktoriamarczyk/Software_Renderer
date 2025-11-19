@@ -1,15 +1,13 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #pragma once
 #include "Common.h"
 #include "Vector3f.h"
-#include "Matrix4.h"
 #include "Vector4f.h"
-#include "Vector2f.h"
 #include "Math.h"
 
 enum class eRendererType : uint8_t
@@ -41,7 +39,6 @@ enum class eTileMode : uint8_t
     Tile_8x8    = 2,
 };
 
-
 class ITexture
 {
 public:
@@ -62,7 +59,6 @@ class IRenderer
 {
 public:
     virtual shared_ptr<ITexture> LoadTexture(const char* fileName)const=0;
-
     virtual void ClearScreen()=0;
     virtual void ClearZBuffer()=0;
     virtual void BeginFrame()=0;
@@ -73,12 +69,10 @@ public:
     virtual const vector<uint32_t>& GetScreenBuffer() const=0;
     virtual const DrawStats& GetDrawStats() const=0;
     virtual shared_ptr<ITexture> GetDefaultTexture() const=0;
-
     virtual void SetModelMatrix(const Matrix4f& other)=0;
     virtual void SetViewMatrix(const Matrix4f& other)=0;
     virtual void SetProjectionMatrix(const Matrix4f& other)=0;
     virtual void SetTexture(shared_ptr<ITexture> texture)=0;
-
     virtual void SetWireFrameColor(const Vector4f& wireFrameColor)=0;
     virtual void SetClearColor(const Vector4f& clearColor)=0;
     virtual void SetDiffuseColor(const Vector3f& diffuseColor)=0;

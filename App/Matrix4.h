@@ -1,11 +1,10 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #pragma once
-#include "Common.h"
 #include "Vector4f.h"
 
 class Plane;

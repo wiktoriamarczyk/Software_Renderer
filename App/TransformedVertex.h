@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #pragma once
@@ -48,12 +48,12 @@ struct ALIGN_FOR_AVX TransformedVertex
 
 inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix,Vector2si ScreenSize)
 {
-    m_WorldPosition = v.position.Multiplied(worldMatrix);
-    m_Normal        = v.normal.TransformedVec(worldMatrix).Normalized();
-    m_Color         = v.color;
-    m_UV            = v.uv;
+    m_WorldPosition = v.m_Position.Multiplied(worldMatrix);
+    m_Normal        = v.m_Normal.TransformedVec(worldMatrix).Normalized();
+    m_Color         = v.m_Color;
+    m_UV            = v.m_UV;
 
-    m_ScreenPosition = Vector4f(v.position, 1.0f).Transformed(mvpMatrix);
+    m_ScreenPosition = Vector4f(v.m_Position, 1.0f).Transformed(mvpMatrix);
 
     float oneOverW = 1.0f / m_ScreenPosition.w;
 
@@ -65,7 +65,7 @@ inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f& wor
     m_ScreenPosition.y = (m_ScreenPosition.y + 1) * ScreenSize.y / 2;
 }
 
-template< int Elements = 8 , eSimdType Type = eSimdType::AVX >
+template<int Elements = 8, eSimdType Type = eSimdType::AVX>
 struct ALIGN_FOR_AVX SimdTransformedVertex
 {
     Vector3<fsimd<Elements,Type>> m_Normal;

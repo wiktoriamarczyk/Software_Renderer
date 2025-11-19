@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #pragma once
@@ -11,49 +11,49 @@
 
 struct DrawSettings
 {
-    Vector3f    modelRotation = Vector3f(360, 0, 0);
-    Vector3f    modelTranslation = Vector3f(0, 0, 0);//.75f);
-    float       modelScale = 2.0f;//5.5;//0.3f;//;
-    Vector4f    wireFrameColor = Vector4f(1, 0, 1, 1);
-    Vector3f    diffuseColor = Vector3f(1, 1, 1);
-    Vector3f    ambientColor = Vector3f(1, 1, 1);
-    Vector3f    backgroundColor = Vector3f(0.18f, 0.24f, 0.44f);
-    Vector3f    lightPosition = Vector3f(0, 0, -20);
-    float       diffuseStrength = 0.7f;
-    float       ambientStrength = 0.1f;
-    float       specularStrength = 0.9f;
-    float       shininessPower = 5; // 2 4 8 16 32
-    int         threadsCount = 1;
-    bool        drawWireframe = false;
-    bool        drawBBoxes = false;
-    bool        colorizeThreads = false;
-    bool        useZBuffer = true;
-    bool        renderDepthBuffer = false;
-    bool        alphaBlend = false;
-    bool        backfaceCulling = true;
-    bool        vSync = false;
-    int         rendererType = 0;
-    int         mathType = 4;
-    int         tileMode = 0;
+    Vector3f    m_ModelRotation = Vector3f(360, 0, 0);
+    Vector3f    m_ModelTranslation = Vector3f(0, 0, 0);
+    float       m_ModelScale = 2.0f;
+    Vector4f    m_WireFrameColor = Vector4f(1, 0, 1, 1);
+    Vector3f    m_DiffuseColor = Vector3f(1, 1, 1);
+    Vector3f    m_AmbientColor = Vector3f(1, 1, 1);
+    Vector3f    m_BackgroundColor = Vector3f(0.18f, 0.24f, 0.44f);
+    Vector3f    m_LightPosition = Vector3f(0, 0, -20);
+    float       m_DiffuseStrength = 0.7f;
+    float       m_AmbientStrength = 0.1f;
+    float       m_SpecularStrength = 0.9f;
+    float       m_ShininessPower = 5;
+    int         m_ThreadsCount = 1;
+    bool        m_DrawWireframe = false;
+    bool        m_DrawBBoxes = false;
+    bool        m_ColorizeThreads = false;
+    bool        m_UseZBuffer = true;
+    bool        m_RenderDepthBuffer = false;
+    bool        m_AlphaBlend = false;
+    bool        m_BackfaceCulling = true;
+    bool        m_VSync = false;
+    int         m_RendererType = 0;   ///< (0 - software, 1 - hardware)
+    int         m_MathType = 4;       ///< (0 - CPU, 1 - CPUx8, 2 - SSEx4, 3 - SSEx8, 4 - AVXx8)
+    int         m_TileMode = 0;       ///< (0 - 32x32, 1 - 16x16, 2 - 8x8)
 };
 
 struct Model
 {
-    vector<Vertex> vertices;
-    Vector3f Min;
-    Vector3f Max;
+    vector<Vertex> m_Vertices;
+    Vector3f m_Min; ///< min model coordinates
+    Vector3f m_Max; ///< max model coordinates
 };
 
 struct MyModelPaths
 {
-    string modelPath;
-    string texturePath;
+    string m_ModelPath;
+    string m_TexturePath;
 };
 
 struct RendererContext
 {
-    shared_ptr<IRenderer> pRenderer;
-    shared_ptr<ITexture>  pModelTexture;
+    shared_ptr<IRenderer> m_pRenderer;
+    shared_ptr<ITexture>  m_pModelTexture;
 };
 
 class aiScene;
@@ -62,9 +62,9 @@ class Application
 {
 public:
     Application()=default;
-    void SaveStats(int pixels, int frames);
-    void StatsThreadChange();
 
+    void SaveStatsToFile(int pixels, int frames);
+    void RunPerformanceTests();
     bool Initialize();
     int Run();
 private:
@@ -75,7 +75,7 @@ private:
     static void OpenDialog(const char* title, const char* filters, function<void()> callback);
     void OpenSceneDataDialog(MyModelPaths& selectedPaths);
     void DrawRenderingStats( int pixels );
-    void SetupStatsToSave();
+    void SetupPerformanceTests();
 
     const uint8_t MAX_THREADS_COUNT = uint8_t(std::min<int>(16, std::thread::hardware_concurrency()));
 

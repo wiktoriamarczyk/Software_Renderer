@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #include "Math.h"
@@ -74,7 +74,7 @@ span<const Vertex> ClipTriangles(const Plane& clipPlane, const float epsilon, sp
     // get all vertices relation to clipping plane
     for (int i = 0; i < oldVerticesCount; ++i)
     {
-        vertsRelation[i] = (uint8_t)clipPlane.GetSide(verts[i].position, epsilon);
+        vertsRelation[i] = (uint8_t)clipPlane.GetSide(verts[i].m_Position, epsilon);
         // count vertices in front/on/back of clipping plane
         frontOnBackCount[vertsRelation[i]]++;
     }
@@ -120,7 +120,7 @@ span<const Vertex> ClipTriangles(const Plane& clipPlane, const float epsilon, sp
             {
                 float distance = 0;
                 // calculate intersection point
-                clipPlane.LineIntersection(verts[vi0].position, verts[vi1].position, distance);
+                clipPlane.LineIntersection(verts[vi0].m_Position, verts[vi1].m_Position, distance);
                 // create new vertex by interpolation of two vertices
                 Vertex newVertex = LerpT(verts[vi0], verts[vi1], distance);
 

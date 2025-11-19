@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #pragma once
@@ -12,49 +12,51 @@ class Texture : public ITexture
 {
 public:
     Texture() = default;
+
     bool CreateWhite4x4Tex();
     bool Load(const char* fileName);
     bool IsValid()const override;
     Vector4f Sample(Vector2f uv)const;
 
-    template< eSimdType Type , int Elements >
-    Vector4<fsimd<Elements,Type>> Sample(const Vector2<fsimd<Elements,Type>>& uv)const;
+    template<eSimdType Type, int Elements>
+    Vector4<fsimd<Elements, Type>> Sample(const Vector2<fsimd<Elements,Type>>& uv)const;
+
 private:
-    template< int Elements , eSimdType Type = eSimdType::None >
+    template<int Elements, eSimdType Type = eSimdType::None>
     struct SampleHelper
     {
-        wide_arithmetic<int,Elements,Type>      m_Width        = {};
-        wide_arithmetic<int,Elements,Type>      m_Height       = {};
+        wide_arithmetic<int, Elements, Type>      m_Width        = {};
+        wide_arithmetic<int, Elements, Type>      m_Height       = {};
 
-        wide_arithmetic<int,Elements,Type>      m_MaxWidth     = {};
-        wide_arithmetic<int,Elements,Type>      m_MaxHeight    = {};
+        wide_arithmetic<int, Elements, Type>      m_MaxWidth     = {};
+        wide_arithmetic<int, Elements, Type>      m_MaxHeight    = {};
 
-        wide_arithmetic<float,Elements,Type>    m_fWidth       = {};
-        wide_arithmetic<float,Elements,Type>    m_fHeight      = {};
+        wide_arithmetic<float, Elements, Type>    m_fWidth       = {};
+        wide_arithmetic<float, Elements, Type>    m_fHeight      = {};
 
-        wide_arithmetic<float,Elements,Type>    m_fMaxWidth    = {};
-        wide_arithmetic<float,Elements,Type>    m_fMaxHeight   = {};
+        wide_arithmetic<float, Elements, Type>    m_fMaxWidth    = {};
+        wide_arithmetic<float, Elements, Type>    m_fMaxHeight   = {};
 
-        wide_arithmetic<int,Elements,Type>      m_SizeShiftX   = {};
-        wide_arithmetic<int,Elements,Type>      m_SizeShiftY   = {};
-        wide_arithmetic<int,Elements,Type>      m_SizeMaskX    = {};
-        wide_arithmetic<int,Elements,Type>      m_SizeMaskY    = {};
+        wide_arithmetic<int, Elements, Type>      m_SizeShiftX   = {};
+        wide_arithmetic<int, Elements, Type>      m_SizeShiftY   = {};
+        wide_arithmetic<int, Elements, Type>      m_SizeMaskX    = {};
+        wide_arithmetic<int, Elements, Type>      m_SizeMaskY    = {};
     };
 
     void InitSimdHelpers();
 
-    template< int Elements , eSimdType Type = eSimdType::None >
+    template<int Elements, eSimdType Type = eSimdType::None>
     auto&            GetHelper()const
     {
-        if constexpr( Elements == 1 )
+        if constexpr(Elements == 1)
             return m_HelperStandard;
-        else if constexpr( Elements == 8 && Type == eSimdType::None )
+        else if constexpr(Elements == 8 && Type == eSimdType::None)
             return m_HelperCPU;
-        else if constexpr( Elements == 4 && Type == eSimdType::SSE )
+        else if constexpr(Elements == 4 && Type == eSimdType::SSE)
             return m_HelperSSE;
-        else if constexpr( Elements == 8 && Type == eSimdType::SSE )
+        else if constexpr(Elements == 8 && Type == eSimdType::SSE)
             return m_HelperSSE8;
-        else if constexpr( Elements == 8 && Type == eSimdType::AVX )
+        else if constexpr(Elements == 8 && Type == eSimdType::AVX)
             return m_HelperAVX;
     }
     vector<uint32_t> m_Data;
@@ -79,31 +81,31 @@ inline Vector4f Texture::Sample(Vector2f uv) const
     int x;
     int y;
     int pixelIndex;
-    if( !m_Pow2 )
+    if(!m_Pow2)
     {
-        if( m_Clamp )
+        if(m_Clamp)
         {
-            x = std::clamp<int>( int32_t( uv.x * helper.m_fWidth ) , 0 , helper.m_MaxWidth  );
-            y = std::clamp<int>( int32_t( uv.y * helper.m_fHeight) , 0 , helper.m_MaxHeight );
+            x = std::clamp<int>(int32_t( uv.x * helper.m_fWidth ), 0, helper.m_MaxWidth);
+            y = std::clamp<int>(int32_t( uv.y * helper.m_fHeight), 0, helper.m_MaxHeight);
         }
         else
         {
-            x = ( int32_t( ( 10 + uv.x ) * helper.m_fWidth  ) ) % helper.m_Width ;
-            y = ( int32_t( ( 10 + uv.y ) * helper.m_fHeight ) ) % helper.m_Height;
+            x = (int32_t( ( 10 + uv.x ) * helper.m_fWidth )) % helper.m_Width ;
+            y = (int32_t( ( 10 + uv.y ) * helper.m_fHeight)) % helper.m_Height;
         }
         pixelIndex = y * helper.m_Width + x;
     }
     else
     {
-        if( m_Clamp )
+        if(m_Clamp)
         {
-            x = std::clamp<int>( int32_t( uv.x * helper.m_fWidth ) , 0 , helper.m_MaxWidth  );
-            y = std::clamp<int>( int32_t( uv.y * helper.m_fHeight) , 0 , helper.m_MaxHeight );
+            x = std::clamp<int>(int32_t(uv.x * helper.m_fWidth) , 0, helper.m_MaxWidth );
+            y = std::clamp<int>(int32_t(uv.y * helper.m_fHeight), 0, helper.m_MaxHeight);
         }
         else
         {
-            x = ( int32_t( ( 10 + uv.x ) * helper.m_fWidth  ) ) & helper.m_SizeMaskX;
-            y = ( int32_t( ( 10 + uv.y ) * helper.m_fHeight ) ) & helper.m_SizeMaskY;
+            x = (int32_t((10 + uv.x) * helper.m_fWidth )) & helper.m_SizeMaskX;
+            y = (int32_t((10 + uv.y) * helper.m_fHeight)) & helper.m_SizeMaskY;
         }
         pixelIndex = (y << helper.m_SizeShiftX) + x;
     }
@@ -111,8 +113,8 @@ inline Vector4f Texture::Sample(Vector2f uv) const
     return m_fData[pixelIndex];
 }
 
-template< eSimdType Type , int Elements >
-Vector4<fsimd<Elements,Type>> Texture::Sample(const Vector2<fsimd<Elements,Type>>& uv)const
+template<eSimdType Type, int Elements>
+Vector4<fsimd<Elements, Type>> Texture::Sample(const Vector2<fsimd<Elements,Type>>& uv)const
 {
     using simd_int  = isimd<Elements,Type>;
     using simd_float= fsimd<Elements, Type>;
@@ -124,33 +126,33 @@ Vector4<fsimd<Elements,Type>> Texture::Sample(const Vector2<fsimd<Elements,Type>
 
     ALIGN_FOR_AVX int pixelIndex[Elements];
 
-    if( !m_Pow2 )
+    if (!m_Pow2)
     {
-        if( m_Clamp )
+        if (m_Clamp)
         {
-            x = simd_int( (uv.x * helper.m_fWidth ).clamp( simd_float::One , helper.m_fMaxWidth  ) );
-            y = simd_int( (uv.y * helper.m_fHeight).clamp( simd_float::One , helper.m_fMaxHeight ) );
+            x = simd_int((uv.x * helper.m_fWidth ).clamp(simd_float::One, helper.m_fMaxWidth ));
+            y = simd_int((uv.y * helper.m_fHeight).clamp(simd_float::One, helper.m_fMaxHeight));
         }
         else
         {
-            x = ( simd_int( ( simd_float::Ten + uv.x ) * helper.m_fWidth ) ) % helper.m_Width ;
-            y = ( simd_int( ( simd_float::Ten + uv.y ) * helper.m_fHeight) ) % helper.m_Height;
+            x = (simd_int((simd_float::Ten + uv.x) * helper.m_fWidth )) % helper.m_Width ;
+            y = (simd_int((simd_float::Ten + uv.y) * helper.m_fHeight)) % helper.m_Height;
         }
         (y * helper.m_Width + x).store( pixelIndex , simd_alignment::AVX );
     }
     else
     {
-        if( m_Clamp )
+        if (m_Clamp)
         {
-            x = simd_int( (uv.x * helper.m_fWidth ).clamp( simd_float::One , helper.m_fMaxWidth  ) );
-            y = simd_int( (uv.y * helper.m_fHeight).clamp( simd_float::One , helper.m_fMaxHeight ) );
+            x = simd_int((uv.x * helper.m_fWidth ).clamp(simd_float::One, helper.m_fMaxWidth ));
+            y = simd_int((uv.y * helper.m_fHeight).clamp(simd_float::One, helper.m_fMaxHeight));
         }
         else
         {
-            x = simd_int( ( simd_float::Ten + uv.x ) * helper.m_fWidth ) & helper.m_SizeMaskX;
-            y = simd_int( ( simd_float::Ten + uv.y ) * helper.m_fHeight) & helper.m_SizeMaskY;
+            x = simd_int(( simd_float::Ten + uv.x) * helper.m_fWidth ) & helper.m_SizeMaskX;
+            y = simd_int(( simd_float::Ten + uv.y) * helper.m_fHeight) & helper.m_SizeMaskY;
         }
-        ((y << helper.m_SizeShiftX) + x).store( pixelIndex , simd_alignment::AVX );
+        ((y << helper.m_SizeShiftX) + x).store( pixelIndex, simd_alignment::AVX );
     }
 
     auto fData = m_fData.data();

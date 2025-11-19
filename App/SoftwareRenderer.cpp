@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #include "immintrin.h"
@@ -13,16 +13,17 @@
 #include <chrono>
 
 
-bool g_showTilesBoundry             = false;
-bool g_showTilestype                = false;
-bool g_showTriangleBoundry          = false;
-bool g_showCornersClassify          = false;
-bool g_showTilesGrid                = false;
-bool g_ThreadPerTile                = true;
-bool g_MultithreadedTransformAndClip= true;
-bool g_TrivialFS                    = false;
-bool g_CompressedPartialTile        = false;
-auto g_max_overdraw                 = std::atomic<int>{0};
+bool g_showTilesBoundry = false; ///< zmienna globalna do pokazywania granic kafelków
+bool g_showTilestype = false; ///< zmienna globalna do pokazywania typu kafelków
+bool g_showTriangleBoundry = false; ///< zmienna globalna do pokazywania granic trójk¹tów
+bool g_showCornersClassify = false; ///< zmienna globalna do pokazywania klasyfikacji naro¿ników
+bool g_showTilesGrid = false; ///< zmienna globalna do pokazywania siatki kafelków
+bool g_ThreadPerTile = true; ///< zmienna globalna do ustawiania zadañ dla w¹tków per kafelek
+bool g_MultithreadedTransformAndClip = true; ///< zmienna globalna do ustawiania wielow¹tkowego przekszta³cania i przycinania wierzcho³ków
+bool g_TrivialFS = false; ///< zmienna globalna do wy³¹czania obliczania oœwietlenia
+bool g_CompressedPartialTile = false; ///< zmienna globalna do ustawiania kompresji czêœciowych kafelków
+auto g_max_overdraw = std::atomic<int>{ 0 }; ///< zmienna globalna do przechowywania maksymalnego przes³oniêcia
+
 
 Vector4f ThreadColors[16] =
 {
@@ -45,13 +46,18 @@ Vector4f ThreadColors[16] =
    { 1.0f, 0.2f, 0.2f, 1.0f },
 };
 
+/**
+ * Struktura pomocnicza do przechowywania pokrycia kafelka.
+ * @tparam T typ danych (np. uint8_t, uint16_t, uint32_t)
+ * @tparam size rozmiar tablicy
+ */
 template< typename T , int size >
 struct tile_coverage_impl
 {
     static inline constexpr int Bits = size;
     using type = T;
 
-    T Buffer[size] = {};
+    T Buffer[size] = {}; ///< tablica przechowuj¹ca pokrycie kafelka
 
     FORCE_INLINE operator T* ()noexcept { return Buffer; }
     FORCE_INLINE T* data()noexcept { return Buffer; }
@@ -65,7 +71,7 @@ template<> struct tile_coverage_t<8>  : tile_coverage_impl<uint8_t ,8>{};
 template<> struct tile_coverage_t<16> : tile_coverage_impl<uint16_t,16>{};
 template<> struct tile_coverage_t<32> : tile_coverage_impl<uint32_t,32>{};
 
-optional<Vector4f> GetTheadColor( bool UseThreadColor )
+optional<Vector4f> GetThreadColor( bool UseThreadColor )
 {
     optional<Vector4f> Result;
     if( !UseThreadColor )
@@ -80,22 +86,32 @@ optional<Vector4f> GetTheadColor( bool UseThreadColor )
     return Result;
 }
 
+/**
+ * Struktura przechowuj¹ca dane wspó³dzielone w potoku renderera.
+ */
 struct PipelineSharedData
 {
-    Plane          m_NearFrustumPlane;
-    CommandBuffer* m_pProcessTrianglesCmdBuffer = nullptr;
-    SyncBarrier*   m_pProcessTrianglesCmdBufferSync = nullptr;
-    CommandBuffer* m_pRenderTilesCmdBuffer = nullptr;
-    SyncBarrier*   m_pRenderTilesCmdBufferSync = nullptr;
-    DrawConfig*    m_pDrawConfig = nullptr;
+    Plane          m_NearFrustumPlane; ///< p³aszczyzna bliskiego przyciêcia
+    CommandBuffer* m_pProcessTrianglesCmdBuffer = nullptr; ///< bufor komend do przetwarzania trójk¹tów
+    SyncBarrier* m_pProcessTrianglesCmdBufferSync = nullptr; ///< bariera synchronizacji bufora komend do przetwarzania trójk¹tów
+    CommandBuffer* m_pRenderTilesCmdBuffer = nullptr; ///< bufor komend do renderowania kafelków
+    SyncBarrier* m_pRenderTilesCmdBufferSync = nullptr; ///< bariera synchronizacji bufora komend do renderowania kafelków
+    DrawConfig* m_pDrawConfig = nullptr; ///< konfiguracja rysowania
 };
 
+/**
+ * Struktura przechowuj¹ca dane w¹tku renderuj¹cego.
+ */
 struct SoftwareRenderer::RenderThreadData
 {
-    monotonic_stack_unsynchronized_memory_resource m_ThreadfastMemResource;
-    DrawStats* m_pDrawStats = nullptr;
+    monotonic_stack_unsynchronized_memory_resource m_ThreadfastMemResource; ///< szybki zasób pamiêci tymczasowej
+    DrawStats* m_pDrawStats = nullptr; ///< wskaŸnik na statystyki rysowania
 };
 
+/**
+ * Struktura przechowuj¹ca funkcje krawêdzi trójk¹ta oraz ich wartoœci startowe i przyrosty.
+ * @tparam T typ danych (np. float, int)
+ */
 template< typename T >
 struct EdgeFunctionRails
 {
@@ -143,17 +159,20 @@ struct EdgeFunctionRails
         return Result;
     };
 
-    Vector2<T> m_ABP_Stride;
-    Vector2<T> m_BCP_Stride;
-    Vector2<T> m_CAP_Stride;
+    Vector2<T> m_ABP_Stride; ///< przyrost funkcji krawêdzi AB
+    Vector2<T> m_BCP_Stride; ///< przyrost funkcji krawêdzi BC
+    Vector2<T> m_CAP_Stride; ///< przyrost funkcji krawêdzi CA
 
-    Vector2<T> m_ABP_Start;
-    Vector2<T> m_BCP_Start;
-    Vector2<T> m_CAP_Start;
+    Vector2<T> m_ABP_Start; ///< wartoœæ startowa funkcji krawêdzi AB
+    Vector2<T> m_BCP_Start; ///< wartoœæ startowa funkcji krawêdzi BC
+    Vector2<T> m_CAP_Start; ///< wartoœæ startowa funkcji krawêdzi CA
 
-    Vector2<T> m_SP;
+    Vector2<T> m_SP; ///< punkt startowy (lewy górny róg)
 };
 
+/**
+ * Typ wyliczeniowy reprezentuj¹cy pokrycie kafelka.
+ */
 enum eTileCoverage : uint8_t
 {
     Undefined   = 0b000, // undefined state, should not be used
@@ -292,14 +311,20 @@ inline Vector4<fsimd<Elements,Type>> SoftwareRenderer::FragmentShader(const Simd
     return finalColor;
 }
 
-struct IntegrerPrecision
+/**
+ * Struktura definiuj¹ca precyzjê liczb ca³kowitych u¿ywanych w rasteryzacji.
+ */
+struct IntegerPrecision
 {
     int Bits           = 4;
     int Multiplier     = 1 << Bits;
     int Mask           = Multiplier - 1;
 };
-constexpr IntegrerPrecision Precision{ 0 };
+constexpr IntegerPrecision Precision{ 0 };
 
+/**
+ * Struktura przechowuj¹ca dane trójk¹ta potrzebne do rasteryzacji.
+ */
 struct ALIGN_FOR_AVX TriangleData
 {
     TriangleData( std::nullptr_t )
@@ -313,12 +338,12 @@ struct ALIGN_FOR_AVX TriangleData
     {
     }
 
-    VertexInterpolator         m_Interpolator;
-    EdgeFunctionRails<int64_t> m_EdgeFunctionRails;
-    float                      m_InvABC = 0.f;
-    float                      m_MinZ = 0.f;
-    float                      m_MaxZ = 0.f;
-    uint32_t                   m_TriIndex = 0;
+    VertexInterpolator         m_Interpolator; ///< interpolator wierzcho³ków
+    EdgeFunctionRails<int64_t> m_EdgeFunctionRails; ///< funkcje krawêdzi trójk¹ta
+    float                      m_InvABC = 0.f; ///< odwrotnoœæ pola trójk¹ta
+    float                      m_MinZ = 0.f; ///< minimalna wartoœæ Z w trójk¹cie
+    float                      m_MaxZ = 0.f; ///< maksymalna wartoœæ Z w trójk¹cie
+    uint32_t                   m_TriIndex = 0; ///< indeks trójk¹ta
 };
 
 void SoftwareRenderer::RecreateBuffers( uint8_t TileSize , int inScreenWidth , int inScreenHeight )
@@ -364,9 +389,9 @@ void SoftwareRenderer::RecreateBuffers( uint8_t TileSize , int inScreenWidth , i
         for( int x=0 ; x<m_TilesGridSize.x ; ++x )
         {
             auto& Tile = m_TilesGrid[y * m_TilesGridSize.x + x];
-            Tile.TileIndex     = Vector2si(x,y);
-            Tile.TileMemOffset = (y * m_TilesGridSize.x + x) * TILE_PIXELS_COUNT;
-            Tile.TileZOffset   = (y * m_TilesGridSize.x + x) * TILE_PIXELS_COUNT;
+            Tile.m_TileIndex     = Vector2si(x,y);
+            Tile.m_TileMemOffset = (y * m_TilesGridSize.x + x) * TILE_PIXELS_COUNT;
+            Tile.m_TileZOffset   = (y * m_TilesGridSize.x + x) * TILE_PIXELS_COUNT;
         }
     }
 }
@@ -421,13 +446,13 @@ inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& _InitTD, Ren
     using coverage_line_t       = typename tile_coverage::type;
 
     // lock tile info to prevent concurrent access
-    std::scoped_lock lock( pTileInfo->Lock );
+    std::scoped_lock lock( pTileInfo->m_Lock );
 
-    const auto pTilePixels  = m_TilesBuffer.data() + pTileInfo->TileMemOffset;
-    const auto pTileZBuffer = m_ZBuffer.data() + pTileInfo->TileZOffset;
+    const auto pTilePixels  = m_TilesBuffer.data() + pTileInfo->m_TileMemOffset;
+    const auto pTileZBuffer = m_ZBuffer.data() + pTileInfo->m_TileZOffset;
     auto       pDrawCommand = &_InitTD;
     auto       pZBuffer     = pTileZBuffer;
-    const bool AlphaBlend   = pDrawCommand->DrawControl.AlphaBlend;
+    const bool AlphaBlend   = pDrawCommand->DrawControl.m_AlphaBlend;
 
     if( g_ThreadPerTile )
     {
@@ -436,13 +461,13 @@ inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& _InitTD, Ren
             memcpy( Pixels , pTilePixels , sizeof(Pixels) );
         memcpy( ZBuffer , pTileZBuffer , sizeof(ZBuffer) );
 
-        pDrawCommand = pTileInfo->pRenderTileCmd.load( std::memory_order_relaxed );
+        pDrawCommand = pTileInfo->m_pRenderTileCmd.load( std::memory_order_relaxed );
         pZBuffer     = ZBuffer;
     }
 
     auto       pixelsDrawn  = 0;
     int32_t    CommandIndex = 0;
-    const auto TilePosition = pTileInfo->TileIndex*TILE_SIZE;
+    const auto TilePosition = pTileInfo->m_TileIndex*TILE_SIZE;
     const int  StartY       = TilePosition.y;
     const int  EndY         = StartY + TILE_SIZE;
 
@@ -460,8 +485,8 @@ inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& _InitTD, Ren
         const auto EdgeStartX   = _EdgeStart.x.ToVector3<int>();
         auto       EdgeStartY   = _EdgeStart.y.ToVector3<int>();
         const auto invABC       = pTriangle->m_InvABC;
-        const bool ZTest        = pDrawCommand->DrawControl.ZTest;
-        const bool ZWrite       = pDrawCommand->DrawControl.ZWrite;
+        const bool ZTest        = pDrawCommand->DrawControl.m_ZTest;
+        const bool ZWrite       = pDrawCommand->DrawControl.m_ZWrite;
 
         // loop through all pixels in tile square
         for (int y = StartY ; y < EndY; y++ , EdgeStartY += EdgeStrideY )
@@ -509,7 +534,7 @@ inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& _InitTD, Ren
     {
         for( ; pDrawCommand ; ++CommandIndex , pDrawCommand = pDrawCommand->pNext.load( std::memory_order_relaxed ) )
         {
-            if( pDrawCommand->DrawControl.IsFullTile )
+            if( pDrawCommand->DrawControl.m_IsFullTile )
                 DrawTileIteration.template operator()<false>( pDrawCommand , Pixels , pZBuffer , TileCoverage );
             else
                 DrawTileIteration.template operator()<true >( pDrawCommand , Pixels , pZBuffer , TileCoverage );
@@ -521,7 +546,7 @@ inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& _InitTD, Ren
     }
     else
     {
-        if( pDrawCommand->DrawControl.IsFullTile )
+        if( pDrawCommand->DrawControl.m_IsFullTile )
             DrawTileIteration.template operator()<false>( pDrawCommand , Pixels , pZBuffer , TileCoverage );
         else
             DrawTileIteration.template operator()<true >( pDrawCommand , Pixels , pZBuffer , TileCoverage );
@@ -531,7 +556,7 @@ inline void SoftwareRenderer::DrawTileImpl(const CommandRenderTile& _InitTD, Ren
     auto*     pTileCoverage = TileCoverage.data();
     Vector4f* pPixels       = Pixels;
 
-    optional<Vector4f> White = GetTheadColor( m_ColorizeThreads );
+    optional<Vector4f> White = GetThreadColor( m_ColorizeThreads );
 
     for (int y = StartY ; y < EndY; y++ )
     {
@@ -719,15 +744,15 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
     ALIGN_FOR_AVX Vector4f      Pixels       [TILE_SIZE * TILE_SIZE];
     ALIGN_FOR_AVX float         ZBuffer      [TILE_SIZE * TILE_SIZE];
     ALIGN_FOR_AVX tile_coverage TileCoverage ;
-    const auto                  TilePosition = pTileInfo->TileIndex*TILE_SIZE;
-    const auto                  pTilePixels  = m_TilesBuffer.data() + pTileInfo->TileMemOffset;
-    const auto                  pTileZBuffer = m_ZBuffer.data()     + pTileInfo->TileZOffset;
+    const auto                  TilePosition = pTileInfo->m_TileIndex*TILE_SIZE;
+    const auto                  pTilePixels  = m_TilesBuffer.data() + pTileInfo->m_TileMemOffset;
+    const auto                  pTileZBuffer = m_ZBuffer.data()     + pTileInfo->m_TileZOffset;
     float*const                 ZBufferStart = g_ThreadPerTile ? ZBuffer : pTileZBuffer;
-    auto                        pDrawCommand = g_ThreadPerTile ? pTileInfo->pRenderTileCmd.load( std::memory_order_relaxed ) : &_InitTD;
-    const bool                  AlphaBlend   = pDrawCommand->DrawControl.AlphaBlend;
+    auto                        pDrawCommand = g_ThreadPerTile ? pTileInfo->m_pRenderTileCmd.load( std::memory_order_relaxed ) : &_InitTD;
+    const bool                  AlphaBlend   = pDrawCommand->DrawControl.m_AlphaBlend;
 
     // lock tile info to prevent concurrent access
-    std::scoped_lock lock( pTileInfo->Lock );
+    std::scoped_lock lock( pTileInfo->m_Lock );
 
     // copy tile memory to local storage
     if( g_ThreadPerTile )
@@ -761,8 +786,8 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
     const auto EdgeStartX   = Vector3i256t{ _EdgeStartX.x , _EdgeStartX.y , _EdgeStartX.z } + EdgeStrideX*i256t::ZeroToN;
           auto EdgeStartY   = Vector3i256t{ _EdgeStartY.x , _EdgeStartY.y , _EdgeStartY.z };
     const auto invABC       = f256t{ pTriangle->m_InvABC };
-    const bool ZTest        = pDrawCommand->DrawControl.ZTest;
-    const bool ZWrite       = pDrawCommand->DrawControl.ZWrite;
+    const bool ZTest        = pDrawCommand->DrawControl.m_ZTest;
+    const bool ZWrite       = pDrawCommand->DrawControl.m_ZWrite;
     EdgeStrideX *= pack_size;
 
     TransformedVertexT      interpolatedVertex;
@@ -898,8 +923,8 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
     const auto EdgeStartX   = Vector3i256t{ _EdgeStartX.x , _EdgeStartX.y , _EdgeStartX.z } + EdgeStrideX*i256t::ZeroToN;
           auto EdgeStartY   = Vector3i256t{ _EdgeStartY.x , _EdgeStartY.y , _EdgeStartY.z };
     const auto invABC       = f256t{ pTriangle->m_InvABC };
-    const bool ZTest        = pDrawCommand->DrawControl.ZTest;
-    const bool ZWrite       = pDrawCommand->DrawControl.ZWrite;
+    const bool ZTest        = pDrawCommand->DrawControl.m_ZTest;
+    const bool ZWrite       = pDrawCommand->DrawControl.m_ZWrite;
                EdgeStrideX *= pack_size;
 
     TransformedVertexT      interpolatedVertex;
@@ -1079,7 +1104,7 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
 
     for( ; pDrawCommand ; ++CommandIndex , pDrawCommand = pDrawCommand->pNext.load( std::memory_order_relaxed ) )
     {
-        if( pDrawCommand->DrawControl.IsFullTile )
+        if( pDrawCommand->DrawControl.m_IsFullTile )
             DrawTileIteration.template operator()<false>( pDrawCommand , Pixels->data() , ZBufferStart , TileCoverage );
         else if( g_CompressedPartialTile )
             DrawTileIterationCompressed.template operator()<true >( pDrawCommand , Pixels->data() , ZBufferStart , TileCoverage );
@@ -1090,7 +1115,7 @@ inline void SoftwareRenderer::DrawTileImplSimd(const CommandRenderTile& _InitTD,
             break;
     }
 
-    optional<Vector4f> White = GetTheadColor( m_ColorizeThreads );
+    optional<Vector4f> White = GetThreadColor( m_ColorizeThreads );
 
     {
 
@@ -1393,12 +1418,12 @@ void SoftwareRenderer::GenerateTileJobs(const TransformedVertex& VA, const Trans
     {
         constexpr bool IsFullTile = FullTile();
 
-        auto ID = pTileInfo->DrawCount++;
+        auto ID = pTileInfo->m_DrawCount++;
 
         pCommand               = alloc.allocate<CommandRenderTile>();
         auto LogicPos          = TilePos.ToVector2<int>();
         pCommand->DrawControl  = DC;
-        pCommand->DrawControl.IsFullTile = IsFullTile;
+        pCommand->DrawControl.m_IsFullTile = IsFullTile;
         pCommand->TileDrawID   = ID;
         pCommand->Triangle     = &Data;
         pCommand->TileInfo     = pTileInfo;
@@ -1407,12 +1432,12 @@ void SoftwareRenderer::GenerateTileJobs(const TransformedVertex& VA, const Trans
 
         if( g_ThreadPerTile )
         {
-            pCurTop = pTileInfo->pRenderTileCmd.load( std::memory_order_relaxed );
+            pCurTop = pTileInfo->m_pRenderTileCmd.load( std::memory_order_relaxed );
 
             for(;;)
             {
                 pCommand->pNext.store( pCurTop , std::memory_order_relaxed );
-                if( !pTileInfo->pRenderTileCmd.compare_exchange_weak( pCurTop , pCommand , std::memory_order_acq_rel ) )
+                if( !pTileInfo->m_pRenderTileCmd.compare_exchange_weak( pCurTop , pCommand , std::memory_order_acq_rel ) )
                     continue;
 
                 break;
@@ -1487,8 +1512,8 @@ void SoftwareRenderer::BeginFrame()
 
     for( int i=0 ; m_TilesGridSize.x * m_TilesGridSize.y > i ; ++i )
     {
-        m_TilesGrid[i].DrawCount = 0;
-        m_TilesGrid[i].pRenderTileCmd = nullptr;
+        m_TilesGrid[i].m_DrawCount = 0;
+        m_TilesGrid[i].m_pRenderTileCmd = nullptr;
     }
 }
 
@@ -1534,16 +1559,16 @@ void SoftwareRenderer::Render(const vector<Vertex>& vertices)
         FrameMarkNamed( "Pre-Render cleanup" );
         for( int i=0 ; m_TilesGridSize.x * m_TilesGridSize.y > i ; ++i )
         {
-            m_TilesGrid[i].DrawCount = 0;
-            m_TilesGrid[i].pRenderTileCmd = nullptr;
+            m_TilesGrid[i].m_DrawCount = 0;
+            m_TilesGrid[i].m_pRenderTileCmd = nullptr;
         }
     }
 
     auto pConfig = m_TransientAllocator.allocate<DrawConfig>();
     pConfig->m_Color                  = m_VertexColor;
-    pConfig->m_DrawControl.AlphaBlend = m_AlphaBlend;
-    pConfig->m_DrawControl.ZTest      = m_ZTest;
-    pConfig->m_DrawControl.ZWrite     = m_ZWrite;
+    pConfig->m_DrawControl.m_AlphaBlend = m_AlphaBlend;
+    pConfig->m_DrawControl.m_ZTest      = m_ZTest;
+    pConfig->m_DrawControl.m_ZWrite     = m_ZWrite;
 
     m_pCommandBuffer->AddSyncBarrier( "Pre-VertexAssemply Sync" , m_ThreadsCount );
     m_pCommandBuffer->PushCommand<CommandVertexAssemply>( vertices , *pConfig );
@@ -1727,13 +1752,13 @@ void SoftwareRenderer::VertexAssemply( const CommandVertexAssemply& cmd )
             pWorkCmdBuffer->PushCommand<CommandVertexTransformAndClip>( vertices , *pData , i/3 );
     }
 
-    pVertexTransformAndClipSync->name = "VertexAssemply end";
+    pVertexTransformAndClipSync->m_Name = "VertexAssemply end";
     pWorkCmdBuffer->AddSyncPoint( *pVertexTransformAndClipSync , m_ThreadsCount );
 
     pVertexTransformAndClipSync->m_Barrier.emplace( m_ThreadsCount , triviall_function_ref{}.Assign( m_TransientMemoryResource , [=,this]
     {
         m_pCommandBuffer->PushCommandBuffer( *pData->m_pProcessTrianglesCmdBuffer );
-        pData->m_pProcessTrianglesCmdBufferSync->name = "transform triangles end";
+        pData->m_pProcessTrianglesCmdBufferSync->m_Name = "transform triangles end";
         m_pCommandBuffer->AddSyncPoint( *pData->m_pProcessTrianglesCmdBufferSync , m_ThreadsCount );
     }) );
 
@@ -1741,7 +1766,7 @@ void SoftwareRenderer::VertexAssemply( const CommandVertexAssemply& cmd )
     {
         m_pCommandBuffer->PushCommandBuffer( *pData->m_pRenderTilesCmdBuffer );
 
-        pData->m_pRenderTilesCmdBufferSync->name = "render triles end";
+        pData->m_pRenderTilesCmdBufferSync->m_Name = "render triles end";
         m_pCommandBuffer->AddSyncPoint( *pData->m_pRenderTilesCmdBufferSync , m_ThreadsCount );
         m_pCommandBuffer->Finish();
     }));
@@ -1842,8 +1867,8 @@ void SoftwareRenderer::RenderDepthBuffer()
     for( int tile_index=0 ; tile_index < m_TilesGridSize.x * m_TilesGridSize.y ; ++tile_index )
     {
         auto& Tile          = m_TilesGrid[tile_index];
-        auto pZBuffer       = m_ZBuffer.data() + Tile.TileZOffset;
-        auto TileScreenPos  = Tile.TileIndex * m_TileSize;
+        auto pZBuffer       = m_ZBuffer.data() + Tile.m_TileZOffset;
+        auto TileScreenPos  = Tile.m_TileIndex * m_TileSize;
 
         uint32_t* pScreenBuffer = m_ScreenBuffer.data() + TileScreenPos.y * m_ScreenSize.x + TileScreenPos.x;
 
@@ -1914,8 +1939,8 @@ void SoftwareRenderer::DoRender(const vector<Vertex>& inVertices, int minY, int 
 
 
         DrawFunctionConfig c;
-        c.ZTest  = m_ZTest;
-        c.ZWrite = m_ZWrite;
+        c.m_ZTest  = m_ZTest;
+        c.m_ZWrite = m_ZWrite;
         const auto Index = c.ToIndex();
 
 
@@ -2189,6 +2214,9 @@ void SoftwareRenderer::DrawFilledTriangle_v2(const TransformedVertex& VA, const 
     stats.FinishDrawCallStats(min,max,pixelsDrawn);
 }
 
+/**
+ * Struktura do przechowywania wstêpnie obliczonych wartoœci funkcji krawêdziowych
+ */
 struct ALIGN_FOR_AVX EdgeFunctionHelper1
 {
     inline EdgeFunctionHelper1( Vector2f A , Vector2f B , Vector2f C )
@@ -2218,12 +2246,15 @@ struct ALIGN_FOR_AVX EdgeFunctionHelper1
     float PrecalculatedB[8];
 };
 
+/**
+ * Struktura do przechowywania wyników funkcji krawêdziowych
+ */
 struct ALIGN_FOR_AVX EdgeFunctionResult
 {
-    float ABP = 0;
-    float BCP = 0;
-    float CAP = 0;
-    int   SKIP= 0;
+    float ABP = 0; ///< Wynik funkcji krawêdziowej dla krawêdzi AB i punktu P
+    float BCP = 0; ///< Wynik funkcji krawêdziowej dla krawêdzi BC i punktu P
+    float CAP = 0; ///< Wynik funkcji krawêdziowej dla krawêdzi CA i punktu P
+    int   SKIP = 0; ///< Flaga pominiêcia (1 jeœli punkt jest poza trójk¹tem, 0 jeœli wewn¹trz)
 };
 
 template< typename MathT , DrawFunctionConfig >

@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #pragma once
@@ -14,11 +14,8 @@ struct CommandBuffer
 
     template< std::derived_from<Command> T , typename ... ARGS >
     void PushCommand( ARGS&& ... args ) noexcept;
-
     void PushCommand( span<const Command*const> ) noexcept;
-
     void PushCommandBuffer( CommandBuffer& Buf );
-
     void AddSyncBarrier( const char* Name , uint8_t Count = 1 );
     void AddSyncBarrier( const char* Name , triviall_function_ref Callabck , uint8_t Count = 1 );
     void AddSyncPoint( ISyncBarier& Sync , uint8_t Count = 1 );
@@ -182,7 +179,7 @@ inline void CommandBuffer::PushCommand( ARGS&& ... args ) noexcept
 inline void CommandBuffer::AddSyncBarrier( const char* Name , uint8_t Count )
 {
     auto pSync = m_Allocator.allocate<SyncBarrier>();
-    pSync->name = Name;
+    pSync->m_Name = Name;
     pSync->m_Barrier.emplace(Count);
 
     AddSyncPoint( *pSync , Count );
@@ -191,7 +188,7 @@ inline void CommandBuffer::AddSyncBarrier( const char* Name , uint8_t Count )
 inline void CommandBuffer::AddSyncBarrier( const char* Name , triviall_function_ref Callabck , uint8_t Count )
 {
     auto pSync = m_Allocator.allocate<SyncBarrier>();
-    pSync->name = Name;
+    pSync->m_Name = Name;
     pSync->m_Barrier.emplace(Count, std::move(Callabck));
 
     AddSyncPoint( *pSync , Count );

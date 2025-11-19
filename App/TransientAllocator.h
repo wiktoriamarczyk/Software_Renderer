@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #pragma once
@@ -15,6 +15,7 @@ struct TransientMemoryAllocator
 {
     TransientMemoryAllocator()=default;
     ~TransientMemoryAllocator()=default;
+
     static void* do_allocate(std::size_t bytes, std::size_t alignment, std::pmr::synchronized_pool_resource& upstream );
     static void reset();
 private:

@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #include "Application.h"
@@ -151,22 +151,22 @@ void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
 
     DrawSettings Def;
 
-    paths.modelPath                 = model.modelPath;
-    paths.texturePath               = model.texturePath;
-    Settings.modelRotation.x        = model.RotationX.value_or(Def.modelRotation.x);
-    Settings.modelRotation.y        = model.RotationY.value_or(Def.modelRotation.y);
-    Settings.modelRotation.z        = model.RotationZ.value_or(Def.modelRotation.z);
-    Settings.modelTranslation.x     = model.PositionX.value_or(Def.modelTranslation.x);
-    Settings.modelTranslation.y     = model.PositionY.value_or(Def.modelTranslation.y);
-    Settings.modelTranslation.z     = model.PositionZ.value_or(Def.modelTranslation.z);
-    Settings.modelScale             = model.Scale.value_or(Def.modelScale);
+    paths.m_ModelPath                 = model.modelPath;
+    paths.m_TexturePath               = model.texturePath;
+    Settings.m_ModelRotation.x        = model.RotationX.value_or(Def.m_ModelRotation.x);
+    Settings.m_ModelRotation.y        = model.RotationY.value_or(Def.m_ModelRotation.y);
+    Settings.m_ModelRotation.z        = model.RotationZ.value_or(Def.m_ModelRotation.z);
+    Settings.m_ModelTranslation.x     = model.PositionX.value_or(Def.m_ModelTranslation.x);
+    Settings.m_ModelTranslation.y     = model.PositionY.value_or(Def.m_ModelTranslation.y);
+    Settings.m_ModelTranslation.z     = model.PositionZ.value_or(Def.m_ModelTranslation.z);
+    Settings.m_ModelScale             = model.Scale.value_or(Def.m_ModelScale);
 }
 
 
 
-void Application::StatsThreadChange()
+void Application::RunPerformanceTests()
 {
-    if (!STATS_DUMP || THREADS >= MAX_THREADS_COUNT)
+    if (!STATS_DUMP || THREADS > MAX_THREADS_COUNT)
         return;
 
     STATS_DUMP = false;
@@ -196,8 +196,8 @@ void Application::StatsThreadChange()
                         {
                             if (!raster.second)
                                 continue;
-                            m_DrawSettings.mathType = raster.first;
-                            m_DrawSettings.tileMode = tile_size.first;
+                            m_DrawSettings.m_MathType = raster.first;
+                            m_DrawSettings.m_TileMode = tile_size.first;
                             for (auto& model_type : m_SelectedModels)
                             {
                                 if (!model_type.second)
@@ -228,8 +228,8 @@ void Application::StatsThreadChange()
 
                                     dispath([this, frames]
                                         {
-                                            auto renderer = m_Contexts[m_DrawSettings.rendererType].pRenderer;
-                                            SaveStats(renderer->GetPixelsDrawn(), frames);
+                                            auto renderer = m_Contexts[m_DrawSettings.m_RendererType].m_pRenderer;
+                                            SaveStatsToFile(renderer->GetPixelsDrawn(), frames);
                                             s_syncBarrier.arrive_and_wait();
                                             THREADS++;
                                         });
@@ -237,8 +237,8 @@ void Application::StatsThreadChange()
                                     s_syncBarrier.arrive_and_wait();
 
                                     auto elapsed = miliseconds_from_app_start() - start;
-                                    printf("time elapsed: %u ms, threads: %d, tile mode: %d, fs: %d, model: %d, %f%%\n\n",
-                                        elapsed, THREADS.load(), m_DrawSettings.mathType, fragment_shader.first, model_type.first, float(it) * 100 / float(max));
+                                    printf("time elapsed: %u ms, %%\n\n",
+                                        elapsed, THREADS.load());
 
                                     it++;
                                 }
@@ -294,7 +294,7 @@ vector<Model> Application::LoadFromScene(const aiScene* pScene)
             continue;
         }
 
-        model.vertices.reserve(mesh->mNumFaces * 3);
+        model.m_Vertices.reserve(mesh->mNumFaces * 3);
 
         for (int t = 0; t < mesh->mNumFaces; ++t)
         {
@@ -307,21 +307,21 @@ vector<Model> Application::LoadFromScene(const aiScene* pScene)
             for (int i = 0; i < face->mNumIndices; i++)
             {
                 Vertex v;
-                v.color = Vector4f(1, 1, 1, 1);
+                v.m_Color = Vector4f(1, 1, 1, 1);
 
                 int index = face->mIndices[i];
                 if (mesh->mColors[0] != NULL)
-                    v.color = Vector4f(mesh->mColors[0][index].r, mesh->mColors[0][index].g, mesh->mColors[0][index].b, mesh->mColors[0][index].a);
+                    v.m_Color = Vector4f(mesh->mColors[0][index].r, mesh->mColors[0][index].g, mesh->mColors[0][index].b, mesh->mColors[0][index].a);
 
                 if (mesh->mTextureCoords[0] != NULL)
-                    v.uv = Vector2f(mesh->mTextureCoords[0][index].x, mesh->mTextureCoords[0][index].y);
+                    v.m_UV = Vector2f(mesh->mTextureCoords[0][index].x, mesh->mTextureCoords[0][index].y);
 
 
                 if (mesh->mNormals != NULL)
-                    v.normal = Vector3f(mesh->mNormals[index].x, mesh->mNormals[index].y, mesh->mNormals[index].z);
+                    v.m_Normal = Vector3f(mesh->mNormals[index].x, mesh->mNormals[index].y, mesh->mNormals[index].z);
 
-                v.position = Vector3f(mesh->mVertices[index].x, mesh->mVertices[index].y, mesh->mVertices[index].z);
-                model.vertices.push_back(v);
+                v.m_Position = Vector3f(mesh->mVertices[index].x, mesh->mVertices[index].y, mesh->mVertices[index].z);
+                model.m_Vertices.push_back(v);
             }
         }
     }
@@ -340,16 +340,16 @@ void Application::NormalizeModelPosition(vector<Model>& models)
 
     for (auto& model : models)
     {
-        model.Min = Vector3f(maxValue, maxValue, maxValue);
-        model.Max = Vector3f(minValue, minValue, minValue);
+        model.m_Min = Vector3f(maxValue, maxValue, maxValue);
+        model.m_Max = Vector3f(minValue, minValue, minValue);
 
-        for (auto& v : model.vertices)
+        for (auto& v : model.m_Vertices)
         {
-            min = min.CWiseMin(v.position);
-            max = max.CWiseMax(v.position);
+            min = min.CWiseMin(v.m_Position);
+            max = max.CWiseMax(v.m_Position);
 
-            model.Min = model.Min.CWiseMin(v.position);
-            model.Max = model.Max.CWiseMax(v.position);
+            model.m_Min = model.m_Min.CWiseMin(v.m_Position);
+            model.m_Max = model.m_Max.CWiseMax(v.m_Position);
         }
     }
 
@@ -361,9 +361,9 @@ void Application::NormalizeModelPosition(vector<Model>& models)
 
     for (auto& model : models)
     {
-        for (auto& v : model.vertices)
+        for (auto& v : model.m_Vertices)
         {
-            v.position = (v.position - center) * currentToExpectedMultiplier;
+            v.m_Position = (v.m_Position - center) * currentToExpectedMultiplier;
         }
     }
 }
@@ -374,7 +374,7 @@ vector<Model> Application::LoadFallbackModel()
     vector<Model> result;
     result.push_back(Model());
 
-    vector<Vertex>& vertices = result[0].vertices;
+    vector<Vertex>& vertices = result[0].m_Vertices;
     vertices.resize(FALLBACK_MODEL_VERT_COUNT);
     std::copy(fallbackVertices, fallbackVertices + FALLBACK_MODEL_VERT_COUNT, vertices.begin());
 
@@ -436,12 +436,12 @@ void Application::OpenSceneDataDialog(MyModelPaths& selectedPaths)
 
     OpenDialog("Choose Model", MODEL_FORMATS, [&selectedPaths]
     {
-        selectedPaths.modelPath = ImGuiFileDialog::Instance()->GetFilePathName();
+        selectedPaths.m_ModelPath = ImGuiFileDialog::Instance()->GetFilePathName();
     });
 
     ImGui::SameLine(); OpenDialog("Choose Model Texture", TEXTURE_FORMATS, [&selectedPaths]
     {
-        selectedPaths.texturePath = ImGuiFileDialog::Instance()->GetFilePathName();
+        selectedPaths.m_TexturePath = ImGuiFileDialog::Instance()->GetFilePathName();
     });
 
 
@@ -471,14 +471,14 @@ bool Application::Initialize()
     m_MainWindow.setActive(true);
 
     // create renderers
-    m_Contexts[0].pRenderer = RendererFactory::CreateRenderer(eRendererType::Software, SCREEN_WIDTH, SCREEN_HEIGHT);
-    m_Contexts[1].pRenderer = RendererFactory::CreateRenderer(eRendererType::Hardware, SCREEN_WIDTH, SCREEN_HEIGHT);
+    m_Contexts[0].m_pRenderer = RendererFactory::CreateRenderer(eRendererType::Software, SCREEN_WIDTH, SCREEN_HEIGHT);
+    m_Contexts[1].m_pRenderer = RendererFactory::CreateRenderer(eRendererType::Hardware, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     // load default textures
-    m_Contexts[0].pModelTexture = m_Contexts[0].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
-    m_Contexts[1].pModelTexture = m_Contexts[1].pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
+    m_Contexts[0].m_pModelTexture = m_Contexts[0].m_pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
+    m_Contexts[1].m_pModelTexture = m_Contexts[1].m_pRenderer->LoadTexture(INIT_TEXTURE_PATH.c_str());
 
-    m_ModelPaths.texturePath = INIT_TEXTURE_PATH;
+    m_ModelPaths.m_TexturePath = INIT_TEXTURE_PATH;
     m_LastModelPaths = m_ModelPaths;
 
     // initialize ImGui
@@ -550,14 +550,14 @@ int Application::Run()
         bool IsInside(const Model& model) const
         {
             Vector3f Points[8];
-            Points[0] = Vector3f(model.Min.x, model.Min.y, model.Min.z);
-            Points[1] = Vector3f(model.Max.x, model.Min.y, model.Min.z);
-            Points[2] = Vector3f(model.Min.x, model.Min.y, model.Max.z);
-            Points[3] = Vector3f(model.Max.x, model.Min.y, model.Max.z);
-            Points[4] = Vector3f(model.Min.x, model.Max.y, model.Min.z);
-            Points[5] = Vector3f(model.Max.x, model.Max.y, model.Min.z);
-            Points[6] = Vector3f(model.Min.x, model.Max.y, model.Max.z);
-            Points[7] = Vector3f(model.Max.x, model.Max.y, model.Max.z);
+            Points[0] = Vector3f(model.m_Min.x, model.m_Min.y, model.m_Min.z);
+            Points[1] = Vector3f(model.m_Max.x, model.m_Min.y, model.m_Min.z);
+            Points[2] = Vector3f(model.m_Min.x, model.m_Min.y, model.m_Max.z);
+            Points[3] = Vector3f(model.m_Max.x, model.m_Min.y, model.m_Max.z);
+            Points[4] = Vector3f(model.m_Min.x, model.m_Max.y, model.m_Min.z);
+            Points[5] = Vector3f(model.m_Max.x, model.m_Max.y, model.m_Min.z);
+            Points[6] = Vector3f(model.m_Min.x, model.m_Max.y, model.m_Max.z);
+            Points[7] = Vector3f(model.m_Max.x, model.m_Max.y, model.m_Max.z);
 
             auto AllPointsInFront = [&Points](const Plane& plane)
             {
@@ -584,8 +584,8 @@ int Application::Run()
     // run the program as long as the window is open
     while (m_MainWindow.isOpen())
     {
-        if (THREADS != m_DrawSettings.threadsCount && THREADS > 0 && THREADS < 17)
-            m_DrawSettings.threadsCount = THREADS;
+        if (THREADS != m_DrawSettings.m_ThreadsCount && THREADS > 0 && THREADS < 17)
+            m_DrawSettings.m_ThreadsCount = THREADS;
 
         FrameMark;
         ZoneScopedN("Main Loop");
@@ -596,8 +596,8 @@ int Application::Run()
         FRAMES_RENDERED++;
         m_LastFrameTime = now;
 
-        auto renderer     = m_Contexts[m_DrawSettings.rendererType].pRenderer;
-        auto modelTexture = m_Contexts[m_DrawSettings.rendererType].pModelTexture;
+        auto renderer     = m_Contexts[m_DrawSettings.m_RendererType].m_pRenderer;
+        auto modelTexture = m_Contexts[m_DrawSettings.m_RendererType].m_pModelTexture;
 
         // check all the window's events that were triggered since the last iteration of the loop
         {
@@ -615,7 +615,7 @@ int Application::Run()
                 {
                     // space pressed
                     if (event.key.code == sf::Keyboard::Space)
-                        m_DrawSettings.rendererType = (m_DrawSettings.rendererType+1)%2;
+                        m_DrawSettings.m_RendererType = (m_DrawSettings.m_RendererType+1)%2;
                 }
             }
         }
@@ -623,22 +623,22 @@ int Application::Run()
         process_dispatch_queue();
 
         // load model and texture if user selected them
-        if (m_LastModelPaths.modelPath != m_ModelPaths.modelPath)
+        if (m_LastModelPaths.m_ModelPath != m_ModelPaths.m_ModelPath)
         {
-            m_ModelsData = LoadModelVertices(m_ModelPaths.modelPath.c_str());
-            m_LastModelPaths.modelPath = m_ModelPaths.modelPath;
-            if( m_LastModelPaths.texturePath == m_ModelPaths.texturePath)
-                m_ModelPaths.texturePath = "";
+            m_ModelsData = LoadModelVertices(m_ModelPaths.m_ModelPath.c_str());
+            m_LastModelPaths.m_ModelPath = m_ModelPaths.m_ModelPath;
+            if( m_LastModelPaths.m_TexturePath == m_ModelPaths.m_TexturePath)
+                m_ModelPaths.m_TexturePath = "";
         }
 
-        if (m_LastModelPaths.texturePath != m_ModelPaths.texturePath)
+        if (m_LastModelPaths.m_TexturePath != m_ModelPaths.m_TexturePath)
         {
-            m_Contexts[0].pModelTexture = m_Contexts[0].pRenderer->LoadTexture(m_ModelPaths.texturePath.c_str());
-            m_Contexts[1].pModelTexture = m_Contexts[1].pRenderer->LoadTexture(m_ModelPaths.texturePath.c_str());
-            m_LastModelPaths.texturePath = m_ModelPaths.texturePath;
+            m_Contexts[0].m_pModelTexture = m_Contexts[0].m_pRenderer->LoadTexture(m_ModelPaths.m_TexturePath.c_str());
+            m_Contexts[1].m_pModelTexture = m_Contexts[1].m_pRenderer->LoadTexture(m_ModelPaths.m_TexturePath.c_str());
+            m_LastModelPaths.m_TexturePath = m_ModelPaths.m_TexturePath;
         }
 
-        m_ModelMatrix = Matrix4f::Rotation(m_DrawSettings.modelRotation / 180.f * PI ) * Matrix4f::Scale(Vector3f(m_DrawSettings.modelScale, m_DrawSettings.modelScale, m_DrawSettings.modelScale)) * Matrix4f::Translation(m_DrawSettings.modelTranslation);
+        m_ModelMatrix = Matrix4f::Rotation(m_DrawSettings.m_ModelRotation / 180.f * PI ) * Matrix4f::Scale(Vector3f(m_DrawSettings.m_ModelScale, m_DrawSettings.m_ModelScale, m_DrawSettings.m_ModelScale)) * Matrix4f::Translation(m_DrawSettings.m_ModelTranslation);
 
         renderer->SetTexture(modelTexture);
         renderer->SetModelMatrix(m_ModelMatrix);
@@ -657,39 +657,39 @@ int Application::Run()
 
         float drag_speeed = 0.01f;
 
-        ImGui::SliderFloat("Ambient Strength", &m_DrawSettings.ambientStrength, 0, 1);
-        ImGui::SliderFloat("Diffuse Strength", &m_DrawSettings.diffuseStrength, 0, 1);
-        ImGui::SliderFloat("Specular Strength", &m_DrawSettings.specularStrength, 0, 1);
-        ImGui::SliderFloat("Shininess Power", &m_DrawSettings.shininessPower, 1.f , 10.0f );
-        ImGui::SliderFloat3("Rotation", &m_DrawSettings.modelRotation.x , 0, FULL_ANGLE);
-        ImGui::SliderFloat3("Translation", &m_DrawSettings.modelTranslation.x , -12, 12);
-        ImGui::SliderFloat("Scale", &m_DrawSettings.modelScale, 0, 16);
-        ImGui::SliderFloat3("Light Position", &m_DrawSettings.lightPosition.x, -20, 20);
+        ImGui::SliderFloat("Ambient Strength", &m_DrawSettings.m_AmbientStrength, 0, 1);
+        ImGui::SliderFloat("Diffuse Strength", &m_DrawSettings.m_DiffuseStrength, 0, 1);
+        ImGui::SliderFloat("Specular Strength", &m_DrawSettings.m_SpecularStrength, 0, 1);
+        ImGui::SliderFloat("Shininess Power", &m_DrawSettings.m_ShininessPower, 1.f , 10.0f );
+        ImGui::SliderFloat3("Rotation", &m_DrawSettings.m_ModelRotation.x , 0, FULL_ANGLE);
+        ImGui::SliderFloat3("Translation", &m_DrawSettings.m_ModelTranslation.x , -12, 12);
+        ImGui::SliderFloat("Scale", &m_DrawSettings.m_ModelScale, 0, 16);
+        ImGui::SliderFloat3("Light Position", &m_DrawSettings.m_LightPosition.x, -20, 20);
 
-        if (ImGui::SliderInt("Thread Count", &m_DrawSettings.threadsCount, 1, MAX_THREADS_COUNT))
+        if (ImGui::SliderInt("Thread Count", &m_DrawSettings.m_ThreadsCount, 1, MAX_THREADS_COUNT))
         {
-            THREADS = m_DrawSettings.threadsCount;
+            THREADS = m_DrawSettings.m_ThreadsCount;
         }
 
-        ImGui::Combo("Renderer Type", &m_DrawSettings.rendererType, "Software\0Hardware\0");
+        ImGui::Combo("Renderer Type", &m_DrawSettings.m_RendererType, "Software\0Hardware\0");
 
-        ImGui::Checkbox("Wireframe", &m_DrawSettings.drawWireframe);
-        ImGui::SameLine(); ImGui::Checkbox("BBoxes", &m_DrawSettings.drawBBoxes);
+        ImGui::Checkbox("Wireframe", &m_DrawSettings.m_DrawWireframe);
+        ImGui::SameLine(); ImGui::Checkbox("BBoxes", &m_DrawSettings.m_DrawBBoxes);
         ImGui::SameLine(); ImGui::Checkbox("Show Tiles Grid" , &g_showTilesGrid);
-        ImGui::SameLine(); ImGui::Checkbox( "Visualize ZBuffer", &m_DrawSettings.renderDepthBuffer);
+        ImGui::SameLine(); ImGui::Checkbox( "Visualize ZBuffer", &m_DrawSettings.m_RenderDepthBuffer);
 
-        //ImGui::SameLine(); ImGui::Checkbox("Alpha Blend" , &m_DrawSettings.alphaBlend);
+        //ImGui::SameLine(); ImGui::Checkbox("Alpha Blend" , &m_DrawSettings.m_AlphaBlend);
 
         ImGui::Checkbox("Trivial FS", &g_TrivialFS);
-        ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.colorizeThreads);
+        ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.m_ColorizeThreads);
         ImGui::SameLine(); ImGui::Checkbox("Threaded T&C", &g_MultithreadedTransformAndClip);
-        ImGui::SameLine(); ImGui::Checkbox( "Vertical Sync", &m_DrawSettings.vSync);
+        ImGui::SameLine(); ImGui::Checkbox( "Vertical Sync", &m_DrawSettings.m_VSync);
 
         ImGui::Checkbox("Compressed Partial Tile", &g_CompressedPartialTile);
-        ImGui::SameLine(); ImGui::Checkbox("Use ZBuffer", &m_DrawSettings.useZBuffer);
+        ImGui::SameLine(); ImGui::Checkbox("Use ZBuffer", &m_DrawSettings.m_UseZBuffer);
         ImGui::SameLine(); ImGui::Checkbox("One Thread Per Tile", &g_ThreadPerTile);
 
-        //ImGui::SameLine(); ImGui::Checkbox("Backface Culling", &m_DrawSettings.backfaceCulling);
+        //ImGui::SameLine(); ImGui::Checkbox("Backface Culling", &m_DrawSettings.m_BackfaceCulling);
 
         if( ImGui::Button("0A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 0); ImGui::SameLine();
         if( ImGui::Button("1A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 1); ImGui::SameLine();
@@ -719,46 +719,46 @@ int Application::Run()
         if (show_panel)
         {
             ImGui::Begin("Stats panel", &show_panel);
-            SetupStatsToSave();
+            SetupPerformanceTests();
             ImGui::End();
         }
 
-        ImGui::ColorEdit3("Ambient Color", &m_DrawSettings.ambientColor.x);
-        ImGui::ColorEdit3("Diffuse Color", &m_DrawSettings.diffuseColor.x);
-        ImGui::ColorEdit3("Background Color", &m_DrawSettings.backgroundColor.x);
-        ImGui::Combo("Math Type", &m_DrawSettings.mathType, "CPU\0CPUx8\0SSEx4\0SSEx8\0AVXx8\0");
-        ImGui::Combo("Tile Size", &m_DrawSettings.tileMode, "32x32\0""16x16\08x8\0");
+        ImGui::ColorEdit3("Ambient Color", &m_DrawSettings.m_AmbientColor.x);
+        ImGui::ColorEdit3("Diffuse Color", &m_DrawSettings.m_DiffuseColor.x);
+        ImGui::ColorEdit3("Background Color", &m_DrawSettings.m_BackgroundColor.x);
+        ImGui::Combo("Math Type", &m_DrawSettings.m_MathType, "CPU\0CPUx8\0SSEx4\0SSEx8\0AVXx8\0");
+        ImGui::Combo("Tile Size", &m_DrawSettings.m_TileMode, "32x32\0""16x16\08x8\0");
 
         ImGui::End();
 
-        if (m_VSync!=m_DrawSettings.vSync)
+        if (m_VSync!=m_DrawSettings.m_VSync)
         {
-            m_VSync = m_DrawSettings.vSync;
+            m_VSync = m_DrawSettings.m_VSync;
             m_MainWindow.setFramerateLimit(m_VSync ? 60 : 0);
         }
 
         // set render params
-        renderer->SetWireFrameColor(m_DrawSettings.wireFrameColor);
-        renderer->SetDiffuseColor(m_DrawSettings.diffuseColor);
-        renderer->SetAmbientColor(m_DrawSettings.ambientColor);
-        renderer->SetLightPosition(m_DrawSettings.lightPosition);
-        renderer->SetDiffuseStrength(m_DrawSettings.diffuseStrength);
-        renderer->SetAmbientStrength(m_DrawSettings.ambientStrength);
-        renderer->SetSpecularStrength(m_DrawSettings.specularStrength);
-        renderer->SetShininess( pow(2.0f,m_DrawSettings.shininessPower) );
-        renderer->SetThreadsCount(m_DrawSettings.threadsCount);
-        renderer->SetDrawWireframe(m_DrawSettings.drawWireframe);
-        renderer->SetColorizeThreads(m_DrawSettings.colorizeThreads);
-        renderer->SetDrawBBoxes(m_DrawSettings.drawBBoxes);
-        renderer->SetZTest(m_DrawSettings.useZBuffer);
-        renderer->SetZWrite(m_DrawSettings.useZBuffer);
-        renderer->SetClearColor(Vector4f{m_DrawSettings.backgroundColor,1});
-        renderer->SetAlphaBlending(m_DrawSettings.alphaBlend);
-        renderer->SetBackfaceCulling(m_DrawSettings.backfaceCulling);
+        renderer->SetWireFrameColor(m_DrawSettings.m_WireFrameColor);
+        renderer->SetDiffuseColor(m_DrawSettings.m_DiffuseColor);
+        renderer->SetAmbientColor(m_DrawSettings.m_AmbientColor);
+        renderer->SetLightPosition(m_DrawSettings.m_LightPosition);
+        renderer->SetDiffuseStrength(m_DrawSettings.m_DiffuseStrength);
+        renderer->SetAmbientStrength(m_DrawSettings.m_AmbientStrength);
+        renderer->SetSpecularStrength(m_DrawSettings.m_SpecularStrength);
+        renderer->SetShininess( pow(2.0f,m_DrawSettings.m_ShininessPower) );
+        renderer->SetThreadsCount(m_DrawSettings.m_ThreadsCount);
+        renderer->SetDrawWireframe(m_DrawSettings.m_DrawWireframe);
+        renderer->SetColorizeThreads(m_DrawSettings.m_ColorizeThreads);
+        renderer->SetDrawBBoxes(m_DrawSettings.m_DrawBBoxes);
+        renderer->SetZTest(m_DrawSettings.m_UseZBuffer);
+        renderer->SetZWrite(m_DrawSettings.m_UseZBuffer);
+        renderer->SetClearColor(Vector4f{m_DrawSettings.m_BackgroundColor,1});
+        renderer->SetAlphaBlending(m_DrawSettings.m_AlphaBlend);
+        renderer->SetBackfaceCulling(m_DrawSettings.m_BackfaceCulling);
         renderer->ClearZBuffer();
         renderer->ClearScreen();
-        renderer->SetBlockMathMode(static_cast<eBlockMathMode>(m_DrawSettings.mathType));
-        renderer->SetTileMode(static_cast<eTileMode>(m_DrawSettings.tileMode));
+        renderer->SetBlockMathMode(static_cast<eBlockMathMode>(m_DrawSettings.m_MathType));
+        renderer->SetTileMode(static_cast<eTileMode>(m_DrawSettings.m_TileMode));
 
         {
             ZoneScopedN("Frame");
@@ -770,7 +770,7 @@ int Application::Run()
             for (auto& model : m_ModelsData)
             {
                 if (frustum.IsInside(model))
-                    renderer->Render(model.vertices);
+                    renderer->Render(model.m_Vertices);
             }
 
             renderer->EndFrame();
@@ -783,7 +783,7 @@ int Application::Run()
                 ZoneScopedN("Update screen texture");
                 // update texture
 
-                if (m_DrawSettings.renderDepthBuffer)
+                if (m_DrawSettings.m_RenderDepthBuffer)
                     renderer->RenderDepthBuffer();
 
                 m_ScreenTexture.update((uint8_t*)buf.data());
@@ -803,7 +803,7 @@ int Application::Run()
         ImGui::Text("FPS: %d", fps);
         ImGui::Text("%s %s (%s)" ,CMAKE_BUILD_NAME, sizeof(void*) == 8 ? "x64" : "x86", COMPILER_NAME);
         ImGui::Text("Mem : %u KB" , uint32_t(g_memory_resource_mem.load()/1024) );
-        ImGui::Text("Max Overdraw: %d" , g_max_overdraw.load() );
+        ImGui::Text("m_Max Overdraw: %d" , g_max_overdraw.load() );
         ImGui::End();
 
         DrawRenderingStats( renderer->GetPixelsDrawn() );
@@ -840,12 +840,12 @@ void SelectCheckboxOptions(span<pair<T,bool>> values, span<const string_view> la
     }
 }
 
-void Application::SetupStatsToSave()
+void Application::SetupPerformanceTests()
 {
     constexpr string_view s_PredefinedModelNames[] = { "Cube 15%", "Cube 25%", "Cube 75%", "Cube 100%", "Teapot 15%", "Teapot 25%", "Teapot 75%", "Teapot 100%", "Shiba 15%", "Shiba 25%", "Shiba 75%", "Shiba 100%", "Dog 15%", "Dog 25%", "Dog 75%", "Dog 100%" };
     constexpr string_view s_TileModeNames[] = { "32x32", "16x16", "8x8" };
     constexpr string_view s_RasterModeNames[] = { "CPU", "CPUx8", "SSEx4", "SSEx8", "AVXx8" };
-    constexpr string_view s_YesNo[] = { "Yes", "No" };
+    constexpr string_view s_YesNo[] = { "With", "Without" };
 
     if (ImGui::CollapsingHeader("Models"))
         SelectCheckboxOptions<int>(m_SelectedModels, s_PredefinedModelNames);
@@ -865,10 +865,10 @@ void Application::SetupStatsToSave()
     if (ImGui::CollapsingHeader("Fragment Shader On"))
         SelectCheckboxOptions<bool>(m_SelectedFragmentShader, s_YesNo);
 
-    if (ImGui::Button("Save Stats"))
+    if (ImGui::Button("Run performance tests"))
     {
         STATS_DUMP = true;
-        StatsThreadChange();
+        RunPerformanceTests();
     }
 }
 
@@ -949,26 +949,26 @@ DrawStatsCollection GetDrawStatsCollection(int frames)
     return GetDrawStatsCollectionImpl<30>();
 }
 
-void Application::SaveStats(int pixels, int frames)
+void Application::SaveStatsToFile(int pixels, int frames)
 {
     auto [avg2, min, max, med, std] = GetDrawStatsCollection(frames);
 
     auto ScreenPixels = SCREEN_WIDTH * SCREEN_HEIGHT;
     int screenCoverage = pixels * 100 / ScreenPixels;
 
-    string modelPath = m_ModelPaths.texturePath.empty() ? m_LastModelPaths.texturePath : m_ModelPaths.texturePath;
+    string modelPath = m_ModelPaths.m_TexturePath.empty() ? m_LastModelPaths.m_TexturePath : m_ModelPaths.m_TexturePath;
 
     string tileSize = "32x32";
-    if (m_DrawSettings.tileMode == 1)
+    if (m_DrawSettings.m_TileMode == 1)
         tileSize = "16x16";
-    else if (m_DrawSettings.tileMode == 2)
+    else if (m_DrawSettings.m_TileMode == 2)
         tileSize = "8x8";
 
     std::filesystem::path p(modelPath);
     std::string baseName = p.stem().string();
     std::string filename = "MED_" + baseName +
         "_SC_" + std::to_string(screenCoverage) +
-        "_T_" + std::to_string(m_DrawSettings.mathType) +
+        "_T_" + std::to_string(m_DrawSettings.m_MathType) +
         "_FS_" + std::to_string(!g_TrivialFS) +
         "_MULTI_" + std::to_string(g_MultithreadedTransformAndClip) +
         "_COM_" + std::to_string(g_CompressedPartialTile) +
@@ -977,7 +977,7 @@ void Application::SaveStats(int pixels, int frames)
     static std::unordered_map<std::string, std::vector<int>> stats;
     static std::vector<std::string> metricOrder;
 
-    int tIndex = m_DrawSettings.threadsCount - 1;
+    int tIndex = m_DrawSettings.m_ThreadsCount - 1;
 
     auto setVal = [&](const std::string& key, int val)
         {
@@ -1036,5 +1036,5 @@ void Application::SaveStats(int pixels, int frames)
     }
 
     fout.close();
-    std::cout << "Stats saved/updated in: " << filename << " for " << std::to_string(m_DrawSettings.threadsCount) << " threads.""\n";
+    std::cout << "Stats saved/updated in: " << filename << " for " << std::to_string(m_DrawSettings.m_ThreadsCount) << " threads.""\n";
 }

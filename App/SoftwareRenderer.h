@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #pragma once
@@ -23,12 +23,12 @@ struct TileInfo
     using at_i16            = atomic<uint16_t>;
     using at_CmdDrawTile    = atomic<CommandRenderTile*>;
 
-    Vector2si               TileIndex;
-    uint32_t                TileMemOffset   = 0;
-    uint32_t                TileZOffset     = 0;
-    mutable at_i16          DrawCount       = 0;
-    Spinlock                Lock;
-    mutable at_CmdDrawTile  pRenderTileCmd  = nullptr;
+    Vector2si               m_TileIndex;
+    uint32_t                m_TileMemOffset   = 0;
+    uint32_t                m_TileZOffset     = 0;
+    mutable at_i16          m_DrawCount       = 0;
+    Spinlock                m_Lock;
+    mutable at_CmdDrawTile  m_pRenderTileCmd  = nullptr;
 };
 
 struct TileData;
@@ -38,39 +38,40 @@ struct DrawFunctionConfig
     static constexpr inline uint8_t Bits = 2;
 
     constexpr DrawFunctionConfig() = default;
-    constexpr DrawFunctionConfig( uint8_t Value )
+
+    constexpr DrawFunctionConfig(uint8_t Value)
     {
-        ZTest  = !!(Value & 0x01) ;
-        ZWrite = !!(Value & 0x02) ;
+        m_ZTest = !!(Value & 0x01);
+        m_ZWrite = !!(Value & 0x02);
     };
 
     constexpr uint8_t ToIndex()const noexcept
     {
-        return (ZTest  ? 0x01 : 0)
-             | (ZWrite ? 0x02 : 0);
+        return (m_ZTest ? 0x01 : 0)
+            | (m_ZWrite ? 0x02 : 0);
     }
 
-    bool ZTest     = false;
-    bool ZWrite    = false;
+    bool m_ZTest = false;
+    bool m_ZWrite = false;
 };
 
 enum class eDrawTriVersion : uint8_t
 {
     DrawTriBaseline = 0,
-    DrawTriv2   ,
-    DrawTriv3   ,
-    DrawTriv4   ,
-    DrawTriv5   ,
-    DrawTri     ,
+    DrawTriv2,
+    DrawTriv3,
+    DrawTriv4,
+    DrawTriv5,
+    DrawTri,
 };
 
 template< int Elements , eSimdType Type = eSimdType::None >
 struct RenderParamsSimd
 {
-    Vector3<fsimd<Elements,Type>> m_LightPosition;
-    Vector3<fsimd<Elements,Type>> m_DiffuseColor;
-    Vector3<fsimd<Elements,Type>> m_AmbientColor;
-    Vector3<fsimd<Elements,Type>> m_CameraPosition;
+    Vector3<fsimd<Elements, Type>> m_LightPosition;
+    Vector3<fsimd<Elements, Type>> m_DiffuseColor;
+    Vector3<fsimd<Elements, Type>> m_AmbientColor;
+    Vector3<fsimd<Elements, Type>> m_CameraPosition;
 };
 
 class SoftwareRenderer : public IRenderer
@@ -124,29 +125,29 @@ public:
     static Vector2<T> EdgeFunctionSeparate(const Vector2<T>& A, const Vector2<T>& B, const Vector2<T>& C);
 private:
     struct RenderThreadData;
-    template< typename , DrawFunctionConfig >
+
+    template<typename, DrawFunctionConfig>
     void DrawFilledTriangleBaseline(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
 
-    template< typename MathT , DrawFunctionConfig >
+    template<typename MathT, DrawFunctionConfig>
     void DrawFilledTriangle_v2(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
 
-    template< typename MathT , DrawFunctionConfig >
+    template<typename MathT, DrawFunctionConfig>
     void DrawFilledTriangle_v3(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
 
-    template< typename MathT , DrawFunctionConfig Config >
+    template<typename MathT, DrawFunctionConfig Config>
     void DrawFilledTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int minY, int maxY, DrawStats& stats);
 
-
-    template< uint8_t TILE_SIZE , eSimdType Type , int Elements = 8 >
+    template<uint8_t TILE_SIZE, eSimdType Type, int Elements = 8>
     void DrawTileImplSimd(const CommandRenderTile& TD, RenderThreadData& data);
-    template< uint8_t TILE_SIZE >
-    void DrawTileImpl   (const CommandRenderTile& TD, RenderThreadData& data);
-    void DrawTile       (const CommandRenderTile& TD, RenderThreadData& data);
 
+    template<uint8_t TILE_SIZE>
+    void DrawTileImpl   (const CommandRenderTile& TD, RenderThreadData& data);
+
+    void DrawTile       (const CommandRenderTile& TD, RenderThreadData& data);
     void GenerateTileJobs(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, DrawStats& stats, const PipelineSharedData* pPipelineSharedData, uint32_t tri_index , pmr::vector<const Command*>& outCommmands );
 
-
-    template< typename MathT , DrawFunctionConfig Config >
+    template<typename MathT, DrawFunctionConfig Config>
     void DrawFilledTriangles(const TransformedVertex* pVerts, size_t Count, const Vector4f& color, int minY, int maxY, DrawStats& stats);
 
     void DrawTriangle(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, const Vector4f& color, int MinY, int maxY);
@@ -165,20 +166,19 @@ private:
         return &m_TilesGrid[tileIndex.y * m_TilesGridSize.x + tileIndex.x];
     }
 
-    void                RendererTaskWorker();
-    void                RecreateBuffers( uint8_t TileSize , int screenWidth , int screenHeight );
-    void                VertexAssemply( const CommandVertexAssemply& cmd );
-    void                ExecuteExitCommand();
-    void                ClearBuffers(const CommandClear& cmd);
-    void                Fill32BitBuffer( const CommandFill32BitBuffer& cmd );
-    void                VertexTransformAndClip( const CommandVertexTransformAndClip& cmd , RenderThreadData& data );
-    void                ProcessTriangles( const CommandProcessTriangles& cmd , RenderThreadData& data );
-    void                WaitForSync(const CommandSyncBarier& cmd);
-    CommandBuffer*      AllocTransientCommandBuffer(){ return CommandBuffer::CreateCommandBuffer( m_TransientMemoryResource); }
-
+    void RendererTaskWorker();
+    void RecreateBuffers( uint8_t TileSize , int screenWidth , int screenHeight );
+    void VertexAssemply( const CommandVertexAssemply& cmd );
+    void ExecuteExitCommand();
+    void ClearBuffers(const CommandClear& cmd);
+    void Fill32BitBuffer( const CommandFill32BitBuffer& cmd );
+    void VertexTransformAndClip( const CommandVertexTransformAndClip& cmd , RenderThreadData& data );
+    void ProcessTriangles( const CommandProcessTriangles& cmd , RenderThreadData& data );
+    void WaitForSync(const CommandSyncBarier& cmd);
+    CommandBuffer* AllocTransientCommandBuffer(){ return CommandBuffer::CreateCommandBuffer( m_TransientMemoryResource); }
     Vector4f FragmentShader(const TransformedVertex& vertex);
-    template< int Elements , eSimdType Type >
-    Vector4<fsimd<Elements,Type>> FragmentShader(const SimdTransformedVertex<Elements,Type>& vertex);
+    template<int Elements, eSimdType Type>
+    Vector4<fsimd<Elements, Type>> FragmentShader(const SimdTransformedVertex<Elements,Type>& vertex);
 
     // 8 bit - one channel (8*4=32 - rgba)
     vector<uint32_t>    m_ScreenBuffer;
@@ -187,8 +187,8 @@ private:
     uint8_t             m_TileSize = 32;
     eTileMode           m_TileMode = eTileMode::Tile_32x32;
 
-    vector<AlignedPixel>m_TilesBuffer;
-    unique_ptr<TileInfo[]>m_TilesGrid;
+    vector<AlignedPixel> m_TilesBuffer;
+    unique_ptr<TileInfo[]> m_TilesGrid;
     vector<float>       m_ZBuffer;
     Vector2si           m_TilesGridSize;
     Vector2si           m_LastTile;
@@ -211,7 +211,7 @@ private:
     RenderPrmSSE8       m_RenderParamsSSE8;
     RenderPrmAVX        m_RenderParamsAVX;
 
-    template< int Elements , eSimdType Type >
+    template<int Elements, eSimdType Type>
     auto&               GetRenderParams()
     {
         if constexpr (Type == eSimdType::CPU && Elements == 8)

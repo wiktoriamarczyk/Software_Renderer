@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #pragma once
@@ -28,10 +28,10 @@ enum class eCommandID : uint8_t
 
 struct DrawControl
 {
-    bool IsFullTile : 1 = false;
-    bool ZTest      : 1 = false;
-    bool ZWrite     : 1 = false;
-    bool AlphaBlend : 1 = false;
+    bool m_IsFullTile : 1 = false;
+    bool m_ZTest      : 1 = false;
+    bool m_ZWrite     : 1 = false;
+    bool m_AlphaBlend : 1 = false;
 };
 
 struct DrawConfig
@@ -48,12 +48,12 @@ struct ISyncBarier
 struct SyncBarrier : ISyncBarier
 {
     mutable optional<std::barrier<triviall_function_ref>> m_Barrier;
-    const char* name = "";
+    const char* m_Name = "";
 
     virtual void Wait()const noexcept override
     {
         ZoneScoped;
-        ZoneName(name, strlen(name));
+        ZoneName(m_Name, strlen(m_Name));
         m_Barrier->arrive_and_wait();
         m_Barrier.reset();
     }
@@ -114,7 +114,7 @@ protected:
 
 struct EncodedCommandPtr
 {
-    static constexpr inline auto Bits = sizeof(size_t)*8;
+    static constexpr inline auto Bits = sizeof(size_t) * 8;
     static constexpr inline auto DataBits = 2;
     static constexpr inline auto DataMask = (1 << DataBits) - 1;
     static constexpr inline auto RequiredCmdAlign = 1 << DataBits;
@@ -128,10 +128,10 @@ struct EncodedCommandPtr
         m_Separated.m_Data = size_t(Kind) & DataMask;
     };
     EncodedCommandPtr( eEncodedCommandPtr Encoded )
-        : m_Enoded(Encoded)
+        : m_Encoded(Encoded)
     {}
     EncodedCommandPtr( const EncodedCommandPtr& Encoded )
-        : m_Enoded(Encoded.m_Enoded)
+        : m_Encoded(Encoded.m_Encoded)
     {}
 
     const Command* GetCommand()const noexcept
@@ -143,9 +143,10 @@ struct EncodedCommandPtr
     {
         return static_cast<eCommandPtrKind>( m_Separated.m_Data );
     }
+
     eEncodedCommandPtr GetEncoded()const noexcept
     {
-        return m_Enoded;
+        return m_Encoded;
     }
     operator eEncodedCommandPtr()const noexcept
     {
@@ -156,23 +157,23 @@ struct EncodedCommandPtr
     {
         EncodedCommandPtr next = *this;
         next.m_Separated.m_Data += sizeof(const Command*);
-        return next.m_Enoded;
+        return next.m_Encoded;
     }
 
     eEncodedCommandPtr GetEncodedCommand()const noexcept
     {
-        return m_Enoded;
+        return m_Encoded;
     }
 
     struct SeparatedCommand
     {
-    size_t m_Ptr    : Bits - DataBits   = 0;
-    size_t m_Data   : DataBits          = 0;
+        size_t m_Ptr : Bits - DataBits = 0;
+        size_t m_Data : DataBits = 0;
     };
 
     union
     {
-        eEncodedCommandPtr  m_Enoded = eEncodedCommandPtr{};
+        eEncodedCommandPtr  m_Encoded = eEncodedCommandPtr{};
         SeparatedCommand    m_Separated;
     };
 };
@@ -194,7 +195,7 @@ struct COMMAND_ALIGN CommandFill32BitBuffer : Command
         , m_Value{ .m_UValue{ Val } }
     {}
 
-    void*    m_pBuffer = nullptr;
+    void* m_pBuffer = nullptr;
     uint32_t m_ElementsCount = 0;
     union
     {
@@ -214,7 +215,7 @@ struct COMMAND_ALIGN CommandClear : Command
         , m_ZValue(ZValue)
     {}
     optional<uint32_t>  m_ClearColor;
-    optional<float>     m_ZValue    ;
+    optional<float>     m_ZValue;
 };
 
 struct COMMAND_ALIGN  CommandVertexAssemply : Command
@@ -294,6 +295,6 @@ struct COMMAND_ALIGN CommandRenderTile : Command
     DrawControl         DrawControl;
     uint32_t            TileDrawID = 0;
     const TriangleData* Triangle;
-    const TileInfo*     TileInfo;
+    const TileInfo* TileInfo;
     atomic<CommandRenderTile*> pNext = nullptr;
 };

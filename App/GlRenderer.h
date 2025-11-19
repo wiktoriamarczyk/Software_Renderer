@@ -1,29 +1,32 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
+
 
 #pragma once
 #include "IRenderer.h"
 #include "Math.h"
 
-// Shader Types
+
 enum class ShaderType { Vertex, Fragment, Count };
-// Standard Uniforms in the shader.
+
 enum class UniformType { TransformPVM, World, LightPos, LightAmbientColor, LightDiffuseColor, AmbientStrength, DiffuseStrength, SpecularStrength, Shininess, CameraPos, WireframeColor, Count };
-// Vertex attributes for shaders and the input vertex array.
+
 enum class VertexAttribute { Position, Normal, Color, TexCoord, Count };
 
 class GlTexture : public ITexture
 {
 public:
     GlTexture()=default;
+
     bool CreateWhite4x4Tex();
     bool Load(const char* fileName);
     bool Bind()const;
     virtual bool IsValid()const;
     static void Unbind();
+
 private:
     sf::Texture m_Texture;
     bool m_Loaded = false;
@@ -34,17 +37,19 @@ class GlProgram
 public:
     GlProgram()=default;
     ~GlProgram();
-    bool LoadShaderFromMemory(const std::string& shaderData, ShaderType type);
 
+    bool LoadShaderFromMemory(const std::string& shaderData, ShaderType type);
     bool LoadMatrix(const Matrix4f& mat , UniformType uniform);
     bool LoadVector(const Vector3f& vec , UniformType uniform);
-    bool LoadVector(const Vector4f& vec , UniformType uniform);
+    bool LoadVector(const Vector4f& vec, UniformType uniform);
     bool LoadFloat(float val , UniformType uniform);
     bool Bind()const;
+
     static void Unbind();
+
 private:
     uint32_t m_Program = 0;
-    uint32_t m_Shader [ static_cast<uint32_t>(ShaderType::Count)  ] = { 0 };
+    uint32_t m_Shader[static_cast<uint32_t>(ShaderType::Count)] = { 0 };
     int      m_Uniform[ static_cast<uint32_t>(UniformType::Count) ] = { 0 };
 };
 
@@ -53,9 +58,12 @@ class GlVertexBuffer
 public:
     GlVertexBuffer();
     ~GlVertexBuffer();
+
     bool Load(const vector<Vertex>& vertices);
     void Bind()const;
+
     static void Unbind();
+
 private:
     uint32_t m_VertexBufferObject = 0;
     uint32_t m_VertexArrayObject = 0;
@@ -64,11 +72,9 @@ private:
     uint32_t m_BufferSize = 0;
 };
 
-
 class GlRenderer : public IRenderer
 {
 public:
-
     GlRenderer(int screenWidth, int screenHeight);
     ~GlRenderer();
 
@@ -104,6 +110,7 @@ public:
     virtual void SetDrawBBoxes(bool drawBBoxes)override;
     virtual void SetZWrite(bool zwrite)override;
     virtual void SetZTest(bool ztest)override;
+
 private:
     int                         m_ScreenWidth = 0;
     int                         m_ScreenHeight = 0;

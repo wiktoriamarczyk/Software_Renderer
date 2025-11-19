@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #pragma once
@@ -14,9 +14,11 @@ public:
 
     SimpleThreadPool();
     ~SimpleThreadPool();
+
     void SetThreadCount(uint8_t count);
     uint8_t GetThreadCount()const;
     void LaunchTasks(vector<TaskFunc> tasks);
+
     static int32_t GetThreadID();
 private:
     struct Task
@@ -28,7 +30,7 @@ private:
     void Worker();
     optional<Task> AcquireTask();
 
-    atomic_bool m_Finlizing;
+    atomic_bool m_Finalizing;
     counting_semaphore<> m_NewTaskSemaphore;
     vector<Task> m_Tasks;
     std::mutex m_TasksCS;
@@ -45,26 +47,27 @@ public:
 
     void lock()const noexcept
     {
-        lock( std::memory_order_acquire );
+        lock(std::memory_order_acquire);
     }
+
     void lockSeqCst()const noexcept
     {
-        lock( std::memory_order_seq_cst );
+        lock(std::memory_order_seq_cst);
     }
 
     void unlock()const noexcept
     {
-        m_Lock.store( false , std::memory_order_release );
+        m_Lock.store(false, std::memory_order_release );
     }
 private:
-    void lock( std::memory_order LockOrder )const noexcept
+    void lock(std::memory_order LockOrder)const noexcept
     {
         for (;;)
         {
-            if( !m_Lock.exchange( true , LockOrder ) )
+            if (!m_Lock.exchange(true, LockOrder ))
                 return;
 
-            while( m_Lock.load( std::memory_order_relaxed ) )
+            while (m_Lock.load( std::memory_order_relaxed))
                 std::this_thread::yield();
         }
     }

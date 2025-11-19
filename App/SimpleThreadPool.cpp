@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #include "SimpleThreadPool.h"
@@ -17,7 +17,7 @@ int32_t SimpleThreadPool::GetThreadID()
 SimpleThreadPool::SimpleThreadPool()
     : m_NewTaskSemaphore(0)
 {
-    m_Finlizing = false;
+    m_Finalizing = false;
 }
 
 SimpleThreadPool::~SimpleThreadPool()
@@ -27,7 +27,7 @@ SimpleThreadPool::~SimpleThreadPool()
         if (m_ThreadCount <= 0)
             return;
 
-        m_Finlizing = true;
+        m_Finalizing = true;
         m_NewTaskSemaphore.release(m_ThreadCount);
     }
 
@@ -88,7 +88,7 @@ void SimpleThreadPool::Worker()
     while (true)
     {
         m_NewTaskSemaphore.acquire();
-        if (m_Finlizing)
+        if (m_Finalizing)
             break;
 
         optional<Task> Task = AcquireTask();

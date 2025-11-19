@@ -1,3 +1,9 @@
+/*
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
+* Author: Wiktoria Marczyk
+* Year: 2025
+*/
+
 #pragma once
 
 #include "Vector2f.h"
@@ -21,28 +27,28 @@
 
 struct Vertex
 {
-    Vector3f position;
-    Vector3f normal;
-    Vector4f color;
-    Vector2f uv;
+    Vector3f m_Position;
+    Vector3f m_Normal;
+    Vector4f m_Color;
+    Vector2f m_UV;
 
     Vertex operator*(float value)const
     {
         Vertex result;
-        result.position = position * value;
-        result.normal = normal * value;
-        result.color = color * value;
-        result.uv = uv * value;
+        result.m_Position = m_Position * value;
+        result.m_Normal = m_Normal * value;
+        result.m_Color = m_Color * value;
+        result.m_UV = m_UV * value;
         return result;
     }
 
     Vertex operator+(const Vertex& vertex)const
     {
         Vertex result;
-        result.position = position + vertex.position;
-        result.normal = normal + vertex.normal;
-        result.color = color + vertex.color;
-        result.uv = uv + vertex.uv;
+        result.m_Position = m_Position + vertex.m_Position;
+        result.m_Normal = m_Normal + vertex.m_Normal;
+        result.m_Color = m_Color + vertex.m_Color;
+        result.m_UV = m_UV + vertex.m_UV;
         return result;
     }
 
@@ -53,23 +59,23 @@ struct Vertex
     static const uint32_t UVOffset;
 };
 
-template< std::integral T >
+template<std::integral T>
 inline constexpr bool IsPowerOfTwo(T value)
 {
     return value > 0 && (value & (value - 1)) == 0;
 }
 
-template< std::integral T >
+template<std::integral T>
 inline constexpr T Granulate(T base, T multiplier)
 {
     return ( (base + multiplier - 1) / multiplier )* multiplier;
 }
 
 constexpr inline const uint32_t Vertex::Stride          = sizeof(Vertex);
-constexpr inline const uint32_t Vertex::PositionOffset  = offsetof(Vertex, position);
-constexpr inline const uint32_t Vertex::NormalOffset    = offsetof(Vertex, normal);
-constexpr inline const uint32_t Vertex::ColorOffset     = offsetof(Vertex, color);
-constexpr inline const uint32_t Vertex::UVOffset        = offsetof(Vertex, uv);
+constexpr inline const uint32_t Vertex::PositionOffset  = offsetof(Vertex, m_Position);
+constexpr inline const uint32_t Vertex::NormalOffset    = offsetof(Vertex, m_Normal);
+constexpr inline const uint32_t Vertex::ColorOffset     = offsetof(Vertex, m_Color);
+constexpr inline const uint32_t Vertex::UVOffset        = offsetof(Vertex, m_UV);
 
 class IMath
 {
@@ -202,8 +208,6 @@ public:
     virtual bool EdgeFunction3xToBool( const Vector2f& P , float* TBL0 , float* TBL1 , float* pResult )const override;
     virtual void EdgeFunction3xToBoolx8( const Vector2f& P , float* TBL0 , float* TBL1 , float* pResult )const override;
 };
-
-
 
 union simd_data
 {
@@ -639,6 +643,7 @@ inline void MathCPU::EdgeFunction3xToBoolx8( const Vector2f& P , float* TBL0 , f
 //        EdgeResult.CAP [i] = Final[2];
 //    }
 //}
+
 //****************************************************************
 //                          Math SSE
 //****************************************************************

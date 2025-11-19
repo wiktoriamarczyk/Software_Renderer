@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #include "GlRenderer.h"
@@ -384,7 +384,6 @@ void main() {
     sumOfLight = min(sumOfLight,vec3(1.0, 1.0, 1.0));
 
     gl_FragColor = vec4(sumOfLight,1) * sampledPixel * ps_color;
-    gl_FragColor = sampledPixel * ps_color;
 }
 )";
 

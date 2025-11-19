@@ -1,8 +1,9 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
+
 
 #pragma once
 #include "Common.h"
@@ -30,12 +31,12 @@ inline void FastNormalize3( const float lpInput[3], float lpOutput[3])
     _mm_store_ss( lpOutput+2 , _mm_mul_ss(vInputSqA, vInputC) );
 }
 
-template< typename T >
+template<typename T>
 class Vector3;
 
 inline void FastNormalize( Vector3<float>& v );
 
-template< typename T >
+template<typename T>
 class Vector3
 {
 public:
@@ -50,31 +51,31 @@ public:
         , z{ Array[ 2 ] , args... }
     {}
 
-    template< typename T2 , eRoundMode RM = eRoundMode::Floor >
+    template< typename T2, eRoundMode RM = eRoundMode::Floor>
     constexpr Vector3<T2> ToVector3()const
     {
-        if constexpr( !std::is_floating_point_v<T2> )
-            return Vector3<T2>( static_cast<T2>(x) , static_cast<T2>(y) , static_cast<T2>(z) );
-        else if constexpr( RM == eRoundMode::Floor )
-            return Vector3<T2>( static_cast<T2>(x), static_cast<T2>(y) , static_cast<T2>(z) );
-        else if constexpr( RM == eRoundMode::Round )
-            return Vector3<T2>( round(x) , round(y) , round(z) );
+        if constexpr(!std::is_floating_point_v<T2>)
+            return Vector3<T2>( static_cast<T2>(x), static_cast<T2>(y), static_cast<T2>(z));
+        else if constexpr(RM == eRoundMode::Floor )
+            return Vector3<T2>( static_cast<T2>(x), static_cast<T2>(y), static_cast<T2>(z));
+        else if constexpr(RM == eRoundMode::Round )
+            return Vector3<T2>( round(x), round(y), round(z));
         else
-            return Vector3<T2>( ceil(x) , ceil(y) , ceil(z) );
+            return Vector3<T2>( ceil(x), ceil(y), ceil(z));
     }
 
-    template< typename U , typename ... A >
+    template<typename U , typename ... A>
         requires HasLoadFrom<T,U,A...>
-    void load( const U& Array , const A& ... args )
+    void load(const U& Array , const A& ... args)
     {
         x.load( Array[0] , args... );
         y.load( Array[1] , args... );
         z.load( Array[2] , args... );
     }
 
-    template< typename U , typename ... A >
+    template<typename U, typename ... A>
         requires HasStoreTo<T,U,A...>
-    void store( U& Array , const A& ... args )const
+    void store(U& Array , const A& ... args)const
     {
         x.store( Array[0] , args... );
         y.store( Array[1] , args... );

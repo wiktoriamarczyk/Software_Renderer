@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #include "TransientAllocator.h"
@@ -11,7 +11,7 @@ atomic<size_t> g_memory_resource_mem;
 
 struct TransientMemoryAllocator::Page
 {
-    void* allocate( size_t bytes, size_t alignment , std::pmr::synchronized_pool_resource& upstream );
+    void* allocate(size_t bytes, size_t alignment, std::pmr::synchronized_pool_resource& upstream);
 
     constexpr Page()=default;
     virtual ~Page();
@@ -19,21 +19,21 @@ struct TransientMemoryAllocator::Page
 
     struct PageImpl;
 protected:
-    Page( uint8_t* pMem , uint32_t size );
+    Page(uint8_t* pMem, uint32_t size);
 private:
-    uint8_t*                m_pCurPos   = nullptr;
-    uint32_t                m_FreeLeft  = 0;
-    uint8_t*const           m_pStartPos = nullptr;
-    const uint32_t          m_MaxSize   = 0xFFFFFF;
-    const uint8_t*const     m_pEnd      = nullptr;
+    uint8_t* m_pCurPos = nullptr;
+    uint32_t                m_FreeLeft = 0;
+    uint8_t* const           m_pStartPos = nullptr;
+    const uint32_t          m_MaxSize = 0xFFFFFF;
+    const uint8_t* const     m_pEnd = nullptr;
 };
 
-TransientMemoryAllocator::Page::Page( uint8_t* pMem , uint32_t size )
-    : m_pCurPos( pMem )
-    , m_FreeLeft( size )
-    , m_pStartPos( pMem )
-    , m_MaxSize( size )
-    , m_pEnd( pMem + size )
+TransientMemoryAllocator::Page::Page(uint8_t* pMem, uint32_t size)
+    : m_pCurPos(pMem)
+    , m_FreeLeft(size)
+    , m_pStartPos(pMem)
+    , m_MaxSize(size)
+    , m_pEnd(pMem + size)
 {
     g_memory_resource_mem.fetch_add( m_MaxSize , std::memory_order_relaxed );
 }
@@ -43,7 +43,7 @@ struct TransientMemoryAllocator::Page::PageImpl : Page
     constexpr static inline auto SIZE = 512*1024;
 
     PageImpl()
-        : Page( m_Buffer , SIZE )
+        : Page(m_Buffer, SIZE)
     {}
 private:
     alignas(64) uint8_t m_Buffer[SIZE];
@@ -51,8 +51,8 @@ private:
 
 TransientMemoryAllocator::Page::~Page()
 {
-    if( m_pStartPos )
-        g_memory_resource_mem.fetch_sub( m_MaxSize , std::memory_order_relaxed );
+    if(m_pStartPos)
+        g_memory_resource_mem.fetch_sub(m_MaxSize, std::memory_order_relaxed);
 }
 
 void TransientMemoryAllocator::Page::reset()
@@ -61,17 +61,17 @@ void TransientMemoryAllocator::Page::reset()
     m_FreeLeft = m_MaxSize;
 }
 
-FORCE_INLINE void* TransientMemoryAllocator::Page::allocate( size_t bytes, size_t alignment , std::pmr::synchronized_pool_resource& upstream )
+FORCE_INLINE void* TransientMemoryAllocator::Page::allocate(size_t bytes, size_t alignment, std::pmr::synchronized_pool_resource& upstream)
 {
     ZoneScoped;
-    static_assert( IsPowerOfTwo( AVX_ALIGN ) );
+    static_assert(IsPowerOfTwo( AVX_ALIGN ));
 
     alignment = Granulate<size_t>(alignment, AVX_ALIGN);
     bytes = Granulate<size_t>(bytes, alignment);
-    if( alignment > 64 || bytes > m_MaxSize/4 )
+    if(alignment > 64 || bytes > m_MaxSize/4)
         return upstream.allocate(bytes, alignment);
 
-    if( m_pCurPos + bytes > m_pEnd )
+    if(m_pCurPos + bytes > m_pEnd)
         return nullptr;
 
     auto pMem = m_pCurPos;
@@ -114,12 +114,12 @@ struct TransientMemoryAllocator::TLSlot
         if( pMem )
             return pMem;
 
-        if( !m_pStorage )
+        if (!m_pStorage)
             m_pStorage = Storage::RegisterSlot(*this);
 
-        if( m_pStorage )
+        if (m_pStorage)
         {
-            if( auto pNewPage = m_pStorage->GetNextFreePage() )
+            if(auto pNewPage = m_pStorage->GetNextFreePage())
                 m_pPage = pNewPage;
         }
 
@@ -139,9 +139,9 @@ struct TransientMemoryAllocator::TLSlot
     }
 
 private:
-    Page*       m_pPage     = nullptr;
-    Storage*    m_pStorage  = nullptr;
-    static inline Page s_EmptyPage ;
+    Page* m_pPage = nullptr;
+    Storage* m_pStorage = nullptr;
+    static inline Page s_EmptyPage;
 };
 
 constinit thread_local TransientMemoryAllocator::TLSlot TransientMemoryAllocator::s_TLSlot;
@@ -221,10 +221,10 @@ void TransientMemoryAllocator::Storage::reset()
     ZoneScoped;
     std::scoped_lock lock(m_Mutex);
 
-    for( auto& pSlot : m_Slots )
+    for(auto& pSlot : m_Slots)
         pSlot->reset();
 
-    for( auto& pPage : m_Pages )
+    for(auto& pPage : m_Pages)
     {
         pPage->reset();
         m_EmptyPages.push_back(std::move(pPage));

@@ -1,7 +1,7 @@
 /*
-* Engineering thesis - Software-based 3D Graphics Renderer
+* Master’s thesis - Analysis of selected optimization techniques for a 3D software renderer
 * Author: Wiktoria Marczyk
-* Year: 2024
+* Year: 2025
 */
 
 #pragma once
@@ -57,12 +57,9 @@ namespace pmr
     using namespace std::pmr;
 }
 
-//const int SCREEN_WIDTH  = 1920*2;
-//const int SCREEN_HEIGHT = 1024*2;
-const int SCREEN_WIDTH  = 1920;
+
+const int SCREEN_WIDTH = 1920;
 const int SCREEN_HEIGHT = 1024;
-//const int SCREEN_WIDTH  = 640;
-//const int SCREEN_HEIGHT = 480;
 const int MAX_MODEL_TRIANGLES = 200'000;
 const int MAX_TEXTURE_SIZE = 4096;
 const int FULL_ANGLE = 360;
@@ -72,17 +69,18 @@ const string INIT_TEXTURE_PATH = "../Data/Checkerboard.png";
 inline const char* MODEL_FORMATS = ".fbx,.glb,.gltf,.blend,.obj";
 inline const char* TEXTURE_FORMATS = ".png,.jpg,.jpeg,.bmp";
 
-template< typename DataT , typename ArrayT , typename ... A >
-concept HasStoreTo = requires( const DataT& Data , ArrayT& Array , const A& ... args ){ { Data.store( Array[0] , args... ) }; };
+template<typename DataT, typename ArrayT, typename ... A>
+concept HasStoreTo = requires(const DataT& Data, ArrayT& Array, const A& ... args) {{ Data.store( Array[0], args...) };};
 
-template< typename DataT , typename ArrayT , typename ... A >
-concept HasLoadFrom = requires( DataT& Data , const ArrayT& Array , const A& ... args ){ { Data.load( Array[0] , args... ) }; };
+template<typename DataT, typename ArrayT, typename ... A>
+concept HasLoadFrom = requires(DataT& Data, const ArrayT& Array, const A& ... args) {{ Data.load( Array[0], args...) };};
 
-template< typename DataT , typename ArrayT , typename ... A >
-concept HasConstructFrom = requires( const ArrayT& Array , const A& ... args ){ { DataT( Array[0] , args... ) }; };
+template<typename DataT, typename ArrayT, typename ... A>
+concept HasConstructFrom = requires(const ArrayT& Array, const A& ... args) {{ DataT( Array[0] , args...) };};
 
-template< typename T >
+template<typename T>
 class Vector2;
+
 
 struct DrawStats
 {
@@ -113,6 +111,7 @@ struct DependentTypeT{
 
 template< typename T , typename D >
 using DependentType = typename DependentTypeT<T,D>::Type;
+
 
 enum class eRoundMode : uint8_t
 {
@@ -149,57 +148,57 @@ constexpr const char* CMAKE_BUILD_NAME = CMAKE_INTDIR;
 namespace Math
 {
 
-template< typename T >
-inline void Rsqrt( const T& val , T& out )
+template<typename T>
+inline void Rsqrt(const T& val, T& out)
 {
-    if constexpr( requires{ val.rsqrt(); } )
+    if constexpr(requires{ val.rsqrt(); })
         out = val.rsqrt();
-    else if constexpr( std::same_as<T,float> )
-        _mm_store_ss( &out , _mm_rsqrt_ss( _mm_set_ss( val ) ) );
-    else if constexpr( std::same_as<T,double> )
-        _mm_store_sd( &out , _mm_rsqrt_sd( _mm_set_sd( val ) ) );
+    else if constexpr(std::same_as<T,float>)
+        _mm_store_ss (&out, _mm_rsqrt_ss(_mm_set_ss(val)));
+    else if constexpr (std::same_as<T,double>)
+        _mm_store_sd (&out, _mm_rsqrt_sd(_mm_set_sd(val)));
     else
         out = sqrt( 1 / val );
 }
 
-template< typename T >
-inline void Min( const T& A , const T& B , T& out )
+template<typename T>
+inline void Min(const T& A, const T& B, T& out)
 {
-    if constexpr( requires{ { A.min( B ) } -> std::same_as<T>; } )
-        out = A.min( B );
+    if constexpr( requires{{ A.min( B ) } -> std::same_as<T>; })
+        out = A.min(B);
     else
-        out = std::min( A , B );
+        out = std::min(A, B);
 }
 
-template< typename T >
-inline T Min( const T& A , const T& B )
+template<typename T>
+inline T Min(const T& A, const T& B)
 {
     T result;
-    Min( A , B , result );
+    Min(A, B, result);
     return result;
 }
 
-template< typename T >
-inline void Max( const T& A , const T& B , T& out )
+template<typename T>
+inline void Max(const T& A, const T& B, T& out)
 {
-    if constexpr( requires{ { A.max( B ) } -> std::same_as<T>; } )
-        out = A.max( B );
+    if constexpr(requires{{ A.max( B ) } -> std::same_as<T>; })
+        out = A.max(B);
     else
-        out = std::max( A , B );
+        out = std::max(A, B);
 }
 
-template< typename T >
-inline T Max( const T& A , const T& B )
+template<typename T>
+inline T Max(const T& A, const T& B)
 {
     T result;
-    Max( A , B , result );
+    Max(A, B, result);
     return result;
 }
 
-template< std::integral T >
-FORCE_INLINE auto CountBitsSetTo1( T val )
+template<std::integral T>
+FORCE_INLINE auto CountBitsSetTo1(T val)
 {
-    return std::popcount( static_cast< std::make_unsigned_t<T> >( val ) );
+    return std::popcount(static_cast<std::make_unsigned_t<T> >( val ));
 }
 
 }
