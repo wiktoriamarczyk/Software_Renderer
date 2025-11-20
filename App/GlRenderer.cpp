@@ -29,44 +29,45 @@ using namespace SOGL;
 namespace
 {
 
-void checkError(uint32_t l_shader, uint32_t l_flag, bool l_program, const std::string& l_errorMsg)
-{
-    int success = 0;
-    char error[1024] = { 0 };
-    if (l_program)
-        glGetProgramiv(l_shader, l_flag, &success);
-    else
-        glGetShaderiv(l_shader, l_flag, &success);
+    void checkError(uint32_t l_shader, uint32_t l_flag, bool l_program, const std::string& l_errorMsg)
+    {
+        int success = 0;
+        char error[1024] = { 0 };
+        if (l_program)
+            glGetProgramiv(l_shader, l_flag, &success);
+        else
+            glGetShaderiv(l_shader, l_flag, &success);
 
-    if (success)
-        return;
+        if (success)
+            return;
 
-    if (l_program)
-        glGetProgramInfoLog(l_shader, sizeof(error), nullptr, error);
-    else
-        glGetShaderInfoLog(l_shader, sizeof(error), nullptr, error);
+        if (l_program)
+            glGetProgramInfoLog(l_shader, sizeof(error), nullptr, error);
+        else
+            glGetShaderInfoLog(l_shader, sizeof(error), nullptr, error);
 
-    std::cout << "Error: '" << error << "'" << std::endl;
+        std::cout << "Error: '" << error << "'" << std::endl;
 
-}
-
-///Creates and compiles a shader.
-GLuint buildShader(const std::string& l_src, unsigned int l_type)
-{
-    GLuint shaderID = glCreateShader(l_type);
-    if (!shaderID) {
-        std::cout << "Bad shader type!";
-        return 0;
     }
-    const GLchar* sources[1];
-    GLint lengths[1];
-    sources[0] = l_src.c_str();
-    lengths[0] = l_src.length();
-    glShaderSource(shaderID, 1, sources, lengths);
-    glCompileShader(shaderID);
-    checkError(shaderID, GL_COMPILE_STATUS, false, "Shader compile error: ");
-    return shaderID;
-}
+
+    ///Creates and compiles a shader.
+    GLuint buildShader(const std::string& l_src, unsigned int l_type)
+    {
+        GLuint shaderID = glCreateShader(l_type);
+        if (!shaderID)
+        {
+            std::cout << "Bad shader type!";
+            return 0;
+        }
+        const GLchar* sources[1];
+        GLint lengths[1];
+        sources[0] = l_src.c_str();
+        lengths[0] = l_src.length();
+        glShaderSource(shaderID, 1, sources, lengths);
+        glCompileShader(shaderID);
+        checkError(shaderID, GL_COMPILE_STATUS, false, "Shader compile error: ");
+        return shaderID;
+    }
 
 }
 
@@ -90,7 +91,7 @@ bool GlProgram::LoadShaderFromMemory(const std::string& shaderData, ShaderType t
     if (shaderData.empty())
         return false;
 
-    uint32_t& shaderID = m_Shader[ static_cast<uint32_t>(type) ];
+    uint32_t& shaderID = m_Shader[static_cast<uint32_t>(type)];
 
     if (m_Program && shaderID)
     {
@@ -122,8 +123,8 @@ bool GlProgram::LoadShaderFromMemory(const std::string& shaderData, ShaderType t
 
     glAttachShader(m_Program, shaderID);
     glBindAttribLocation(m_Program, static_cast<GLuint>(VertexAttribute::Position), "vs_position");
-    glBindAttribLocation(m_Program, static_cast<GLuint>(VertexAttribute::Normal  ), "vs_normal");
-    glBindAttribLocation(m_Program, static_cast<GLuint>(VertexAttribute::Color   ), "vs_color");
+    glBindAttribLocation(m_Program, static_cast<GLuint>(VertexAttribute::Normal), "vs_normal");
+    glBindAttribLocation(m_Program, static_cast<GLuint>(VertexAttribute::Color), "vs_color");
     glBindAttribLocation(m_Program, static_cast<GLuint>(VertexAttribute::TexCoord), "vs_uv");
 
     glLinkProgram(m_Program);
@@ -131,17 +132,17 @@ bool GlProgram::LoadShaderFromMemory(const std::string& shaderData, ShaderType t
     glValidateProgram(m_Program);
     checkError(m_Program, GL_VALIDATE_STATUS, true, "Invalid shader:");
 
-    m_Uniform[uint32_t(UniformType::TransformPVM        )] = glGetUniformLocation(m_Program, "g_MatPVM");
-    m_Uniform[uint32_t(UniformType::World               )] = glGetUniformLocation(m_Program, "g_MatW");
-    m_Uniform[uint32_t(UniformType::LightPos            )] = glGetUniformLocation(m_Program, "g_LightPos");
-    m_Uniform[uint32_t(UniformType::LightAmbientColor   )] = glGetUniformLocation(m_Program, "g_LightAmbientColor");
-    m_Uniform[uint32_t(UniformType::LightDiffuseColor   )] = glGetUniformLocation(m_Program, "g_LightDiffuseColor");
-    m_Uniform[uint32_t(UniformType::AmbientStrength     )] = glGetUniformLocation(m_Program, "g_LightAmbientStrength");
-    m_Uniform[uint32_t(UniformType::DiffuseStrength     )] = glGetUniformLocation(m_Program, "g_LightDiffuseStrength");
-    m_Uniform[uint32_t(UniformType::SpecularStrength    )] = glGetUniformLocation(m_Program, "g_SpecularStrength");
-    m_Uniform[uint32_t(UniformType::CameraPos           )] = glGetUniformLocation(m_Program, "g_CameraPos");
-    m_Uniform[uint32_t(UniformType::Shininess           )] = glGetUniformLocation(m_Program, "g_Shininess");
-    m_Uniform[uint32_t(UniformType::WireframeColor      )] = glGetUniformLocation(m_Program, "g_WireframeColor");
+    m_Uniform[uint32_t(UniformType::TransformPVM)] = glGetUniformLocation(m_Program, "g_MatPVM");
+    m_Uniform[uint32_t(UniformType::World)] = glGetUniformLocation(m_Program, "g_MatW");
+    m_Uniform[uint32_t(UniformType::LightPos)] = glGetUniformLocation(m_Program, "g_LightPos");
+    m_Uniform[uint32_t(UniformType::LightAmbientColor)] = glGetUniformLocation(m_Program, "g_LightAmbientColor");
+    m_Uniform[uint32_t(UniformType::LightDiffuseColor)] = glGetUniformLocation(m_Program, "g_LightDiffuseColor");
+    m_Uniform[uint32_t(UniformType::AmbientStrength)] = glGetUniformLocation(m_Program, "g_LightAmbientStrength");
+    m_Uniform[uint32_t(UniformType::DiffuseStrength)] = glGetUniformLocation(m_Program, "g_LightDiffuseStrength");
+    m_Uniform[uint32_t(UniformType::SpecularStrength)] = glGetUniformLocation(m_Program, "g_SpecularStrength");
+    m_Uniform[uint32_t(UniformType::CameraPos)] = glGetUniformLocation(m_Program, "g_CameraPos");
+    m_Uniform[uint32_t(UniformType::Shininess)] = glGetUniformLocation(m_Program, "g_Shininess");
+    m_Uniform[uint32_t(UniformType::WireframeColor)] = glGetUniformLocation(m_Program, "g_WireframeColor");
 
     return true;
 }
@@ -155,11 +156,11 @@ bool GlProgram::LoadMatrix(const Matrix4f& mat, UniformType uniformType)
     if (uniform == -1)
         return false;
 
-    glUniformMatrix4fv( uniform , 1, GL_FALSE, mat.m_Matrix[0] );
+    glUniformMatrix4fv(uniform, 1, GL_FALSE, mat.m_Matrix[0]);
     return true;
 }
 
-bool GlProgram::LoadVector(const Vector4f& vec , UniformType uniform)
+bool GlProgram::LoadVector(const Vector4f& vec, UniformType uniform)
 {
     if (!m_Program)
         return false;
@@ -168,11 +169,11 @@ bool GlProgram::LoadVector(const Vector4f& vec , UniformType uniform)
     if (uniformID == -1)
         return false;
 
-    glUniform4fv( uniformID , 1, &vec.x );
+    glUniform4fv(uniformID, 1, &vec.x);
     return true;
 }
 
-bool GlProgram::LoadVector(const Vector3f& vec , UniformType uniform)
+bool GlProgram::LoadVector(const Vector3f& vec, UniformType uniform)
 {
     if (!m_Program)
         return false;
@@ -181,7 +182,7 @@ bool GlProgram::LoadVector(const Vector3f& vec , UniformType uniform)
     if (uniformID == -1)
         return false;
 
-    glUniform3fv( uniformID , 1, &vec.x );
+    glUniform3fv(uniformID, 1, &vec.x);
     return true;
 }
 
@@ -194,7 +195,7 @@ bool GlProgram::LoadFloat(float val, UniformType uniform)
     if (uniformID == -1)
         return false;
 
-    glUniform1f( uniformID , val );
+    glUniform1f(uniformID, val);
     return true;
 }
 
@@ -211,9 +212,9 @@ void GlProgram::Unbind()
     glUseProgram(0);
 }
 
-void* ToGlOffset( uint32_t l_offset )
+void* ToGlOffset(uint32_t l_offset)
 {
-    return reinterpret_cast<char*>(0)+l_offset;
+    return reinterpret_cast<char*>(0) + l_offset;
 }
 
 GlVertexBuffer::GlVertexBuffer()
@@ -221,11 +222,11 @@ GlVertexBuffer::GlVertexBuffer()
     glGenVertexArrays(1, &m_VertexArrayObject);
     glBindVertexArray(m_VertexArrayObject);
 
-    m_BufferCapacity = 1024*10;
+    m_BufferCapacity = 1024 * 10;
 
     glGenBuffers(1, &m_VertexBufferObject);
     glBindBuffer(GL_ARRAY_BUFFER, m_VertexBufferObject);
-    glBufferData(GL_ARRAY_BUFFER, Vertex::Stride*m_BufferCapacity, nullptr, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, Vertex::Stride * m_BufferCapacity, nullptr, GL_DYNAMIC_DRAW);
 
 
     glEnableVertexAttribArray(uint32_t(VertexAttribute::Position));
@@ -260,11 +261,11 @@ bool GlVertexBuffer::Load(const vector<Vertex>& vertices)
     if (vertices.size() > m_BufferCapacity)
     {
         m_BufferCapacity = vertices.size();
-        glBufferData(GL_ARRAY_BUFFER, Vertex::Stride*m_BufferCapacity, nullptr, GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, Vertex::Stride * m_BufferCapacity, nullptr, GL_DYNAMIC_DRAW);
     }
 
     m_BufferSize = vertices.size();
-    glBufferSubData(GL_ARRAY_BUFFER, 0, Vertex::Stride*m_BufferSize, vertices.data());
+    glBufferSubData(GL_ARRAY_BUFFER, 0, Vertex::Stride * m_BufferSize, vertices.data());
     return true;
 }
 
@@ -295,7 +296,7 @@ bool GlTexture::Load(const char* fileName)
 
     texture.setSmooth(false);
 
-    m_Texture.swap( texture );
+    m_Texture.swap(texture);
     m_Loaded = true;
     return true;
 }
@@ -316,12 +317,12 @@ bool GlTexture::IsValid() const
 
 void GlTexture::Unbind()
 {
-    glBindTexture( GL_TEXTURE_2D, 0 );
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 namespace ShadersCode
 {
-const std::string defaultVertexShader = R"(
+    const std::string defaultVertexShader = R"(
 #version 330
 attribute vec3 vs_position;
 attribute vec3 vs_normal;
@@ -346,7 +347,7 @@ void main() {
 )";
 
 
-const std::string defaultFragShader = R"(
+    const std::string defaultFragShader = R"(
 #version 330
 
 uniform sampler2D texture;
@@ -388,7 +389,7 @@ void main() {
 )";
 
 
-const std::string lineVertexShader = R"(
+    const std::string lineVertexShader = R"(
 #version 330
 attribute vec3 vs_position;
 attribute vec4 vs_color;
@@ -403,7 +404,7 @@ void main() {
 }
 )";
 
-const std::string lineFragShader = R"(
+    const std::string lineFragShader = R"(
 #version 330
 
 varying vec4 ps_color;
@@ -413,7 +414,7 @@ void main() {
 }
 )";
 
-const std::string wireframeVertexShader = R"(
+    const std::string wireframeVertexShader = R"(
 #version 330
 attribute vec3 vs_position;
 uniform mat4 g_MatPVM;
@@ -424,7 +425,7 @@ void main() {
 }
 )";
 
-const std::string wireframeFragShader = R"(
+    const std::string wireframeFragShader = R"(
 #version 330
 
 uniform vec3 g_WireframeColor;
@@ -442,7 +443,7 @@ GlRenderer::GlRenderer(int screenWidth, int screenHeight)
 
     if (!sogl_loadOpenGL())
     {
-        const char **failures = sogl_getFailures();
+        const char** failures = sogl_getFailures();
         while (*failures)
         {
             char debugMessage[256];
@@ -453,21 +454,21 @@ GlRenderer::GlRenderer(int screenWidth, int screenHeight)
         return;
     }
 
-    glGetIntegerv(GL_CURRENT_PROGRAM,&m_DefaultSFMLProgram);
+    glGetIntegerv(GL_CURRENT_PROGRAM, &m_DefaultSFMLProgram);
 
     m_DefaultVertexBuffer = make_unique<GlVertexBuffer>();
 
     m_DefaultProgram = std::make_unique<GlProgram>();
     m_DefaultProgram->LoadShaderFromMemory(ShadersCode::defaultVertexShader, ShaderType::Vertex);
-    m_DefaultProgram->LoadShaderFromMemory(ShadersCode::defaultFragShader  , ShaderType::Fragment);
+    m_DefaultProgram->LoadShaderFromMemory(ShadersCode::defaultFragShader, ShaderType::Fragment);
 
     m_LineProgram = std::make_unique<GlProgram>();
     m_LineProgram->LoadShaderFromMemory(ShadersCode::lineVertexShader, ShaderType::Vertex);
-    m_LineProgram->LoadShaderFromMemory(ShadersCode::lineFragShader  , ShaderType::Fragment);
+    m_LineProgram->LoadShaderFromMemory(ShadersCode::lineFragShader, ShaderType::Fragment);
 
     m_WireframeProgram = std::make_unique<GlProgram>();
     m_WireframeProgram->LoadShaderFromMemory(ShadersCode::wireframeVertexShader, ShaderType::Vertex);
-    m_WireframeProgram->LoadShaderFromMemory(ShadersCode::wireframeFragShader  , ShaderType::Fragment);
+    m_WireframeProgram->LoadShaderFromMemory(ShadersCode::wireframeFragShader, ShaderType::Fragment);
 
     m_DefaultProgram->Bind();
 
@@ -492,7 +493,7 @@ GlRenderer::~GlRenderer()
 
 std::shared_ptr<ITexture> GlRenderer::LoadTexture(const char* fileName) const
 {
-    if (!fileName || fileName[0]==0)
+    if (!fileName || fileName[0] == 0)
         return m_DefaultTexture;
     auto texture = std::make_shared<GlTexture>();
     if (!texture->Load(fileName))
@@ -507,7 +508,7 @@ void GlRenderer::ClearScreen()
 
     glClearColor(m_ClearColor.x, m_ClearColor.y, m_ClearColor.z, m_ClearColor.w);
     // Clear the depth buffer
-    glClear(GL_COLOR_BUFFER_BIT );
+    glClear(GL_COLOR_BUFFER_BIT);
 }
 
 void GlRenderer::ClearZBuffer()
@@ -524,17 +525,17 @@ void GlRenderer::Render(const vector<Vertex>& vertices)
 {
     auto& pCurProgram = m_DrawWireframe ? m_WireframeProgram : m_DefaultProgram;
     pCurProgram->Bind();
-    pCurProgram->LoadMatrix( m_MVPMatrix            , UniformType::TransformPVM );
-    pCurProgram->LoadMatrix( m_ModelMatrix          , UniformType::World );
-    pCurProgram->LoadVector( m_LightPosition        , UniformType::LightPos );
-    pCurProgram->LoadVector( m_AmbientColor         , UniformType::LightAmbientColor );
-    pCurProgram->LoadVector( m_DiffuseColor         , UniformType::LightDiffuseColor );
-    pCurProgram->LoadVector( m_CameraPosition       , UniformType::CameraPos );
-    pCurProgram->LoadFloat ( m_AmbientStrength      , UniformType::AmbientStrength );
-    pCurProgram->LoadFloat ( m_DiffuseStrength      , UniformType::DiffuseStrength );
-    pCurProgram->LoadFloat ( m_SpecularStrength     , UniformType::SpecularStrength );
-    pCurProgram->LoadFloat ( m_Shininess            , UniformType::Shininess );
-    pCurProgram->LoadVector( m_WireFrameColor.xyz() , UniformType::WireframeColor );
+    pCurProgram->LoadMatrix(m_MVPMatrix, UniformType::TransformPVM);
+    pCurProgram->LoadMatrix(m_ModelMatrix, UniformType::World);
+    pCurProgram->LoadVector(m_LightPosition, UniformType::LightPos);
+    pCurProgram->LoadVector(m_AmbientColor, UniformType::LightAmbientColor);
+    pCurProgram->LoadVector(m_DiffuseColor, UniformType::LightDiffuseColor);
+    pCurProgram->LoadVector(m_CameraPosition, UniformType::CameraPos);
+    pCurProgram->LoadFloat(m_AmbientStrength, UniformType::AmbientStrength);
+    pCurProgram->LoadFloat(m_DiffuseStrength, UniformType::DiffuseStrength);
+    pCurProgram->LoadFloat(m_SpecularStrength, UniformType::SpecularStrength);
+    pCurProgram->LoadFloat(m_Shininess, UniformType::Shininess);
+    pCurProgram->LoadVector(m_WireFrameColor.xyz(), UniformType::WireframeColor);
 
 
     m_DefaultVertexBuffer->Bind();
@@ -557,15 +558,15 @@ void GlRenderer::Render(const vector<Vertex>& vertices)
     if (m_DrawWireframe)
     {
         glDisable(GL_CULL_FACE);
-        glPolygonMode(GL_FRONT_AND_BACK,GL_LINE);
-        glDrawArrays( GL_TRIANGLES , 0 , vertices.size() );
-        glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glEnable(GL_CULL_FACE);
     }
     else
     {
         glEnable(GL_CULL_FACE);
-        glDrawArrays( GL_TRIANGLES , 0 , vertices.size() );
+        glDrawArrays(GL_TRIANGLES, 0, vertices.size());
     }
 
     GlVertexBuffer::Unbind();

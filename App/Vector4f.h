@@ -16,18 +16,19 @@ class Vector4
 {
 public:
     constexpr Vector4() = default;
-    constexpr Vector4(const Vector2<T>& v,T z, T w);
-    constexpr Vector4(const Vector3<T>& v,T w);
+    constexpr Vector4(const Vector2<T>& v, T z, T w);
+    constexpr Vector4(const Vector3<T>& v, T w);
     constexpr Vector4(T x, T y, T z, T w);
 
-    template< typename U , typename ... A >
-        requires HasConstructFrom<T,U,A...>
-    constexpr Vector4( const U& Array , const A& ... args )
+    template< typename U, typename ... A >
+        requires HasConstructFrom<T, U, A...>
+    constexpr Vector4(const U& Array, const A& ... args)
         : x{ Array[0] , args... }
         , y{ Array[1] , args... }
         , z{ Array[2] , args... }
         , w{ Array[3] , args... }
-    {}
+    {
+    }
 
     constexpr Vector4<T> operator+(Vector4<T> other)const;
     constexpr Vector4<T> operator-(Vector4<T> other)const;
@@ -41,24 +42,24 @@ public:
         return Vector4(v.x * value, v.y * value, v.z * value, v.w * value);
     }
 
-    template< typename U , typename ... A >
-        requires HasLoadFrom<T,U,A...>
-    void load( const U& Array , const A& ... args )
+    template< typename U, typename ... A >
+        requires HasLoadFrom<T, U, A...>
+    void load(const U& Array, const A& ... args)
     {
-        x.load( Array[0] , args... );
-        y.load( Array[1] , args... );
-        z.load( Array[2] , args... );
-        w.load( Array[3] , args... );
+        x.load(Array[0], args...);
+        y.load(Array[1], args...);
+        z.load(Array[2], args...);
+        w.load(Array[3], args...);
     }
 
-    template< typename U , typename ... A >
-        requires HasStoreTo<T,U,A...>
-    void store( U& Array , const A& ... args )const
+    template< typename U, typename ... A >
+        requires HasStoreTo<T, U, A...>
+    void store(U& Array, const A& ... args)const
     {
-        x.store( Array[0] , args... );
-        y.store( Array[1] , args... );
-        z.store( Array[2] , args... );
-        w.store( Array[3] , args... );
+        x.store(Array[0], args...);
+        y.store(Array[1], args...);
+        z.store(Array[2], args...);
+        w.store(Array[3], args...);
     }
 
     T GetLength()const;
@@ -69,20 +70,20 @@ public:
     Vector4<T> CWiseMin(const Vector4& other)const;
     Vector4<T> CWiseMax(const Vector4& other)const;
 
-          Vector2<T>& xy();
+    Vector2<T>& xy();
     const Vector2<T>& xy()const;
 
-          Vector3<T>& xyz();
+    Vector3<T>& xyz();
     const Vector3<T>& xyz()const;
 
-          T* Data() { return &x; }
+    T* Data() { return &x; }
     const T* Data() const { return &x; }
 
-          T* data()       { return &x; }
+    T* data() { return &x; }
     const T* data() const { return &x; }
 
     constexpr static uint32_t ToARGB(const Vector4& color);
-    constexpr inline uint32_t ToARGB()const{ return ToARGB(*this); }
+    constexpr inline uint32_t ToARGB()const { return ToARGB(*this); }
     constexpr static Vector4<T> FromARGB(uint32_t color);
 
     T x{};

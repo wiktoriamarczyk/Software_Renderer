@@ -181,7 +181,8 @@ span<const Vertex> ClipTriangles(const Plane& clipPlane, const float epsilon, sp
                 clippedVerts.push_back(splitedVertices[edgeSplit0]);
                 clippedVerts.push_back(verts[vi2]);
             }
-            else {
+            else
+            {
                 clippedVerts.push_back(splitedVertices[edgeSplit0]);
                 clippedVerts.push_back(verts[vi1]);
                 clippedVerts.push_back(verts[vi2]);
@@ -210,7 +211,8 @@ span<const Vertex> ClipTriangles(const Plane& clipPlane, const float epsilon, sp
                 clippedVerts.push_back(splitedVertices[edgeSplit2]);
                 clippedVerts.push_back(verts[vi1]);
             }
-            else {
+            else
+            {
 
                 clippedVerts.push_back(splitedVertices[edgeSplit2]);
                 clippedVerts.push_back(verts[vi0]);
@@ -225,7 +227,8 @@ span<const Vertex> ClipTriangles(const Plane& clipPlane, const float epsilon, sp
                 clippedVerts.push_back(splitedVertices[edgeSplit1]);
                 clippedVerts.push_back(splitedVertices[edgeSplit0]);
             }
-            else {
+            else
+            {
                 clippedVerts.push_back(verts[vi0]);
                 clippedVerts.push_back(splitedVertices[edgeSplit0]);
                 clippedVerts.push_back(splitedVertices[edgeSplit1]);
@@ -244,7 +247,8 @@ span<const Vertex> ClipTriangles(const Plane& clipPlane, const float epsilon, sp
                 clippedVerts.push_back(splitedVertices[edgeSplit0]);
                 clippedVerts.push_back(splitedVertices[edgeSplit2]);
             }
-            else {
+            else
+            {
 
                 clippedVerts.push_back(splitedVertices[edgeSplit0]);
                 clippedVerts.push_back(verts[vi1]);
@@ -263,7 +267,8 @@ span<const Vertex> ClipTriangles(const Plane& clipPlane, const float epsilon, sp
                 clippedVerts.push_back(splitedVertices[edgeSplit2]);
                 clippedVerts.push_back(splitedVertices[edgeSplit1]);
             }
-            else {
+            else
+            {
                 clippedVerts.push_back(splitedVertices[edgeSplit2]);
                 clippedVerts.push_back(verts[vi1]);
                 clippedVerts.push_back(splitedVertices[edgeSplit1]);
@@ -278,21 +283,21 @@ span<const Vertex> ClipTriangles(const Plane& clipPlane, const float epsilon, sp
     return clippedVerts;
 }
 
-void Frustum::Update( const Matrix4f& mvpMatrix )
+void Frustum::Update(const Matrix4f& mvpMatrix)
 {
-    mvpMatrix.GetFrustumNearPlane  ( m_Planes[0] );
-    mvpMatrix.GetFrustumFarPlane   ( m_Planes[1] );
-    mvpMatrix.GetFrustumLeftPlane  ( m_Planes[2] );
-    mvpMatrix.GetFrustumRightPlane ( m_Planes[3] );
-    mvpMatrix.GetFrustumTopPlane   ( m_Planes[4] );
-    mvpMatrix.GetFrustumBottomPlane( m_Planes[5] );
+    mvpMatrix.GetFrustumNearPlane(m_Planes[0]);
+    mvpMatrix.GetFrustumFarPlane(m_Planes[1]);
+    mvpMatrix.GetFrustumLeftPlane(m_Planes[2]);
+    mvpMatrix.GetFrustumRightPlane(m_Planes[3]);
+    mvpMatrix.GetFrustumTopPlane(m_Planes[4]);
+    mvpMatrix.GetFrustumBottomPlane(m_Planes[5]);
 }
 
-bool Frustum::IsInside( const Vector3f& point ) const
+bool Frustum::IsInside(const Vector3f& point) const
 {
-    for( const Plane& plane : m_Planes )
+    for (const Plane& plane : m_Planes)
     {
-        if( plane.GetSide( point ) == Plane::eSide::Back )
+        if (plane.GetSide(point) == Plane::eSide::Back)
             return false;
     }
     return true;
@@ -313,13 +318,13 @@ bool Frustum::IsBoundingBoxInside(const Vector3f& Min, const Vector3f& Max) cons
     };
 
     // check box outside/inside of frustum
-    for( int i=0; i<6; i++ )
+    for (int i = 0; i < 6; i++)
     {
         int out = 0;
-        for( auto& p : BBPoints )
-            out += m_Planes[i].GetSide(p) == Plane::eSide::Front ? 1: 0;
+        for (auto& p : BBPoints)
+            out += m_Planes[i].GetSide(p) == Plane::eSide::Front ? 1 : 0;
 
-        if( out==8 )
+        if (out == 8)
             return false;
     }
 

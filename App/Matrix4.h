@@ -13,15 +13,15 @@ class Matrix4f
 {
 public:
     constexpr Matrix4f();
-    constexpr Matrix4f(const Matrix4f&)=default;
+    constexpr Matrix4f(const Matrix4f&) = default;
     constexpr Matrix4f(float m00, float m01, float m02, float m03,
-                      float m10, float m11, float m12, float m13,
-                      float m20, float m21, float m22, float m23,
-                      float m30, float m31, float m32, float m33)
-        : m_Matrix{{m00, m01, m02, m03},
+        float m10, float m11, float m12, float m13,
+        float m20, float m21, float m22, float m23,
+        float m30, float m31, float m32, float m33)
+        : m_Matrix{ {m00, m01, m02, m03},
             {m10, m11, m12, m13},
             {m20, m21, m22, m23},
-            {m30, m31, m32, m33}}
+            {m30, m31, m32, m33} }
     {
     }
 
@@ -61,9 +61,9 @@ constexpr Matrix4f::Matrix4f()
 constexpr Matrix4f Matrix4f::Identity()
 {
     constexpr Matrix4f result(1, 0, 0, 0,
-                   0, 1, 0, 0,
-                   0, 0, 1, 0,
-                   0, 0, 0, 1);
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1);
     return result;
 }
 
@@ -71,9 +71,9 @@ template< typename T >
 inline Vector3<T> Vector3<T>::Multiplied(const Matrix4f& m) const
 {
     return Vector3f(
-        (m[0] * x + m[4] * y + m[8] * z + m[12])  ,
-        (m[1] * x + m[5] * y + m[9] * z + m[13])  ,
-        (m[2] * x + m[6] * y + m[10] * z + m[14]) );
+        (m[0] * x + m[4] * y + m[8] * z + m[12]),
+        (m[1] * x + m[5] * y + m[9] * z + m[13]),
+        (m[2] * x + m[6] * y + m[10] * z + m[14]));
 }
 
 template< typename T >
@@ -90,16 +90,16 @@ template< typename T >
 inline Vector3<T> Vector3<T>::TransformedVec(const Matrix4f& m) const
 {
     return Vector3<T>(
-        m[0] * x + m[4] * y + m[ 8] * z,
-        m[1] * x + m[5] * y + m[ 9] * z,
+        m[0] * x + m[4] * y + m[8] * z,
+        m[1] * x + m[5] * y + m[9] * z,
         m[2] * x + m[6] * y + m[10] * z);
 }
 
 template< typename T >
 Vector4<T> Vector4<T>::Transformed(const Matrix4f& m) const
 {
-    return Vector4<T>(m[0] * x + m[4] * y + m[8]  * z + m[12] * w,
-                      m[1] * x + m[5] * y + m[9]  * z + m[13] * w,
-                      m[2] * x + m[6] * y + m[10] * z + m[14] * w,
-                      m[3] * x + m[7] * y + m[11] * z + m[15] * w);
+    return Vector4<T>(m[0] * x + m[4] * y + m[8] * z + m[12] * w,
+        m[1] * x + m[5] * y + m[9] * z + m[13] * w,
+        m[2] * x + m[6] * y + m[10] * z + m[14] * w,
+        m[3] * x + m[7] * y + m[11] * z + m[15] * w);
 }

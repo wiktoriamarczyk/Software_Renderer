@@ -70,13 +70,13 @@ inline const char* MODEL_FORMATS = ".fbx,.glb,.gltf,.blend,.obj";
 inline const char* TEXTURE_FORMATS = ".png,.jpg,.jpeg,.bmp";
 
 template<typename DataT, typename ArrayT, typename ... A>
-concept HasStoreTo = requires(const DataT& Data, ArrayT& Array, const A& ... args) {{ Data.store( Array[0], args...) };};
+concept HasStoreTo = requires(const DataT & Data, ArrayT & Array, const A& ... args) { { Data.store(Array[0], args...) }; };
 
 template<typename DataT, typename ArrayT, typename ... A>
-concept HasLoadFrom = requires(DataT& Data, const ArrayT& Array, const A& ... args) {{ Data.load( Array[0], args...) };};
+concept HasLoadFrom = requires(DataT & Data, const ArrayT & Array, const A& ... args) { { Data.load(Array[0], args...) }; };
 
 template<typename DataT, typename ArrayT, typename ... A>
-concept HasConstructFrom = requires(const ArrayT& Array, const A& ... args) {{ DataT( Array[0] , args...) };};
+concept HasConstructFrom = requires(const ArrayT & Array, const A& ... args) { { DataT(Array[0], args...) }; };
 
 template<typename T>
 class Vector2;
@@ -84,40 +84,41 @@ class Vector2;
 
 struct DrawStats
 {
-    int m_FrameTriangles         = 0;
-    int m_FrameTrianglesDrawn    = 0;
-    int m_FrameDrawsPerTile      = 0;
-    int m_FramePixels            = 0;
-    int m_FramePixelsDrawn       = 0;
-    int m_FramePixelsCalcualted  = 0;
+    int m_FrameTriangles = 0;
+    int m_FrameTrianglesDrawn = 0;
+    int m_FrameDrawsPerTile = 0;
+    int m_FramePixels = 0;
+    int m_FramePixelsDrawn = 0;
+    int m_FramePixelsCalcualted = 0;
 
-    int m_RasterTimeUS           = 0;
-    int m_RasterTimePerThreadUS  = 0;
-    int m_TransformTimeUS        = 0;
-    int m_TransformTimePerThreadUS=0;
+    int m_RasterTimeUS = 0;
+    int m_RasterTimePerThreadUS = 0;
+    int m_TransformTimeUS = 0;
+    int m_TransformTimePerThreadUS = 0;
 
-    int m_DrawTimeUS             = 0;
-    int m_DrawTimePerThreadUS    = 0;
-    int m_FillrateKP             = 0;
-    int m_DT                     = 0;
+    int m_DrawTimeUS = 0;
+    int m_DrawTimePerThreadUS = 0;
+    int m_FillrateKP = 0;
+    int m_DT = 0;
 
     inline void FinishDrawCallStats(Vector2<int> min, Vector2<int> max, int pixelsDrawn);
 };
 
-template< typename T , typename D >
-struct DependentTypeT{
+template< typename T, typename D >
+struct DependentTypeT
+{
     using Type = T;
 };
 
-template< typename T , typename D >
-using DependentType = typename DependentTypeT<T,D>::Type;
+template< typename T, typename D >
+using DependentType = typename DependentTypeT<T, D>::Type;
 
 
 enum class eRoundMode : uint8_t
 {
     Floor = 0,
     Round = 1,
-    Ceil  = 2
+    Ceil = 2
 };
 
 #define AVX_ALIGN 32
@@ -128,77 +129,77 @@ enum class eRoundMode : uint8_t
 
 // detect clang
 #if defined( __clang__ ) || defined( __GNUC__ )
-    #define FORCE_INLINE inline __attribute__((always_inline))
+#define FORCE_INLINE inline __attribute__((always_inline))
 #else
-    #define FORCE_INLINE __forceinline
+#define FORCE_INLINE __forceinline
 #endif
 
 constexpr const char* CMAKE_BUILD_NAME = CMAKE_INTDIR;
 
 // detect clang
 #if defined( __clang__ ) || defined( __GNUC__ )
-    constexpr const char* COMPILER_NAME = "Clang";
-    #define FINAVX2 __attribute__((target("avx2")))
+constexpr const char* COMPILER_NAME = "Clang";
+#define FINAVX2 __attribute__((target("avx2")))
 #else
-    constexpr const char* COMPILER_NAME = "MSVC";
-    #define FINAVX2 __forceinline
+constexpr const char* COMPILER_NAME = "MSVC";
+#define FINAVX2 __forceinline
 #endif
 //#define ALIGN_FOR_AVX
 
 namespace Math
 {
 
-template<typename T>
-inline void Rsqrt(const T& val, T& out)
-{
-    if constexpr(requires{ val.rsqrt(); })
-        out = val.rsqrt();
-    else if constexpr(std::same_as<T,float>)
-        _mm_store_ss (&out, _mm_rsqrt_ss(_mm_set_ss(val)));
-    else if constexpr (std::same_as<T,double>)
-        _mm_store_sd (&out, _mm_rsqrt_sd(_mm_set_sd(val)));
-    else
-        out = sqrt( 1 / val );
-}
+    template<typename T>
+    inline void Rsqrt(const T& val, T& out)
+    {
+        if constexpr (requires{ val.rsqrt(); })
+            out = val.rsqrt();
+        else if constexpr (std::same_as<T, float>)
+            _mm_store_ss(&out, _mm_rsqrt_ss(_mm_set_ss(val)));
+        else if constexpr (std::same_as<T, double>)
+            _mm_store_sd(&out, _mm_rsqrt_sd(_mm_set_sd(val)));
+        else
+            out = sqrt(1 / val);
+    }
 
-template<typename T>
-inline void Min(const T& A, const T& B, T& out)
-{
-    if constexpr( requires{{ A.min( B ) } -> std::same_as<T>; })
-        out = A.min(B);
-    else
-        out = std::min(A, B);
-}
+    template<typename T>
+    inline void Min(const T& A, const T& B, T& out)
+    {
+        if constexpr (requires{{ A.min(B) } -> std::same_as<T>; })
+            out = A.min(B);
+        else
+            out = std::min(A, B);
+    }
 
-template<typename T>
-inline T Min(const T& A, const T& B)
-{
-    T result;
-    Min(A, B, result);
-    return result;
-}
+    template<typename T>
+    inline T Min(const T& A, const T& B)
+    {
+        T result;
+        Min(A, B, result);
+        return result;
+    }
 
-template<typename T>
-inline void Max(const T& A, const T& B, T& out)
-{
-    if constexpr(requires{{ A.max( B ) } -> std::same_as<T>; })
-        out = A.max(B);
-    else
-        out = std::max(A, B);
-}
+    template<typename T>
+    inline void Max(const T& A, const T& B, T& out)
+    {
+        if constexpr (requires{{ A.max(B) } -> std::same_as<T>; })
+            out = A.max(B);
+        else
+            out = std::max(A, B);
+    }
 
-template<typename T>
-inline T Max(const T& A, const T& B)
-{
-    T result;
-    Max(A, B, result);
-    return result;
-}
+    template<typename T>
+    inline T Max(const T& A, const T& B)
+    {
+        T result;
+        Max(A, B, result);
+        return result;
+    }
 
-template<std::integral T>
-FORCE_INLINE auto CountBitsSetTo1(T val)
-{
-    return std::popcount(static_cast<std::make_unsigned_t<T> >( val ));
-}
+    template<std::integral T>
+    FORCE_INLINE auto CountBitsSetTo1(T val)
+    {
+        return std::popcount(static_cast<std::make_unsigned_t<T>>(val));
+    }
 
 }

@@ -16,13 +16,13 @@ struct ALIGN_FOR_AVX TransformedVertex
     Vector3f m_WorldPosition;   // 9-11
     Vector4f m_ScreenPosition;
 
-    float*       Data()      { return m_Normal.data(); }
+    float* Data() { return m_Normal.data(); }
     const float* Data()const { return m_Normal.data(); }
 
     TransformedVertex operator*(float value)const
     {
         TransformedVertex result;
-       // result.zValue = zValue * value;
+        // result.zValue = zValue * value;
         result.m_Normal = m_Normal * value;
         result.m_Color = m_Color * value;
         result.m_UV = m_UV * value;
@@ -43,15 +43,15 @@ struct ALIGN_FOR_AVX TransformedVertex
         return result;
     }
 
-    void ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix,Vector2si ScreenSize);
+    void ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix, Vector2si ScreenSize);
 };
 
-inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix,Vector2si ScreenSize)
+inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f& worldMatrix, const Matrix4f& mvpMatrix, Vector2si ScreenSize)
 {
     m_WorldPosition = v.m_Position.Multiplied(worldMatrix);
-    m_Normal        = v.m_Normal.TransformedVec(worldMatrix).Normalized();
-    m_Color         = v.m_Color;
-    m_UV            = v.m_UV;
+    m_Normal = v.m_Normal.TransformedVec(worldMatrix).Normalized();
+    m_Color = v.m_Color;
+    m_UV = v.m_UV;
 
     m_ScreenPosition = Vector4f(v.m_Position, 1.0f).Transformed(mvpMatrix);
 
@@ -68,9 +68,9 @@ inline void TransformedVertex::ProjToScreen(const Vertex& v, const Matrix4f& wor
 template<int Elements = 8, eSimdType Type = eSimdType::AVX>
 struct ALIGN_FOR_AVX SimdTransformedVertex
 {
-    Vector3<fsimd<Elements,Type>> m_Normal;
-    Vector4<fsimd<Elements,Type>> m_Color;
-    Vector2<fsimd<Elements,Type>> m_UV;
-    Vector3<fsimd<Elements,Type>> m_WorldPosition;
-    Vector4<fsimd<Elements,Type>> m_ScreenPosition;
+    Vector3<fsimd<Elements, Type>> m_Normal;
+    Vector4<fsimd<Elements, Type>> m_Color;
+    Vector2<fsimd<Elements, Type>> m_UV;
+    Vector3<fsimd<Elements, Type>> m_WorldPosition;
+    Vector4<fsimd<Elements, Type>> m_ScreenPosition;
 };

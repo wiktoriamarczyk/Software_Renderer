@@ -21,36 +21,36 @@ void DrawStatsSystem::Data<SAMPLES>::Update()
     m_Median = {};
     m_StdDev = {};
 
-    m_Min.m_FramePixels             = std::numeric_limits<int>::max();
-    m_Min.m_FramePixelsDrawn        = std::numeric_limits<int>::max();
-    m_Min.m_FramePixelsCalcualted   = std::numeric_limits<int>::max();
-    m_Min.m_FrameTriangles          = std::numeric_limits<int>::max();
-    m_Min.m_FrameTrianglesDrawn     = std::numeric_limits<int>::max();
-    m_Min.m_FrameDrawsPerTile       = std::numeric_limits<int>::max();
-    m_Min.m_DT                      = std::numeric_limits<int>::max();
-    m_Min.m_DrawTimeUS              = std::numeric_limits<int>::max();
-    m_Min.m_DrawTimePerThreadUS     = std::numeric_limits<int>::max();
-    m_Min.m_FillrateKP              = std::numeric_limits<int>::max();
+    m_Min.m_FramePixels = std::numeric_limits<int>::max();
+    m_Min.m_FramePixelsDrawn = std::numeric_limits<int>::max();
+    m_Min.m_FramePixelsCalcualted = std::numeric_limits<int>::max();
+    m_Min.m_FrameTriangles = std::numeric_limits<int>::max();
+    m_Min.m_FrameTrianglesDrawn = std::numeric_limits<int>::max();
+    m_Min.m_FrameDrawsPerTile = std::numeric_limits<int>::max();
+    m_Min.m_DT = std::numeric_limits<int>::max();
+    m_Min.m_DrawTimeUS = std::numeric_limits<int>::max();
+    m_Min.m_DrawTimePerThreadUS = std::numeric_limits<int>::max();
+    m_Min.m_FillrateKP = std::numeric_limits<int>::max();
 
-    m_Min.m_RasterTimeUS            = std::numeric_limits<int>::max();
-    m_Min.m_RasterTimePerThreadUS   = std::numeric_limits<int>::max();
-    m_Min.m_TransformTimeUS         = std::numeric_limits<int>::max();
+    m_Min.m_RasterTimeUS = std::numeric_limits<int>::max();
+    m_Min.m_RasterTimePerThreadUS = std::numeric_limits<int>::max();
+    m_Min.m_TransformTimeUS = std::numeric_limits<int>::max();
 
-    m_Max.m_FramePixels             = std::numeric_limits<int>::min();
-    m_Max.m_FramePixelsDrawn        = std::numeric_limits<int>::min();
-    m_Max.m_FramePixelsCalcualted   = std::numeric_limits<int>::min();
-    m_Max.m_FrameTriangles          = std::numeric_limits<int>::min();
-    m_Max.m_FrameTrianglesDrawn     = std::numeric_limits<int>::min();
-    m_Max.m_FrameDrawsPerTile       = std::numeric_limits<int>::min();
-    m_Max.m_DT                      = std::numeric_limits<int>::min();
-    m_Max.m_DrawTimeUS              = std::numeric_limits<int>::min();
-    m_Max.m_DrawTimePerThreadUS     = std::numeric_limits<int>::min();
-    m_Max.m_FillrateKP              = std::numeric_limits<int>::min();
+    m_Max.m_FramePixels = std::numeric_limits<int>::min();
+    m_Max.m_FramePixelsDrawn = std::numeric_limits<int>::min();
+    m_Max.m_FramePixelsCalcualted = std::numeric_limits<int>::min();
+    m_Max.m_FrameTriangles = std::numeric_limits<int>::min();
+    m_Max.m_FrameTrianglesDrawn = std::numeric_limits<int>::min();
+    m_Max.m_FrameDrawsPerTile = std::numeric_limits<int>::min();
+    m_Max.m_DT = std::numeric_limits<int>::min();
+    m_Max.m_DrawTimeUS = std::numeric_limits<int>::min();
+    m_Max.m_DrawTimePerThreadUS = std::numeric_limits<int>::min();
+    m_Max.m_FillrateKP = std::numeric_limits<int>::min();
 
-    m_Max.m_RasterTimeUS            = std::numeric_limits<int>::min();
-    m_Max.m_RasterTimePerThreadUS   = std::numeric_limits<int>::min();
-    m_Max.m_TransformTimeUS         = std::numeric_limits<int>::min();
-    m_Max.m_TransformTimePerThreadUS= std::numeric_limits<int>::min();
+    m_Max.m_RasterTimeUS = std::numeric_limits<int>::min();
+    m_Max.m_RasterTimePerThreadUS = std::numeric_limits<int>::min();
+    m_Max.m_TransformTimeUS = std::numeric_limits<int>::min();
+    m_Max.m_TransformTimePerThreadUS = std::numeric_limits<int>::min();
 
     for (auto& sample : m_FrameSamples)
     {
@@ -115,10 +115,10 @@ void DrawStatsSystem::Data<SAMPLES>::Update()
     m_Avg.m_DrawTimePerThreadUS /= FRAME_SAMPLES_COUNT;
     m_Avg.m_FillrateKP /= FRAME_SAMPLES_COUNT;
 
-    m_Avg.m_RasterTimeUS  /= FRAME_SAMPLES_COUNT;
-    m_Avg.m_RasterTimePerThreadUS  /= FRAME_SAMPLES_COUNT;
-    m_Avg.m_TransformTimeUS  /= FRAME_SAMPLES_COUNT;
-    m_Avg.m_TransformTimePerThreadUS  /= FRAME_SAMPLES_COUNT;
+    m_Avg.m_RasterTimeUS /= FRAME_SAMPLES_COUNT;
+    m_Avg.m_RasterTimePerThreadUS /= FRAME_SAMPLES_COUNT;
+    m_Avg.m_TransformTimeUS /= FRAME_SAMPLES_COUNT;
+    m_Avg.m_TransformTimePerThreadUS /= FRAME_SAMPLES_COUNT;
 
     memcpy(m_MedianBuf, m_FrameSamples, sizeof(m_FrameSamples));
     std::sort(std::begin(m_MedianBuf), std::end(m_MedianBuf), [](const DrawStats& a, const DrawStats& b) { return a.m_DT < b.m_DT; });
@@ -177,66 +177,66 @@ void DrawStatsSystem::Data<SAMPLES>::Update()
     m_Median.m_TransformTimePerThreadUS = m_MedianBuf[FRAME_SAMPLES_COUNT / 2].m_TransformTimePerThreadUS;
 
     auto intsqr = [](int64_t v)
-    {
-        int64_t r = v*v;
-        return r;
-    };
+        {
+            int64_t r = v * v;
+            return r;
+        };
 
-    m_Avg.m_FPS     = m_Avg.m_DT    ? 1000'000.0f / m_Avg.m_DT : 0;
-    m_Min.m_FPS     = m_Max.m_DT    ? 1000'000.0f / m_Max.m_DT : 0;
-    m_Max.m_FPS     = m_Min.m_DT    ? 1000'000.0f / m_Min.m_DT : 0;
-    m_Median.m_FPS  = m_Median.m_DT ? 1000'000.0f / m_Median.m_DT : 0;
+    m_Avg.m_FPS = m_Avg.m_DT ? 1000'000.0f / m_Avg.m_DT : 0;
+    m_Min.m_FPS = m_Max.m_DT ? 1000'000.0f / m_Max.m_DT : 0;
+    m_Max.m_FPS = m_Min.m_DT ? 1000'000.0f / m_Min.m_DT : 0;
+    m_Median.m_FPS = m_Median.m_DT ? 1000'000.0f / m_Median.m_DT : 0;
 
-    int64_t StdDev_FPS                      = 0;
-    int64_t StdDev_DT                       = 0;
-    int64_t StdDev_DrawTimePerThreadUS      = 0;
-    int64_t StdDev_DrawTimeUS               = 0;
-    int64_t StdDev_FillrateKT               = 0;
-    int64_t StdDev_FramePixels              = 0;
-    int64_t StdDev_FramePixelsDrawn         = 0;
-    int64_t StdDev_FramePixelsCalcualted    = 0;
-    int64_t StdDev_FrameTriangles           = 0;
-    int64_t StdDev_FrameTrianglesDrawn      = 0;
-    int64_t StdDev_FrameDrawsPerTile        = 0;
-    int64_t StdDev_RasterTimeUS             = 0;
-    int64_t StdDev_RasterTimePerThreadUS    = 0;
-    int64_t StdDev_TransformTimeUS          = 0;
+    int64_t StdDev_FPS = 0;
+    int64_t StdDev_DT = 0;
+    int64_t StdDev_DrawTimePerThreadUS = 0;
+    int64_t StdDev_DrawTimeUS = 0;
+    int64_t StdDev_FillrateKT = 0;
+    int64_t StdDev_FramePixels = 0;
+    int64_t StdDev_FramePixelsDrawn = 0;
+    int64_t StdDev_FramePixelsCalcualted = 0;
+    int64_t StdDev_FrameTriangles = 0;
+    int64_t StdDev_FrameTrianglesDrawn = 0;
+    int64_t StdDev_FrameDrawsPerTile = 0;
+    int64_t StdDev_RasterTimeUS = 0;
+    int64_t StdDev_RasterTimePerThreadUS = 0;
+    int64_t StdDev_TransformTimeUS = 0;
     int64_t StdDev_TransformTimePerThreadUS = 0;
 
     for (auto& sample : m_FrameSamples)
     {
-        StdDev_FPS                      += intsqr( 1000'000.0f / sample.m_DT        - m_Median.m_FPS                        );
-        StdDev_DT                       += intsqr(sample.m_DT                       - m_Median.m_DT                         );
-        StdDev_DrawTimePerThreadUS      += intsqr(sample.m_DrawTimePerThreadUS      - m_Median.m_DrawTimePerThreadUS        );
-        StdDev_DrawTimeUS               += intsqr(sample.m_DrawTimeUS               - m_Median.m_DrawTimeUS                 );
-        StdDev_FillrateKT               += intsqr(sample.m_FillrateKP               - m_Median.m_FillrateKP                 );
-        StdDev_FramePixels              += intsqr(sample.m_FramePixels              - m_Median.m_FramePixels                );
-        StdDev_FramePixelsDrawn         += intsqr(sample.m_FramePixelsDrawn         - m_Median.m_FramePixelsDrawn           );
-        StdDev_FramePixelsCalcualted    += intsqr(sample.m_FramePixelsCalcualted    - m_Median.m_FramePixelsCalcualted      );
-        StdDev_FrameTriangles           += intsqr(sample.m_FrameTriangles           - m_Median.m_FrameTriangles             );
-        StdDev_FrameTrianglesDrawn      += intsqr(sample.m_FrameTrianglesDrawn      - m_Median.m_FrameTrianglesDrawn        );
-        StdDev_FrameDrawsPerTile        += intsqr(sample.m_FrameDrawsPerTile        - m_Median.m_FrameDrawsPerTile          );
-        StdDev_RasterTimeUS             += intsqr(sample.m_RasterTimeUS             - m_Median.m_RasterTimeUS               );
-        StdDev_RasterTimePerThreadUS    += intsqr(sample.m_RasterTimePerThreadUS    - m_Median.m_RasterTimePerThreadUS      );
-        StdDev_TransformTimeUS          += intsqr(sample.m_TransformTimeUS          - m_Median.m_TransformTimeUS            );
-        StdDev_TransformTimePerThreadUS += intsqr(sample.m_TransformTimePerThreadUS - m_Median.m_TransformTimePerThreadUS   );
+        StdDev_FPS += intsqr(1000'000.0f / sample.m_DT - m_Median.m_FPS);
+        StdDev_DT += intsqr(sample.m_DT - m_Median.m_DT);
+        StdDev_DrawTimePerThreadUS += intsqr(sample.m_DrawTimePerThreadUS - m_Median.m_DrawTimePerThreadUS);
+        StdDev_DrawTimeUS += intsqr(sample.m_DrawTimeUS - m_Median.m_DrawTimeUS);
+        StdDev_FillrateKT += intsqr(sample.m_FillrateKP - m_Median.m_FillrateKP);
+        StdDev_FramePixels += intsqr(sample.m_FramePixels - m_Median.m_FramePixels);
+        StdDev_FramePixelsDrawn += intsqr(sample.m_FramePixelsDrawn - m_Median.m_FramePixelsDrawn);
+        StdDev_FramePixelsCalcualted += intsqr(sample.m_FramePixelsCalcualted - m_Median.m_FramePixelsCalcualted);
+        StdDev_FrameTriangles += intsqr(sample.m_FrameTriangles - m_Median.m_FrameTriangles);
+        StdDev_FrameTrianglesDrawn += intsqr(sample.m_FrameTrianglesDrawn - m_Median.m_FrameTrianglesDrawn);
+        StdDev_FrameDrawsPerTile += intsqr(sample.m_FrameDrawsPerTile - m_Median.m_FrameDrawsPerTile);
+        StdDev_RasterTimeUS += intsqr(sample.m_RasterTimeUS - m_Median.m_RasterTimeUS);
+        StdDev_RasterTimePerThreadUS += intsqr(sample.m_RasterTimePerThreadUS - m_Median.m_RasterTimePerThreadUS);
+        StdDev_TransformTimeUS += intsqr(sample.m_TransformTimeUS - m_Median.m_TransformTimeUS);
+        StdDev_TransformTimePerThreadUS += intsqr(sample.m_TransformTimePerThreadUS - m_Median.m_TransformTimePerThreadUS);
     }
 
-    m_StdDev.m_FPS                      = int( sqrt( StdDev_FPS                     / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_DT                       = int( sqrt( StdDev_DT                      / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_DrawTimePerThreadUS      = int( sqrt( StdDev_DrawTimePerThreadUS     / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_DrawTimeUS               = int( sqrt( StdDev_DrawTimeUS              / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_FillrateKP               = int( sqrt( StdDev_FillrateKT              / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_FramePixels              = int( sqrt( StdDev_FramePixels             / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_FramePixelsDrawn         = int( sqrt( StdDev_FramePixelsDrawn        / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_FramePixelsCalcualted    = int( sqrt( StdDev_FramePixelsCalcualted   / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_FrameTriangles           = int( sqrt( StdDev_FrameTriangles          / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_FrameTrianglesDrawn      = int( sqrt( StdDev_FrameTrianglesDrawn     / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_FrameDrawsPerTile        = int( sqrt( StdDev_FrameDrawsPerTile       / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_RasterTimeUS             = int( sqrt( StdDev_RasterTimeUS            / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_RasterTimePerThreadUS    = int( sqrt( StdDev_RasterTimePerThreadUS   / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_TransformTimeUS          = int( sqrt( StdDev_TransformTimeUS         / double(FRAME_SAMPLES_COUNT) ) );
-    m_StdDev.m_TransformTimePerThreadUS = int( sqrt(StdDev_TransformTimePerThreadUS / double(FRAME_SAMPLES_COUNT) ) );
+    m_StdDev.m_FPS = int(sqrt(StdDev_FPS / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_DT = int(sqrt(StdDev_DT / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_DrawTimePerThreadUS = int(sqrt(StdDev_DrawTimePerThreadUS / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_DrawTimeUS = int(sqrt(StdDev_DrawTimeUS / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_FillrateKP = int(sqrt(StdDev_FillrateKT / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_FramePixels = int(sqrt(StdDev_FramePixels / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_FramePixelsDrawn = int(sqrt(StdDev_FramePixelsDrawn / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_FramePixelsCalcualted = int(sqrt(StdDev_FramePixelsCalcualted / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_FrameTriangles = int(sqrt(StdDev_FrameTriangles / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_FrameTrianglesDrawn = int(sqrt(StdDev_FrameTrianglesDrawn / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_FrameDrawsPerTile = int(sqrt(StdDev_FrameDrawsPerTile / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_RasterTimeUS = int(sqrt(StdDev_RasterTimeUS / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_RasterTimePerThreadUS = int(sqrt(StdDev_RasterTimePerThreadUS / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_TransformTimeUS = int(sqrt(StdDev_TransformTimeUS / double(FRAME_SAMPLES_COUNT)));
+    m_StdDev.m_TransformTimePerThreadUS = int(sqrt(StdDev_TransformTimePerThreadUS / double(FRAME_SAMPLES_COUNT)));
 
     m_Dirty = false;
 }

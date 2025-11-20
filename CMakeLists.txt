@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.26)
 set(USE_LLVM_COMPILER_IN_VS_DEF    FALSE)
 SET(USE_LLVM_COMPILER_IN_VS        ${USE_LLVM_COMPILER_IN_VS_DEF}        CACHE BOOL "Check to use LLVM as compiler frontend")
 
-if( USE_LLVM_COMPILER_IN_VS )
+if(USE_LLVM_COMPILER_IN_VS)
     set(CMAKE_GENERATOR_TOOLSET ClangCL)
 	message(STATUS "Using clang CL")
 endif()
@@ -73,9 +73,7 @@ SET(APP_SRC_FILES_LIST
     ImGuiFileDialog/ImGuiFileDialog.cpp
 
     Dependencies/Tracy/TracyClient.cpp
-
 )
-
 
 #*****************************************************
 # Find SFML library (set proper path and run find_package)
@@ -88,7 +86,7 @@ elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
     # 32-bit
     set(SFML_DIR "./Dependencies/SFML-2.6.0-32/lib/cmake/SFML")
 else()
-    message(FATAL_ERROR "Nieznana architektura (CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P})")
+    message(FATAL_ERROR "Unknown architecture (CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P})")
 endif()
 
 set(SFML_STATIC_LIBRARIES TRUE)
@@ -112,7 +110,7 @@ ADD_EXECUTABLE(SoftwareRenderer ${APP_SRC_FILES_LIST} )
 # set compiler options
 #*****************************************************
 
-if( USE_LLVM_COMPILER_IN_VS )
+if(USE_LLVM_COMPILER_IN_VS)
     #target_compile_options(SoftwareRenderer PRIVATE "/clang:-mfma" "/clang:-fno-slp-vectorize")
 	target_compile_options(SoftwareRenderer PRIVATE "/clang:-mfma" "/clang:-fno-slp-vectorize" "/clang:-msse2" "/clang:-mno-avx" "/clang:-mno-avx2")
 endif()

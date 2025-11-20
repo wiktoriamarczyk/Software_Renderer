@@ -19,7 +19,7 @@ enum class VertexAttribute { Position, Normal, Color, TexCoord, Count };
 class GlTexture : public ITexture
 {
 public:
-    GlTexture()=default;
+    GlTexture() = default;
 
     bool CreateWhite4x4Tex();
     bool Load(const char* fileName);
@@ -35,14 +35,14 @@ private:
 class GlProgram
 {
 public:
-    GlProgram()=default;
+    GlProgram() = default;
     ~GlProgram();
 
     bool LoadShaderFromMemory(const std::string& shaderData, ShaderType type);
-    bool LoadMatrix(const Matrix4f& mat , UniformType uniform);
-    bool LoadVector(const Vector3f& vec , UniformType uniform);
+    bool LoadMatrix(const Matrix4f& mat, UniformType uniform);
+    bool LoadVector(const Vector3f& vec, UniformType uniform);
     bool LoadVector(const Vector4f& vec, UniformType uniform);
-    bool LoadFloat(float val , UniformType uniform);
+    bool LoadFloat(float val, UniformType uniform);
     bool Bind()const;
 
     static void Unbind();
@@ -50,7 +50,7 @@ public:
 private:
     uint32_t m_Program = 0;
     uint32_t m_Shader[static_cast<uint32_t>(ShaderType::Count)] = { 0 };
-    int      m_Uniform[ static_cast<uint32_t>(UniformType::Count) ] = { 0 };
+    int      m_Uniform[static_cast<uint32_t>(UniformType::Count)] = { 0 };
 };
 
 class GlVertexBuffer

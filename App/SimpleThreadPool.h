@@ -57,17 +57,17 @@ public:
 
     void unlock()const noexcept
     {
-        m_Lock.store(false, std::memory_order_release );
+        m_Lock.store(false, std::memory_order_release);
     }
 private:
     void lock(std::memory_order LockOrder)const noexcept
     {
         for (;;)
         {
-            if (!m_Lock.exchange(true, LockOrder ))
+            if (!m_Lock.exchange(true, LockOrder))
                 return;
 
-            while (m_Lock.load( std::memory_order_relaxed))
+            while (m_Lock.load(std::memory_order_relaxed))
                 std::this_thread::yield();
         }
     }

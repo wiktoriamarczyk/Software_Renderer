@@ -61,7 +61,7 @@ class aiScene;
 class Application
 {
 public:
-    Application()=default;
+    Application() = default;
 
     void SaveStatsToFile(int pixels, int frames);
     void RunPerformanceTests();
@@ -74,7 +74,7 @@ private:
     static vector<Model> LoadFallbackModel();
     static void OpenDialog(const char* title, const char* filters, function<void()> callback);
     void OpenSceneDataDialog(MyModelPaths& selectedPaths);
-    void DrawRenderingStats( int pixels );
+    void DrawRenderingStats(int pixels);
     void SetupPerformanceTests();
 
     const uint8_t MAX_THREADS_COUNT = uint8_t(std::min<int>(16, std::thread::hardware_concurrency()));
@@ -95,10 +95,10 @@ private:
     bool m_VSync = true;
 
     // stats
-    vector<pair<int ,bool>> m_SelectedModels;
-    vector<pair<int ,bool>> m_SelectedRasterModes;
-    vector<pair<int ,bool>> m_SelectedTileModes;
-    vector<pair<bool,bool>> m_SelectedCompressed;
-    vector<pair<bool,bool>> m_SelectedMultiTC;
-    vector<pair<bool,bool>> m_SelectedFragmentShader;
+    vector<pair<int, bool>> m_SelectedModels;
+    vector<pair<int, bool>> m_SelectedRasterModes;
+    vector<pair<int, bool>> m_SelectedTileModes;
+    vector<pair<bool, bool>> m_SelectedCompressed;
+    vector<pair<bool, bool>> m_SelectedMultiTC;
+    vector<pair<bool, bool>> m_SelectedFragmentShader;
 };

@@ -9,7 +9,7 @@
 
 class DrawStatsSystem
 {
-    DrawStatsSystem()=default;
+    DrawStatsSystem() = default;
 public:
     struct Stats : DrawStats
     {
@@ -29,7 +29,7 @@ public:
 
     template<int SAMPLES = 120>
     static const Stats& GetMed();
- 
+
     template<int SAMPLES = 120>
     static const Stats& GetStd();
 private:

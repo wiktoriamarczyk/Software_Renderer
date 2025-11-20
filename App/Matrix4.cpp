@@ -18,7 +18,8 @@ Matrix4f Matrix4f::Translation(Vector3f other)
     return result;
 }
 
-Matrix4f Matrix4f::Rotation(Vector3f other) {
+Matrix4f Matrix4f::Rotation(Vector3f other)
+{
     const float xs = sinf(other.x);
     const float xc = cosf(other.x);
     const float ys = sinf(other.y);
@@ -33,8 +34,9 @@ Matrix4f Matrix4f::Rotation(Vector3f other) {
         0.0f, 0.0f, 0.0f, 1.0f);
 }
 
-Matrix4f Matrix4f::Scale(Vector3f other) {
-    return Matrix4f {
+Matrix4f Matrix4f::Scale(Vector3f other)
+{
+    return Matrix4f{
         other.x, 0.0f, 0.0f, 0.0f,
         0.0f, other.y, 0.0f, 0.0f,
         0.0f, 0.0f, other.z, 0.0f,
@@ -44,9 +46,9 @@ Matrix4f Matrix4f::Scale(Vector3f other) {
 Matrix4f Matrix4f::Transposed() const
 {
     return Matrix4f(m_Matrix[0][0], m_Matrix[1][0], m_Matrix[2][0], m_Matrix[3][0],
-                    m_Matrix[0][1], m_Matrix[1][1], m_Matrix[2][1], m_Matrix[3][1],
-                    m_Matrix[0][2], m_Matrix[1][2], m_Matrix[2][2], m_Matrix[3][2],
-                    m_Matrix[0][3], m_Matrix[1][3], m_Matrix[2][3], m_Matrix[3][3]);
+        m_Matrix[0][1], m_Matrix[1][1], m_Matrix[2][1], m_Matrix[3][1],
+        m_Matrix[0][2], m_Matrix[1][2], m_Matrix[2][2], m_Matrix[3][2],
+        m_Matrix[0][3], m_Matrix[1][3], m_Matrix[2][3], m_Matrix[3][3]);
 }
 
 Matrix4f Matrix4f::operator*(const Matrix4f& m) const
@@ -71,12 +73,14 @@ Matrix4f Matrix4f::operator*(const Matrix4f& m) const
         m.m_Matrix[0][3] * m_Matrix[3][0] + m.m_Matrix[1][3] * m_Matrix[3][1] + m.m_Matrix[2][3] * m_Matrix[3][2] + m.m_Matrix[3][3] * m_Matrix[3][3]);
 }
 
-float& Matrix4f::operator[](int index) {
+float& Matrix4f::operator[](int index)
+{
     return m_Matrix[0][index];
 }
 
-const float& Matrix4f::operator[](int index)const {
-   return m_Matrix[0][index];
+const float& Matrix4f::operator[](int index)const
+{
+    return m_Matrix[0][index];
 }
 
 Matrix4f Matrix4f::CreateProjectionMatrix(float fieldOfView, float aspectRatio, float near, float far)

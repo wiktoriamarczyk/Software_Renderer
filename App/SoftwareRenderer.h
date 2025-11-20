@@ -20,15 +20,15 @@
 
 struct TileInfo
 {
-    using at_i16            = atomic<uint16_t>;
-    using at_CmdDrawTile    = atomic<CommandRenderTile*>;
+    using at_i16 = atomic<uint16_t>;
+    using at_CmdDrawTile = atomic<CommandRenderTile*>;
 
     Vector2si               m_TileIndex;
-    uint32_t                m_TileMemOffset   = 0;
-    uint32_t                m_TileZOffset     = 0;
-    mutable at_i16          m_DrawCount       = 0;
+    uint32_t                m_TileMemOffset = 0;
+    uint32_t                m_TileZOffset = 0;
+    mutable at_i16          m_DrawCount = 0;
     Spinlock                m_Lock;
-    mutable at_CmdDrawTile  m_pRenderTileCmd  = nullptr;
+    mutable at_CmdDrawTile  m_pRenderTileCmd = nullptr;
 };
 
 struct TileData;
@@ -65,7 +65,7 @@ enum class eDrawTriVersion : uint8_t
     DrawTri,
 };
 
-template< int Elements , eSimdType Type = eSimdType::None >
+template< int Elements, eSimdType Type = eSimdType::None >
 struct RenderParamsSimd
 {
     Vector3<fsimd<Elements, Type>> m_LightPosition;
@@ -142,10 +142,10 @@ private:
     void DrawTileImplSimd(const CommandRenderTile& TD, RenderThreadData& data);
 
     template<uint8_t TILE_SIZE>
-    void DrawTileImpl   (const CommandRenderTile& TD, RenderThreadData& data);
+    void DrawTileImpl(const CommandRenderTile& TD, RenderThreadData& data);
 
-    void DrawTile       (const CommandRenderTile& TD, RenderThreadData& data);
-    void GenerateTileJobs(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, DrawStats& stats, const PipelineSharedData* pPipelineSharedData, uint32_t tri_index , pmr::vector<const Command*>& outCommmands );
+    void DrawTile(const CommandRenderTile& TD, RenderThreadData& data);
+    void GenerateTileJobs(const TransformedVertex& A, const TransformedVertex& B, const TransformedVertex& C, DrawStats& stats, const PipelineSharedData* pPipelineSharedData, uint32_t tri_index, pmr::vector<const Command*>& outCommmands);
 
     template<typename MathT, DrawFunctionConfig Config>
     void DrawFilledTriangles(const TransformedVertex* pVerts, size_t Count, const Vector4f& color, int minY, int maxY, DrawStats& stats);
@@ -159,7 +159,7 @@ private:
     void UpdateMVPMatrix();
     void DoRender(const vector<Vertex>& vertices, int MinY, int maxY, int threadID);
 
-    struct ALIGN_FOR_AVX AlignedPixel : Vector4f{};
+    struct ALIGN_FOR_AVX AlignedPixel : Vector4f {};
 
     inline TileInfo* GetTileInfo(const Vector2si& tileIndex)
     {
@@ -167,18 +167,18 @@ private:
     }
 
     void RendererTaskWorker();
-    void RecreateBuffers( uint8_t TileSize , int screenWidth , int screenHeight );
-    void VertexAssemply( const CommandVertexAssemply& cmd );
+    void RecreateBuffers(uint8_t TileSize, int screenWidth, int screenHeight);
+    void VertexAssemply(const CommandVertexAssemply& cmd);
     void ExecuteExitCommand();
     void ClearBuffers(const CommandClear& cmd);
-    void Fill32BitBuffer( const CommandFill32BitBuffer& cmd );
-    void VertexTransformAndClip( const CommandVertexTransformAndClip& cmd , RenderThreadData& data );
-    void ProcessTriangles( const CommandProcessTriangles& cmd , RenderThreadData& data );
+    void Fill32BitBuffer(const CommandFill32BitBuffer& cmd);
+    void VertexTransformAndClip(const CommandVertexTransformAndClip& cmd, RenderThreadData& data);
+    void ProcessTriangles(const CommandProcessTriangles& cmd, RenderThreadData& data);
     void WaitForSync(const CommandSyncBarier& cmd);
-    CommandBuffer* AllocTransientCommandBuffer(){ return CommandBuffer::CreateCommandBuffer( m_TransientMemoryResource); }
+    CommandBuffer* AllocTransientCommandBuffer() { return CommandBuffer::CreateCommandBuffer(m_TransientMemoryResource); }
     Vector4f FragmentShader(const TransformedVertex& vertex);
     template<int Elements, eSimdType Type>
-    Vector4<fsimd<Elements, Type>> FragmentShader(const SimdTransformedVertex<Elements,Type>& vertex);
+    Vector4<fsimd<Elements, Type>> FragmentShader(const SimdTransformedVertex<Elements, Type>& vertex);
 
     // 8 bit - one channel (8*4=32 - rgba)
     vector<uint32_t>    m_ScreenBuffer;
@@ -201,10 +201,10 @@ private:
     Vector3f            m_CameraPosition = Vector3f(0, 0, 0);
     uint32_t            m_ClearColor = 0xFF000000;
 
-    using RenderPrmCPU  = RenderParamsSimd<8, eSimdType::CPU>;
-    using RenderPrmSSE  = RenderParamsSimd<4, eSimdType::SSE>;
+    using RenderPrmCPU = RenderParamsSimd<8, eSimdType::CPU>;
+    using RenderPrmSSE = RenderParamsSimd<4, eSimdType::SSE>;
     using RenderPrmSSE8 = RenderParamsSimd<8, eSimdType::SSE>;
-    using RenderPrmAVX  = RenderParamsSimd<8, eSimdType::AVX>;
+    using RenderPrmAVX = RenderParamsSimd<8, eSimdType::AVX>;
 
     RenderPrmCPU        m_RenderParamsCPU;
     RenderPrmSSE        m_RenderParamsSSE;
@@ -212,7 +212,7 @@ private:
     RenderPrmAVX        m_RenderParamsAVX;
 
     template<int Elements, eSimdType Type>
-    auto&               GetRenderParams()
+    auto& GetRenderParams()
     {
         if constexpr (Type == eSimdType::CPU && Elements == 8)
             return m_RenderParamsCPU;
@@ -220,7 +220,7 @@ private:
             return m_RenderParamsSSE;
         else if constexpr (Type == eSimdType::SSE && Elements == 8)
             return m_RenderParamsSSE8;
-        else if constexpr( Type == eSimdType::AVX )
+        else if constexpr (Type == eSimdType::AVX)
             return m_RenderParamsAVX;
     }
 

@@ -71,13 +71,13 @@ void SimpleThreadPool::Worker()
     unique_ptr<int> m_ID;
     {
         std::unique_lock lock(m_IDsCS);
-        if( m_FreeThreadIds.empty() )
+        if (m_FreeThreadIds.empty())
         {
-            m_ID = make_unique<int>( m_ThreadCount );
+            m_ID = make_unique<int>(m_ThreadCount);
         }
         else
         {
-            m_ID = std::move( m_FreeThreadIds.back() );
+            m_ID = std::move(m_FreeThreadIds.back());
             m_FreeThreadIds.pop_back();
         }
 
@@ -116,8 +116,8 @@ void SimpleThreadPool::LaunchTasks(vector<TaskFunc> TaskFuncs)
         if (m_ThreadCount <= 0)
             return;
 
-        m_Tasks.reserve( TaskFuncs.size()*2 );
-        tasksAwaiters.reserve( TaskFuncs.size()*2 );
+        m_Tasks.reserve(TaskFuncs.size() * 2);
+        tasksAwaiters.reserve(TaskFuncs.size() * 2);
 
         for (auto& Func : TaskFuncs)
         {
@@ -151,7 +151,7 @@ optional<SimpleThreadPool::Task> SimpleThreadPool::AcquireTask()
     return result;
 }
 
- uint8_t SimpleThreadPool::GetThreadCount()const
- {
-     return m_ThreadCount;
- }
+uint8_t SimpleThreadPool::GetThreadCount()const
+{
+    return m_ThreadCount;
+}

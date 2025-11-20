@@ -60,7 +60,7 @@ extern bool g_ThreadPerTile;
 extern bool g_MultithreadedTransformAndClip;
 extern bool g_TrivialFS;
 extern bool g_CompressedPartialTile;
-extern std::atomic<size_t> g_memory_resource_mem ;
+extern std::atomic<size_t> g_memory_resource_mem;
 extern std::atomic<int> g_max_overdraw;
 
 std::atomic<bool> STATS_DUMP{ true };
@@ -138,10 +138,10 @@ int wait_for_stats()
 }
 
 
-void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
+void LoadPredefined(MyModelPaths& paths, DrawSettings& Settings, int index)
 {
     span<const PredefinedModel> PredefinedArray{ s_PredefinedModels };
-    if( PredefinedArray.size() <= index )
+    if (PredefinedArray.size() <= index)
     {
         paths = {};
         return;
@@ -151,15 +151,15 @@ void LoadPredefined( MyModelPaths& paths , DrawSettings& Settings , int index )
 
     DrawSettings Def;
 
-    paths.m_ModelPath                 = model.modelPath;
-    paths.m_TexturePath               = model.texturePath;
-    Settings.m_ModelRotation.x        = model.RotationX.value_or(Def.m_ModelRotation.x);
-    Settings.m_ModelRotation.y        = model.RotationY.value_or(Def.m_ModelRotation.y);
-    Settings.m_ModelRotation.z        = model.RotationZ.value_or(Def.m_ModelRotation.z);
-    Settings.m_ModelTranslation.x     = model.PositionX.value_or(Def.m_ModelTranslation.x);
-    Settings.m_ModelTranslation.y     = model.PositionY.value_or(Def.m_ModelTranslation.y);
-    Settings.m_ModelTranslation.z     = model.PositionZ.value_or(Def.m_ModelTranslation.z);
-    Settings.m_ModelScale             = model.Scale.value_or(Def.m_ModelScale);
+    paths.m_ModelPath = model.modelPath;
+    paths.m_TexturePath = model.texturePath;
+    Settings.m_ModelRotation.x = model.RotationX.value_or(Def.m_ModelRotation.x);
+    Settings.m_ModelRotation.y = model.RotationY.value_or(Def.m_ModelRotation.y);
+    Settings.m_ModelRotation.z = model.RotationZ.value_or(Def.m_ModelRotation.z);
+    Settings.m_ModelTranslation.x = model.PositionX.value_or(Def.m_ModelTranslation.x);
+    Settings.m_ModelTranslation.y = model.PositionY.value_or(Def.m_ModelTranslation.y);
+    Settings.m_ModelTranslation.z = model.PositionZ.value_or(Def.m_ModelTranslation.z);
+    Settings.m_ModelScale = model.Scale.value_or(Def.m_ModelScale);
 }
 
 
@@ -172,84 +172,84 @@ void Application::RunPerformanceTests()
     STATS_DUMP = false;
 
     std::thread([this]
-    {
-        auto max = 4 * 16 * 16;
-        auto it = 0;
-
-        for (auto& multi_tc : m_SelectedMultiTC)
         {
-            if (!multi_tc.second)
-                continue;
-            for (auto& compressed : m_SelectedCompressed)
+            auto max = 4 * 16 * 16;
+            auto it = 0;
+
+            for (auto& multi_tc : m_SelectedMultiTC)
             {
-                if (!compressed.second)
+                if (!multi_tc.second)
                     continue;
-                for (auto& tile_size : m_SelectedTileModes)
+                for (auto& compressed : m_SelectedCompressed)
                 {
-                    if (!tile_size.second)
+                    if (!compressed.second)
                         continue;
-                    for (auto& fragment_shader : m_SelectedFragmentShader)
+                    for (auto& tile_size : m_SelectedTileModes)
                     {
-                        if (!fragment_shader.second)
+                        if (!tile_size.second)
                             continue;
-                        for (auto& raster : m_SelectedRasterModes)
+                        for (auto& fragment_shader : m_SelectedFragmentShader)
                         {
-                            if (!raster.second)
+                            if (!fragment_shader.second)
                                 continue;
-                            m_DrawSettings.m_MathType = raster.first;
-                            m_DrawSettings.m_TileMode = tile_size.first;
-                            for (auto& model_type : m_SelectedModels)
+                            for (auto& raster : m_SelectedRasterModes)
                             {
-                                if (!model_type.second)
+                                if (!raster.second)
                                     continue;
-
-                                THREADS = 1;
-
-                                while (THREADS <= 16)
+                                m_DrawSettings.m_MathType = raster.first;
+                                m_DrawSettings.m_TileMode = tile_size.first;
+                                for (auto& model_type : m_SelectedModels)
                                 {
-                                    auto start = miliseconds_from_app_start();
+                                    if (!model_type.second)
+                                        continue;
 
-                                    dispath([this, model_type, fragment_shader, compressed, multi_tc]
-                                        {
-                                            auto time = miliseconds_from_app_start();
-                                            LoadPredefined(m_ModelPaths, m_DrawSettings, model_type.first);
-                                            g_TrivialFS = !fragment_shader.first;
-                                            g_CompressedPartialTile = compressed.first;
-                                            g_MultithreadedTransformAndClip = multi_tc.first;
-                                            auto load_time = miliseconds_from_app_start() - time;
-                                            if (load_time > 5)
-                                                printf("model load done in %u ms\n", load_time);
-                                            s_syncBarrier.arrive_and_wait();
-                                        });
+                                    THREADS = 1;
 
-                                    s_syncBarrier.arrive_and_wait();
+                                    while (THREADS <= 16)
+                                    {
+                                        auto start = miliseconds_from_app_start();
 
-                                    int frames = wait_for_stats();
+                                        dispath([this, model_type, fragment_shader, compressed, multi_tc]
+                                            {
+                                                auto time = miliseconds_from_app_start();
+                                                LoadPredefined(m_ModelPaths, m_DrawSettings, model_type.first);
+                                                g_TrivialFS = !fragment_shader.first;
+                                                g_CompressedPartialTile = compressed.first;
+                                                g_MultithreadedTransformAndClip = multi_tc.first;
+                                                auto load_time = miliseconds_from_app_start() - time;
+                                                if (load_time > 5)
+                                                    printf("model load done in %u ms\n", load_time);
+                                                s_syncBarrier.arrive_and_wait();
+                                            });
 
-                                    dispath([this, frames]
-                                        {
-                                            auto renderer = m_Contexts[m_DrawSettings.m_RendererType].m_pRenderer;
-                                            SaveStatsToFile(renderer->GetPixelsDrawn(), frames);
-                                            s_syncBarrier.arrive_and_wait();
-                                            THREADS++;
-                                        });
+                                        s_syncBarrier.arrive_and_wait();
 
-                                    s_syncBarrier.arrive_and_wait();
+                                        int frames = wait_for_stats();
 
-                                    auto elapsed = miliseconds_from_app_start() - start;
-                                    printf("time elapsed: %u ms, %%\n\n",
-                                        elapsed, THREADS.load());
+                                        dispath([this, frames]
+                                            {
+                                                auto renderer = m_Contexts[m_DrawSettings.m_RendererType].m_pRenderer;
+                                                SaveStatsToFile(renderer->GetPixelsDrawn(), frames);
+                                                s_syncBarrier.arrive_and_wait();
+                                                THREADS++;
+                                            });
 
-                                    it++;
+                                        s_syncBarrier.arrive_and_wait();
+
+                                        auto elapsed = miliseconds_from_app_start() - start;
+                                        printf("time elapsed: %u ms, %%\n\n",
+                                            elapsed, THREADS.load());
+
+                                        it++;
+                                    }
                                 }
-                            }
 
+                            }
                         }
                     }
                 }
             }
-        }
-    }).detach();
+        }).detach();
 }
 
 vector<Model> Application::LoadFromScene(const aiScene* pScene)
@@ -265,7 +265,7 @@ vector<Model> Application::LoadFromScene(const aiScene* pScene)
 
     for (int i = 0; i < pScene->mNumMeshes; ++i)
     {
-        if ((pScene->mMeshes[i]->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)!=aiPrimitiveType_TRIANGLE)
+        if ((pScene->mMeshes[i]->mPrimitiveTypes & aiPrimitiveType_TRIANGLE) != aiPrimitiveType_TRIANGLE)
         {
             // skip non-triangle meshes
             continue;
@@ -275,7 +275,7 @@ vector<Model> Application::LoadFromScene(const aiScene* pScene)
 
     if (totalTriangles > MAX_MODEL_TRIANGLES)
     {
-        printf("Total triangles count %d exceeds max allowed number of triangles %d\n" , totalTriangles , MAX_MODEL_TRIANGLES );
+        printf("Total triangles count %d exceeds max allowed number of triangles %d\n", totalTriangles, MAX_MODEL_TRIANGLES);
         return vector<Model>();
     }
 
@@ -288,7 +288,7 @@ vector<Model> Application::LoadFromScene(const aiScene* pScene)
         Model& model = result.back();
 
         auto mesh = pScene->mMeshes[i];
-        if ((mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)!=aiPrimitiveType_TRIANGLE)
+        if ((mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE) != aiPrimitiveType_TRIANGLE)
         {
             // skip non-triangle meshes
             continue;
@@ -435,14 +435,14 @@ void Application::OpenSceneDataDialog(MyModelPaths& selectedPaths)
     ImGui::Begin("Settings");
 
     OpenDialog("Choose Model", MODEL_FORMATS, [&selectedPaths]
-    {
-        selectedPaths.m_ModelPath = ImGuiFileDialog::Instance()->GetFilePathName();
-    });
+        {
+            selectedPaths.m_ModelPath = ImGuiFileDialog::Instance()->GetFilePathName();
+        });
 
     ImGui::SameLine(); OpenDialog("Choose Model Texture", TEXTURE_FORMATS, [&selectedPaths]
-    {
-        selectedPaths.m_TexturePath = ImGuiFileDialog::Instance()->GetFilePathName();
-    });
+        {
+            selectedPaths.m_TexturePath = ImGuiFileDialog::Instance()->GetFilePathName();
+        });
 
 
     ImGui::End();
@@ -491,9 +491,9 @@ bool Application::Initialize()
     m_ScreenSprite.setTextureRect(sf::IntRect(0, SCREEN_HEIGHT, SCREEN_WIDTH, -SCREEN_HEIGHT));
 
     // set initial matrices
-    m_CameraMatrix      = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 0), Vector3f(0, 1, 0));
-    m_ProjectionMatrix  = Matrix4f::CreateProjectionMatrix(60, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.8f, 40.0f);
-    m_ModelMatrix       = Matrix4f::Identity();
+    m_CameraMatrix = Matrix4f::CreateLookAtMatrix(Vector3f(0, 0, -10), Vector3f(0, 0, 0), Vector3f(0, 1, 0));
+    m_ProjectionMatrix = Matrix4f::CreateProjectionMatrix(60, (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.8f, 40.0f);
+    m_ModelMatrix = Matrix4f::Identity();
 
     m_LastFrameTime = std::chrono::high_resolution_clock::now();
 
@@ -507,7 +507,7 @@ bool Application::Initialize()
 
     m_SelectedModels[0] = { 0 , true };
     for (int i = 1; i < m_SelectedModels.size(); ++i)
-        m_SelectedModels[(i%4)*4 + i/4] = { i , false };
+        m_SelectedModels[(i % 4) * 4 + i / 4] = { i , false };
 
     m_SelectedRasterModes[0] = { 0 , true };
     for (int i = 1; i < m_SelectedRasterModes.size(); ++i)
@@ -539,12 +539,12 @@ int Application::Run()
         static Frustum FromMatrix(const Matrix4f& m)
         {
             Frustum F;
-            m.GetFrustumNearPlane   ( F.m_Planes[0] );
-            m.GetFrustumFarPlane    ( F.m_Planes[1] );
-            m.GetFrustumLeftPlane   ( F.m_Planes[2] );
-            m.GetFrustumRightPlane  ( F.m_Planes[3] );
-            m.GetFrustumTopPlane    ( F.m_Planes[4] );
-            m.GetFrustumBottomPlane ( F.m_Planes[5] );
+            m.GetFrustumNearPlane(F.m_Planes[0]);
+            m.GetFrustumFarPlane(F.m_Planes[1]);
+            m.GetFrustumLeftPlane(F.m_Planes[2]);
+            m.GetFrustumRightPlane(F.m_Planes[3]);
+            m.GetFrustumTopPlane(F.m_Planes[4]);
+            m.GetFrustumBottomPlane(F.m_Planes[5]);
             return F;
         }
         bool IsInside(const Model& model) const
@@ -560,14 +560,14 @@ int Application::Run()
             Points[7] = Vector3f(model.m_Max.x, model.m_Max.y, model.m_Max.z);
 
             auto AllPointsInFront = [&Points](const Plane& plane)
-            {
-                for (auto& point : Points)
                 {
-                    if (plane.GetSide(point) != Plane::eSide::Front)
-                        return false;
-                }
-                return true;
-            };
+                    for (auto& point : Points)
+                    {
+                        if (plane.GetSide(point) != Plane::eSide::Front)
+                            return false;
+                    }
+                    return true;
+                };
 
             for (auto& plane : m_Planes)
             {
@@ -596,7 +596,7 @@ int Application::Run()
         FRAMES_RENDERED++;
         m_LastFrameTime = now;
 
-        auto renderer     = m_Contexts[m_DrawSettings.m_RendererType].m_pRenderer;
+        auto renderer = m_Contexts[m_DrawSettings.m_RendererType].m_pRenderer;
         auto modelTexture = m_Contexts[m_DrawSettings.m_RendererType].m_pModelTexture;
 
         // check all the window's events that were triggered since the last iteration of the loop
@@ -615,7 +615,7 @@ int Application::Run()
                 {
                     // space pressed
                     if (event.key.code == sf::Keyboard::Space)
-                        m_DrawSettings.m_RendererType = (m_DrawSettings.m_RendererType+1)%2;
+                        m_DrawSettings.m_RendererType = (m_DrawSettings.m_RendererType + 1) % 2;
                 }
             }
         }
@@ -627,7 +627,7 @@ int Application::Run()
         {
             m_ModelsData = LoadModelVertices(m_ModelPaths.m_ModelPath.c_str());
             m_LastModelPaths.m_ModelPath = m_ModelPaths.m_ModelPath;
-            if( m_LastModelPaths.m_TexturePath == m_ModelPaths.m_TexturePath)
+            if (m_LastModelPaths.m_TexturePath == m_ModelPaths.m_TexturePath)
                 m_ModelPaths.m_TexturePath = "";
         }
 
@@ -638,7 +638,7 @@ int Application::Run()
             m_LastModelPaths.m_TexturePath = m_ModelPaths.m_TexturePath;
         }
 
-        m_ModelMatrix = Matrix4f::Rotation(m_DrawSettings.m_ModelRotation / 180.f * PI ) * Matrix4f::Scale(Vector3f(m_DrawSettings.m_ModelScale, m_DrawSettings.m_ModelScale, m_DrawSettings.m_ModelScale)) * Matrix4f::Translation(m_DrawSettings.m_ModelTranslation);
+        m_ModelMatrix = Matrix4f::Rotation(m_DrawSettings.m_ModelRotation / 180.f * PI) * Matrix4f::Scale(Vector3f(m_DrawSettings.m_ModelScale, m_DrawSettings.m_ModelScale, m_DrawSettings.m_ModelScale)) * Matrix4f::Translation(m_DrawSettings.m_ModelTranslation);
 
         renderer->SetTexture(modelTexture);
         renderer->SetModelMatrix(m_ModelMatrix);
@@ -660,9 +660,9 @@ int Application::Run()
         ImGui::SliderFloat("Ambient Strength", &m_DrawSettings.m_AmbientStrength, 0, 1);
         ImGui::SliderFloat("Diffuse Strength", &m_DrawSettings.m_DiffuseStrength, 0, 1);
         ImGui::SliderFloat("Specular Strength", &m_DrawSettings.m_SpecularStrength, 0, 1);
-        ImGui::SliderFloat("Shininess Power", &m_DrawSettings.m_ShininessPower, 1.f , 10.0f );
-        ImGui::SliderFloat3("Rotation", &m_DrawSettings.m_ModelRotation.x , 0, FULL_ANGLE);
-        ImGui::SliderFloat3("Translation", &m_DrawSettings.m_ModelTranslation.x , -12, 12);
+        ImGui::SliderFloat("Shininess Power", &m_DrawSettings.m_ShininessPower, 1.f, 10.0f);
+        ImGui::SliderFloat3("Rotation", &m_DrawSettings.m_ModelRotation.x, 0, FULL_ANGLE);
+        ImGui::SliderFloat3("Translation", &m_DrawSettings.m_ModelTranslation.x, -12, 12);
         ImGui::SliderFloat("Scale", &m_DrawSettings.m_ModelScale, 0, 16);
         ImGui::SliderFloat3("Light Position", &m_DrawSettings.m_LightPosition.x, -20, 20);
 
@@ -675,15 +675,15 @@ int Application::Run()
 
         ImGui::Checkbox("Wireframe", &m_DrawSettings.m_DrawWireframe);
         ImGui::SameLine(); ImGui::Checkbox("BBoxes", &m_DrawSettings.m_DrawBBoxes);
-        ImGui::SameLine(); ImGui::Checkbox("Show Tiles Grid" , &g_showTilesGrid);
-        ImGui::SameLine(); ImGui::Checkbox( "Visualize ZBuffer", &m_DrawSettings.m_RenderDepthBuffer);
+        ImGui::SameLine(); ImGui::Checkbox("Show Tiles Grid", &g_showTilesGrid);
+        ImGui::SameLine(); ImGui::Checkbox("Visualize ZBuffer", &m_DrawSettings.m_RenderDepthBuffer);
 
         //ImGui::SameLine(); ImGui::Checkbox("Alpha Blend" , &m_DrawSettings.m_AlphaBlend);
 
         ImGui::Checkbox("Trivial FS", &g_TrivialFS);
         ImGui::SameLine(); ImGui::Checkbox("Colorize Threads", &m_DrawSettings.m_ColorizeThreads);
         ImGui::SameLine(); ImGui::Checkbox("Threaded T&C", &g_MultithreadedTransformAndClip);
-        ImGui::SameLine(); ImGui::Checkbox( "Vertical Sync", &m_DrawSettings.m_VSync);
+        ImGui::SameLine(); ImGui::Checkbox("Vertical Sync", &m_DrawSettings.m_VSync);
 
         ImGui::Checkbox("Compressed Partial Tile", &g_CompressedPartialTile);
         ImGui::SameLine(); ImGui::Checkbox("Use ZBuffer", &m_DrawSettings.m_UseZBuffer);
@@ -691,25 +691,25 @@ int Application::Run()
 
         //ImGui::SameLine(); ImGui::Checkbox("Backface Culling", &m_DrawSettings.m_BackfaceCulling);
 
-        if( ImGui::Button("0A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 0); ImGui::SameLine();
-        if( ImGui::Button("1A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 1); ImGui::SameLine();
-        if( ImGui::Button("2A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 2); ImGui::SameLine();
-        if( ImGui::Button("3A") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 3);
+        if (ImGui::Button("0A")) LoadPredefined(m_ModelPaths, m_DrawSettings, 0); ImGui::SameLine();
+        if (ImGui::Button("1A")) LoadPredefined(m_ModelPaths, m_DrawSettings, 1); ImGui::SameLine();
+        if (ImGui::Button("2A")) LoadPredefined(m_ModelPaths, m_DrawSettings, 2); ImGui::SameLine();
+        if (ImGui::Button("3A")) LoadPredefined(m_ModelPaths, m_DrawSettings, 3);
 
-        if( ImGui::Button("0B") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 4); ImGui::SameLine();
-        if( ImGui::Button("1B") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 5); ImGui::SameLine();
-        if( ImGui::Button("2B") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 6); ImGui::SameLine();
-        if( ImGui::Button("3B") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 7);
+        if (ImGui::Button("0B")) LoadPredefined(m_ModelPaths, m_DrawSettings, 4); ImGui::SameLine();
+        if (ImGui::Button("1B")) LoadPredefined(m_ModelPaths, m_DrawSettings, 5); ImGui::SameLine();
+        if (ImGui::Button("2B")) LoadPredefined(m_ModelPaths, m_DrawSettings, 6); ImGui::SameLine();
+        if (ImGui::Button("3B")) LoadPredefined(m_ModelPaths, m_DrawSettings, 7);
 
-        if( ImGui::Button("0C") ) LoadPredefined(m_ModelPaths , m_DrawSettings ,  8); ImGui::SameLine();
-        if( ImGui::Button("1C") ) LoadPredefined(m_ModelPaths , m_DrawSettings ,  9); ImGui::SameLine();
-        if( ImGui::Button("2C") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 10); ImGui::SameLine();
-        if( ImGui::Button("3C") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 11);
+        if (ImGui::Button("0C")) LoadPredefined(m_ModelPaths, m_DrawSettings, 8); ImGui::SameLine();
+        if (ImGui::Button("1C")) LoadPredefined(m_ModelPaths, m_DrawSettings, 9); ImGui::SameLine();
+        if (ImGui::Button("2C")) LoadPredefined(m_ModelPaths, m_DrawSettings, 10); ImGui::SameLine();
+        if (ImGui::Button("3C")) LoadPredefined(m_ModelPaths, m_DrawSettings, 11);
 
-        if( ImGui::Button("0D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 12); ImGui::SameLine();
-        if( ImGui::Button("1D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 13); ImGui::SameLine();
-        if( ImGui::Button("2D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 14); ImGui::SameLine();
-        if( ImGui::Button("3D") ) LoadPredefined(m_ModelPaths , m_DrawSettings , 15);
+        if (ImGui::Button("0D")) LoadPredefined(m_ModelPaths, m_DrawSettings, 12); ImGui::SameLine();
+        if (ImGui::Button("1D")) LoadPredefined(m_ModelPaths, m_DrawSettings, 13); ImGui::SameLine();
+        if (ImGui::Button("2D")) LoadPredefined(m_ModelPaths, m_DrawSettings, 14); ImGui::SameLine();
+        if (ImGui::Button("3D")) LoadPredefined(m_ModelPaths, m_DrawSettings, 15);
 
         if (ImGui::Button("Stats panel"))
         {
@@ -731,7 +731,7 @@ int Application::Run()
 
         ImGui::End();
 
-        if (m_VSync!=m_DrawSettings.m_VSync)
+        if (m_VSync != m_DrawSettings.m_VSync)
         {
             m_VSync = m_DrawSettings.m_VSync;
             m_MainWindow.setFramerateLimit(m_VSync ? 60 : 0);
@@ -745,14 +745,14 @@ int Application::Run()
         renderer->SetDiffuseStrength(m_DrawSettings.m_DiffuseStrength);
         renderer->SetAmbientStrength(m_DrawSettings.m_AmbientStrength);
         renderer->SetSpecularStrength(m_DrawSettings.m_SpecularStrength);
-        renderer->SetShininess( pow(2.0f,m_DrawSettings.m_ShininessPower) );
+        renderer->SetShininess(pow(2.0f, m_DrawSettings.m_ShininessPower));
         renderer->SetThreadsCount(m_DrawSettings.m_ThreadsCount);
         renderer->SetDrawWireframe(m_DrawSettings.m_DrawWireframe);
         renderer->SetColorizeThreads(m_DrawSettings.m_ColorizeThreads);
         renderer->SetDrawBBoxes(m_DrawSettings.m_DrawBBoxes);
         renderer->SetZTest(m_DrawSettings.m_UseZBuffer);
         renderer->SetZWrite(m_DrawSettings.m_UseZBuffer);
-        renderer->SetClearColor(Vector4f{m_DrawSettings.m_BackgroundColor,1});
+        renderer->SetClearColor(Vector4f{ m_DrawSettings.m_BackgroundColor,1 });
         renderer->SetAlphaBlending(m_DrawSettings.m_AlphaBlend);
         renderer->SetBackfaceCulling(m_DrawSettings.m_BackfaceCulling);
         renderer->ClearZBuffer();
@@ -777,7 +777,7 @@ int Application::Run()
         }
 
         // for software renderer render screen buffer to window (hardware renderer renders directly to window and calling GetScreenBuffer on it returns empty buffer)
-        if (auto& buf = renderer->GetScreenBuffer() ; buf.size())
+        if (auto& buf = renderer->GetScreenBuffer(); buf.size())
         {
             {
                 ZoneScopedN("Update screen texture");
@@ -801,12 +801,12 @@ int Application::Run()
         ImGui::Begin("FPS", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::SetWindowPos(ImVec2(0, 0));
         ImGui::Text("FPS: %d", fps);
-        ImGui::Text("%s %s (%s)" ,CMAKE_BUILD_NAME, sizeof(void*) == 8 ? "x64" : "x86", COMPILER_NAME);
-        ImGui::Text("Mem : %u KB" , uint32_t(g_memory_resource_mem.load()/1024) );
-        ImGui::Text("m_Max Overdraw: %d" , g_max_overdraw.load() );
+        ImGui::Text("%s %s (%s)", CMAKE_BUILD_NAME, sizeof(void*) == 8 ? "x64" : "x86", COMPILER_NAME);
+        ImGui::Text("Mem : %u KB", uint32_t(g_memory_resource_mem.load() / 1024));
+        ImGui::Text("m_Max Overdraw: %d", g_max_overdraw.load());
         ImGui::End();
 
-        DrawRenderingStats( renderer->GetPixelsDrawn() );
+        DrawRenderingStats(renderer->GetPixelsDrawn());
 
         OpenSceneDataDialog(m_ModelPaths);
 
@@ -832,7 +832,7 @@ int Application::Run()
 }
 
 template<typename T>
-void SelectCheckboxOptions(span<pair<T,bool>> values, span<const string_view> labels)
+void SelectCheckboxOptions(span<pair<T, bool>> values, span<const string_view> labels)
 {
     for (int i = 0; i < values.size(); ++i)
     {
@@ -872,44 +872,44 @@ void Application::SetupPerformanceTests()
     }
 }
 
-void Application::DrawRenderingStats( int pixels )
+void Application::DrawRenderingStats(int pixels)
 {
-    if( !ImGui::Begin( "Stats" ) )
+    if (!ImGui::Begin("Stats"))
     {
         ImGui::End();
         return;
     }
 
-    auto& avg   = DrawStatsSystem::GetAvg();
-    auto& min   = DrawStatsSystem::GetMin();
-    auto& max   = DrawStatsSystem::GetMax();
-    auto& med   = DrawStatsSystem::GetMed();
-    auto& std   = DrawStatsSystem::GetStd();
+    auto& avg = DrawStatsSystem::GetAvg();
+    auto& min = DrawStatsSystem::GetMin();
+    auto& max = DrawStatsSystem::GetMax();
+    auto& med = DrawStatsSystem::GetMed();
+    auto& std = DrawStatsSystem::GetStd();
 
     auto ScreenPixels = SCREEN_WIDTH * SCREEN_HEIGHT;
 
-    ImVec4 Col1{1.0f,1.0f,1.0f,1.0f};
-    ImVec4 Col2{0.4f,0.8f,0.9f,1.0f};
+    ImVec4 Col1{ 1.0f,1.0f,1.0f,1.0f };
+    ImVec4 Col2{ 0.4f,0.8f,0.9f,1.0f };
 
-    ImGui::TextColored( Col1 , " __________________________________________________________________________________________________________" );
-    ImGui::TextColored( Col1 , "|                               |      AVG     |      MIN     |      MAX     |    MEDIAN    |    STD DEV   |" );
-    ImGui::TextColored( Col1 , "|-------------------------------|--------------|--------------|--------------|--------------|--------------|" );
-    ImGui::TextColored( Col1 , "| FPS                           | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FPS)                       , int(min.m_FPS)                    , int(max.m_FPS)                    , int(med.m_FPS)                    , int(std.m_FPS)                    );
-    ImGui::TextColored( Col2 , "| Triangles analyzed per frame  | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTriangles)            , int(min.m_FrameTriangles)         , int(max.m_FrameTriangles)         , int(med.m_FrameTriangles)         , int(std.m_FrameTriangles)         );
-    ImGui::TextColored( Col1 , "| Triangles drawn per frame     | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTrianglesDrawn)       , int(min.m_FrameTrianglesDrawn)    , int(max.m_FrameTrianglesDrawn)    , int(med.m_FrameTrianglesDrawn)    , int(std.m_FrameTrianglesDrawn)    );
-    ImGui::TextColored( Col2 , "| Pixels analyzed  per frame    | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixels)               , int(min.m_FramePixels)            , int(max.m_FramePixels)            , int(med.m_FramePixels)            , int(std.m_FramePixels)            );
-    ImGui::TextColored( Col1 , "| Pixels drawn per frame        | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixelsDrawn)          , int(min.m_FramePixelsDrawn)       , int(max.m_FramePixelsDrawn)       , int(med.m_FramePixelsDrawn)       , int(std.m_FramePixelsDrawn)       );
-    ImGui::TextColored( Col2 , "| Pixels calculated per frame   | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixelsCalcualted)     , int(min.m_FramePixelsCalcualted)  , int(max.m_FramePixelsCalcualted)  , int(med.m_FramePixelsCalcualted)  , int(std.m_FramePixelsCalcualted)  );
-    ImGui::TextColored( Col1 , "| Avg Draws per tile            | %12f | %12f | %12f | %12f | %12f |", (avg.m_FrameDrawsPerTile)*0.01f      , (min.m_FrameDrawsPerTile)*0.01f   , (max.m_FrameDrawsPerTile)*0.01f   , (med.m_FrameDrawsPerTile)*0.01f   , (std.m_FrameDrawsPerTile)*0.01f   );
-    ImGui::TextColored( Col2 , "| Frame draw time (US)          | %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimeUS)                , int(min.m_DrawTimeUS)             , int(max.m_DrawTimeUS )            , int(med.m_DrawTimeUS)             , int(std.m_DrawTimeUS)             );
-    ImGui::TextColored( Col1 , "| Frame draw time per thread(US)| %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimePerThreadUS)       , int(min.m_DrawTimePerThreadUS)    , int(max.m_DrawTimePerThreadUS)    , int(med.m_DrawTimePerThreadUS)    , int(std.m_DrawTimePerThreadUS)    );
-    ImGui::TextColored( Col2 , "| Transform Time (US)           | %12d | %12d | %12d | %12d | %12d |", int(avg.m_TransformTimeUS)           , int(min.m_TransformTimeUS)        , int(max.m_TransformTimeUS )       , int(med.m_TransformTimeUS)        , int(std.m_TransformTimeUS)        );
-    ImGui::TextColored( Col1 , "| Transform Time per thread(US) | %12d | %12d | %12d | %12d | %12d |", int(avg.m_TransformTimePerThreadUS)  , int(min.m_TransformTimePerThreadUS),int(max.m_TransformTimePerThreadUS),int(med.m_TransformTimePerThreadUS),int(std.m_TransformTimePerThreadUS));
-    ImGui::TextColored( Col2 , "| Raster time (US)              | %12d | %12d | %12d | %12d | %12d |", int(avg.m_RasterTimeUS)              , int(min.m_RasterTimeUS)           , int(max.m_RasterTimeUS)           , int(med.m_RasterTimeUS)           , int(std.m_RasterTimeUS)           );
-    ImGui::TextColored( Col1 , "| Raster time per thread(US)    | %12d | %12d | %12d | %12d | %12d |", int(avg.m_RasterTimePerThreadUS)     , int(min.m_RasterTimePerThreadUS)  , int(max.m_RasterTimePerThreadUS)  , int(med.m_RasterTimePerThreadUS)  , int(std.m_RasterTimePerThreadUS)  );
-    ImGui::TextColored( Col2 , "| Fillrate (Kilo pixels/s)      | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FillrateKP)                , int(min.m_FillrateKP)             , int(max.m_FillrateKP)             , int(med.m_FillrateKP)             , int(std.m_FillrateKP)             );
-    ImGui::TextColored( Col1 , "|_______________________________|______________|______________|______________|______________|______________|" );
-    ImGui::TextColored( Col1 , " Screen coverage %u%% (%u pixels / %u pixels)", pixels*100/ScreenPixels, pixels, ScreenPixels);
+    ImGui::TextColored(Col1, " __________________________________________________________________________________________________________");
+    ImGui::TextColored(Col1, "|                               |      AVG     |      MIN     |      MAX     |    MEDIAN    |    STD DEV   |");
+    ImGui::TextColored(Col1, "|-------------------------------|--------------|--------------|--------------|--------------|--------------|");
+    ImGui::TextColored(Col1, "| FPS                           | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FPS), int(min.m_FPS), int(max.m_FPS), int(med.m_FPS), int(std.m_FPS));
+    ImGui::TextColored(Col2, "| Triangles analyzed per frame  | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTriangles), int(min.m_FrameTriangles), int(max.m_FrameTriangles), int(med.m_FrameTriangles), int(std.m_FrameTriangles));
+    ImGui::TextColored(Col1, "| Triangles drawn per frame     | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FrameTrianglesDrawn), int(min.m_FrameTrianglesDrawn), int(max.m_FrameTrianglesDrawn), int(med.m_FrameTrianglesDrawn), int(std.m_FrameTrianglesDrawn));
+    ImGui::TextColored(Col2, "| Pixels analyzed  per frame    | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixels), int(min.m_FramePixels), int(max.m_FramePixels), int(med.m_FramePixels), int(std.m_FramePixels));
+    ImGui::TextColored(Col1, "| Pixels drawn per frame        | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixelsDrawn), int(min.m_FramePixelsDrawn), int(max.m_FramePixelsDrawn), int(med.m_FramePixelsDrawn), int(std.m_FramePixelsDrawn));
+    ImGui::TextColored(Col2, "| Pixels calculated per frame   | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FramePixelsCalcualted), int(min.m_FramePixelsCalcualted), int(max.m_FramePixelsCalcualted), int(med.m_FramePixelsCalcualted), int(std.m_FramePixelsCalcualted));
+    ImGui::TextColored(Col1, "| Avg Draws per tile            | %12f | %12f | %12f | %12f | %12f |", (avg.m_FrameDrawsPerTile) * 0.01f, (min.m_FrameDrawsPerTile) * 0.01f, (max.m_FrameDrawsPerTile) * 0.01f, (med.m_FrameDrawsPerTile) * 0.01f, (std.m_FrameDrawsPerTile) * 0.01f);
+    ImGui::TextColored(Col2, "| Frame draw time (US)          | %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimeUS), int(min.m_DrawTimeUS), int(max.m_DrawTimeUS), int(med.m_DrawTimeUS), int(std.m_DrawTimeUS));
+    ImGui::TextColored(Col1, "| Frame draw time per thread(US)| %12d | %12d | %12d | %12d | %12d |", int(avg.m_DrawTimePerThreadUS), int(min.m_DrawTimePerThreadUS), int(max.m_DrawTimePerThreadUS), int(med.m_DrawTimePerThreadUS), int(std.m_DrawTimePerThreadUS));
+    ImGui::TextColored(Col2, "| Transform Time (US)           | %12d | %12d | %12d | %12d | %12d |", int(avg.m_TransformTimeUS), int(min.m_TransformTimeUS), int(max.m_TransformTimeUS), int(med.m_TransformTimeUS), int(std.m_TransformTimeUS));
+    ImGui::TextColored(Col1, "| Transform Time per thread(US) | %12d | %12d | %12d | %12d | %12d |", int(avg.m_TransformTimePerThreadUS), int(min.m_TransformTimePerThreadUS), int(max.m_TransformTimePerThreadUS), int(med.m_TransformTimePerThreadUS), int(std.m_TransformTimePerThreadUS));
+    ImGui::TextColored(Col2, "| Raster time (US)              | %12d | %12d | %12d | %12d | %12d |", int(avg.m_RasterTimeUS), int(min.m_RasterTimeUS), int(max.m_RasterTimeUS), int(med.m_RasterTimeUS), int(std.m_RasterTimeUS));
+    ImGui::TextColored(Col1, "| Raster time per thread(US)    | %12d | %12d | %12d | %12d | %12d |", int(avg.m_RasterTimePerThreadUS), int(min.m_RasterTimePerThreadUS), int(max.m_RasterTimePerThreadUS), int(med.m_RasterTimePerThreadUS), int(std.m_RasterTimePerThreadUS));
+    ImGui::TextColored(Col2, "| Fillrate (Kilo pixels/s)      | %12d | %12d | %12d | %12d | %12d |", int(avg.m_FillrateKP), int(min.m_FillrateKP), int(max.m_FillrateKP), int(med.m_FillrateKP), int(std.m_FillrateKP));
+    ImGui::TextColored(Col1, "|_______________________________|______________|______________|______________|______________|______________|");
+    ImGui::TextColored(Col1, " Screen coverage %u%% (%u pixels / %u pixels)", pixels * 100 / ScreenPixels, pixels, ScreenPixels);
     ImGui::End();
 }
 

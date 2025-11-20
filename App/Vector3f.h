@@ -11,75 +11,76 @@
 
 class Matrix4f;
 
-inline void FastNormalize3( const float lpInput[3], float lpOutput[3])
+inline void FastNormalize3(const float lpInput[3], float lpOutput[3])
 {
-    __m128 vInputA = _mm_load_ss(lpInput+0); // load input vector (x, y, z, a)
-    __m128 vInputB = _mm_load_ss(lpInput+1); // load input vector (x, y, z, a)
-    __m128 vInputC = _mm_load_ss(lpInput+2); // load input vector (x, y, z, a)
+    __m128 vInputA = _mm_load_ss(lpInput + 0); // load input vector (x, y, z, a)
+    __m128 vInputB = _mm_load_ss(lpInput + 1); // load input vector (x, y, z, a)
+    __m128 vInputC = _mm_load_ss(lpInput + 2); // load input vector (x, y, z, a)
 
-    __m128 vInputSqA = _mm_mul_ss(vInputA,vInputA); // square the input values
-    __m128 vInputSqB = _mm_mul_ss(vInputB,vInputB); // square the input values
-    __m128 vInputSqC = _mm_mul_ss(vInputC,vInputC); // square the input values
+    __m128 vInputSqA = _mm_mul_ss(vInputA, vInputA); // square the input values
+    __m128 vInputSqB = _mm_mul_ss(vInputB, vInputB); // square the input values
+    __m128 vInputSqC = _mm_mul_ss(vInputC, vInputC); // square the input values
 
     vInputSqA = _mm_add_ss(vInputSqA, vInputSqB);
     vInputSqA = _mm_add_ss(vInputSqA, vInputSqC);
 
     vInputSqA = _mm_rsqrt_ss(vInputSqA); // compute the inverse sqrt
 
-    _mm_store_ss( lpOutput+0 , _mm_mul_ss(vInputSqA, vInputA) );
-    _mm_store_ss( lpOutput+1 , _mm_mul_ss(vInputSqA, vInputB) );
-    _mm_store_ss( lpOutput+2 , _mm_mul_ss(vInputSqA, vInputC) );
+    _mm_store_ss(lpOutput + 0, _mm_mul_ss(vInputSqA, vInputA));
+    _mm_store_ss(lpOutput + 1, _mm_mul_ss(vInputSqA, vInputB));
+    _mm_store_ss(lpOutput + 2, _mm_mul_ss(vInputSqA, vInputC));
 }
 
 template<typename T>
 class Vector3;
 
-inline void FastNormalize( Vector3<float>& v );
+inline void FastNormalize(Vector3<float>& v);
 
 template<typename T>
 class Vector3
 {
 public:
-    Vector3()=default;
+    Vector3() = default;
     Vector3(T x, T y, T z);
 
-    template< typename U , typename ... A >
-        requires HasConstructFrom<T,U,A...>
-    Vector3( const U& Array , const A& ... args )
-        : x{ Array[ 0 ] , args... }
-        , y{ Array[ 1 ] , args... }
-        , z{ Array[ 2 ] , args... }
-    {}
+    template< typename U, typename ... A >
+        requires HasConstructFrom<T, U, A...>
+    Vector3(const U& Array, const A& ... args)
+        : x{ Array[0] , args... }
+        , y{ Array[1] , args... }
+        , z{ Array[2] , args... }
+    {
+    }
 
     template< typename T2, eRoundMode RM = eRoundMode::Floor>
     constexpr Vector3<T2> ToVector3()const
     {
-        if constexpr(!std::is_floating_point_v<T2>)
-            return Vector3<T2>( static_cast<T2>(x), static_cast<T2>(y), static_cast<T2>(z));
-        else if constexpr(RM == eRoundMode::Floor )
-            return Vector3<T2>( static_cast<T2>(x), static_cast<T2>(y), static_cast<T2>(z));
-        else if constexpr(RM == eRoundMode::Round )
-            return Vector3<T2>( round(x), round(y), round(z));
+        if constexpr (!std::is_floating_point_v<T2>)
+            return Vector3<T2>(static_cast<T2>(x), static_cast<T2>(y), static_cast<T2>(z));
+        else if constexpr (RM == eRoundMode::Floor)
+            return Vector3<T2>(static_cast<T2>(x), static_cast<T2>(y), static_cast<T2>(z));
+        else if constexpr (RM == eRoundMode::Round)
+            return Vector3<T2>(round(x), round(y), round(z));
         else
-            return Vector3<T2>( ceil(x), ceil(y), ceil(z));
-    }
-
-    template<typename U , typename ... A>
-        requires HasLoadFrom<T,U,A...>
-    void load(const U& Array , const A& ... args)
-    {
-        x.load( Array[0] , args... );
-        y.load( Array[1] , args... );
-        z.load( Array[2] , args... );
+            return Vector3<T2>(ceil(x), ceil(y), ceil(z));
     }
 
     template<typename U, typename ... A>
-        requires HasStoreTo<T,U,A...>
-    void store(U& Array , const A& ... args)const
+        requires HasLoadFrom<T, U, A...>
+    void load(const U& Array, const A& ... args)
     {
-        x.store( Array[0] , args... );
-        y.store( Array[1] , args... );
-        z.store( Array[2] , args... );
+        x.load(Array[0], args...);
+        y.load(Array[1], args...);
+        z.load(Array[2], args...);
+    }
+
+    template<typename U, typename ... A>
+        requires HasStoreTo<T, U, A...>
+    void store(U& Array, const A& ... args)const
+    {
+        x.store(Array[0], args...);
+        y.store(Array[1], args...);
+        z.store(Array[2], args...);
     }
 
     Vector3 operator+(const Vector3& other)const;
@@ -96,14 +97,14 @@ public:
         return Vector3(v.x * value, v.y * value, v.z * value);
     }
 
-          T* data()       { return &x; }
+    T* data() { return &x; }
     const T* data() const { return &x; }
 
-    template< int xp , int yp , int zp >
+    template< int xp, int yp, int zp >
     Vector3 Swizzle()const
     {
         auto* pData = data();
-        return Vector3( pData[xp], pData[yp], pData[zp] );
+        return Vector3(pData[xp], pData[yp], pData[zp]);
     }
 
     T GetLength()const;
@@ -123,7 +124,7 @@ public:
     inline Vector3& FastNormalize()
     {
         auto sumsq = x * x + y * y + z * z;
-        Math::Rsqrt(sumsq,sumsq);
+        Math::Rsqrt(sumsq, sumsq);
         x *= sumsq;
         y *= sumsq;
         z *= sumsq;
@@ -142,12 +143,12 @@ public:
     T z{};
 };
 
-inline void FastNormalize( Vector3<float>& v )
+inline void FastNormalize(Vector3<float>& v)
 {
     float sumsq = v.x * v.x + v.y * v.y + v.z * v.z;
     auto mm_sum = _mm_set_ss(sumsq); // set the sum of squares to the first element of the vector
     mm_sum = _mm_rsqrt_ss(mm_sum); // compute the inverse sqrt
-    _mm_store_ss( &sumsq, mm_sum); // store the result back to sumsq
+    _mm_store_ss(&sumsq, mm_sum); // store the result back to sumsq
 
     v.x *= sumsq;
     v.y *= sumsq;
@@ -323,7 +324,7 @@ template< eSimdType Type = eSimdType::SSE >
 using Vector3i256 = Vector3< i256<Type> >;
 
 using Vector3f128S = Vector3f128<eSimdType::SSE>;
-using Vector3f128S8= Vector3f256<eSimdType::SSE>;
+using Vector3f128S8 = Vector3f256<eSimdType::SSE>;
 using Vector3f256A = Vector3f256<eSimdType::AVX>;
 using Vector3f256C = Vector3f256<eSimdType::CPU>;
 using Vector3i256A = Vector3i256<eSimdType::AVX>;
