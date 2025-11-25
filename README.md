@@ -1,7 +1,6 @@
 # Software-based 3D Graphics Renderer #
 
-This renderer is based on the rasterization method and offers features such as discarding invisible triangles (frustum culling and back-face culling), a depth buffer (Z-Buffer), perspective-correct texture mapping and basic shading using the Phong method. The application provides the ability to configure certain renderer options, such as the number of utilized threads, lightning, as well as displaying statistics for individual stages of the rendering process. 
-Particular emphasis was placed on the use of SIMD vector instructions, even distribution of work across multiple threads, and tile-based rasterization. The obtained results were evaluated in terms of performance and scalability, confirming that the combination of these techniques significantly improves rendering efficiency.
+Project developed as an engineering thesis and later continued as part of my master's thesis. This renderer is based on a triangle rasterization method and offers features such as discarding invisible triangles, a depth buffer, perspective-correct texture mapping, and Phong shading. The application provides the ability to configure certain renderer options, such as the number of utilized threads, lightning, as well as displaying statistics for individual stages of the rendering process. Particular emphasis was placed on the use of SIMD vector instructions, balanced workload distribution across multiple threads, and tile-based rasterization. The final results were evaluated in terms of performance and scalability, confirming that the combination of these techniques significantly improves rendering efficiency.
 
 ## <b>Overwiev</b>
 
